@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(dotnet:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(ng:*)",
+      "Bash(node:*)",
+      "Bash(node -e:*)",
+      "Bash(cmake:*)",
+      "Bash(docker:*)",
+      "Bash(py -3.11:*)",
+      "Bash(py -3.12:*)",
+      "Bash(py -3.13:*)",
+      "Bash(py -3.14:*)",
+      "Bash(py --list-paths)",
+      "Bash(py -0)",
+      "Bash(python -c:*)",
+      "Bash(python3 -c:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(python -m pip:*)",
+      "Bash(python3 -m pip:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(pip list:*)",
+      "Bash(pip index:*)",
+      "Bash(.venv/Scripts/pytest.exe:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(.venv/Scripts/pip:*)",
+      "Bash(./.venv/Scripts/pytest.exe:*)",
+      "Bash(./.venv/Scripts/python.exe:*)",
+      "Bash(curl -s:*)",
+      "Bash(curl -sI:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist:*)",
+      "Bash(taskkill:*)",
+      "Bash(reg query:*)",
+      "Bash(git check-ignore:*)",
+      "PowerShell(git:*)",
+      "PowerShell(gh:*)",
+      "PowerShell(dotnet:*)",
+      "PowerShell(docker:*)",
+      "PowerShell(cmake:*)",
+      "PowerShell(npm:*)",
+      "PowerShell(npx:*)",
+      "PowerShell(py:*)",
+      "PowerShell(python:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:help.agi.com)",
+      "WebFetch(domain:stk.docs.pyansys.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "Read(//c/Program Files/AGI/**)",
+      "Read(//c/ProgramData/AGI/**)",
+      "Read(//tmp/**)",
+      "Skill(superpowers:test-driven-development)",
+      "Skill(superpowers:test-driven-development:*)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.pfx)",
+      "Read(**/*.key)",
+      "Read(**/id_rsa)",
+      "Read(**/credentials*.json)",
+      "Read(**/secrets*.json)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Edit(**/*.pem)",
+      "Edit(**/*.pfx)",
+      "Edit(**/*.key)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$ErrorActionPreference='SilentlyContinue'; $raw=[Console]::In.ReadToEnd(); try{$j=$raw|ConvertFrom-Json}catch{exit 0}; $f=$j.tool_input.file_path; if(-not $f){$f=$j.tool_response.filePath}; if(-not $f){exit 0}; $e=[IO.Path]::GetExtension($f).ToLower(); function Up($s,$r){$d=Split-Path -Parent $s; while($d){$p=Join-Path $d $r; if(Test-Path $p){return $p}; $q=Split-Path -Parent $d; if($q -eq $d){break}; $d=$q}; return $null}; if($e -eq '.py'){$t=Up $f '.venv\\Scripts\\ruff.exe'; if($t){& $t format $f *>$null}}elseif(@('.ts','.tsx','.js','.jsx','.mjs','.cjs','.json','.css','.scss','.html') -contains $e){$t=Up $f 'node_modules\\.bin\\prettier.cmd'; if($t){& $t --write --log-level silent $f *>$null}}elseif($e -eq '.cs'){$m=Up $f '.config\\dotnet-tools.json'; if($m){$dir=Split-Path -Parent (Split-Path -Parent $m); Push-Location $dir; dotnet csharpier format $f *>$null; Pop-Location}}elseif(@('.c','.cc','.cpp','.cxx','.h','.hpp','.hxx') -contains $e){if(Up $f '.clang-format'){$cf=(Get-Command clang-format -ErrorAction SilentlyContinue).Source; if(-not $cf){$cf=Get-ChildItem 'C:\\Program Files\\Microsoft Visual Studio\\2022\\*\\VC\\Tools\\Llvm\\bin\\clang-format.exe' -ErrorAction SilentlyContinue|Select-Object -First 1 -ExpandProperty FullName}; if($cf){& $cf -i $f *>$null}}}; exit 0",
+            "shell": "powershell",
+            "statusMessage": "format on save"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true
+  }
+}
