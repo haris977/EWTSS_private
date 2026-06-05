@@ -1,0 +1,44 @@
+﻿<UserControl x:Class="Sg.Mvp4.App.Views.Entities.SensorPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:Sg.Mvp4.Domain.Models;assembly=Sg.Mvp4.Domain">
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Margin="8" FontWeight="Bold"
+                   Text="{Binding EntityName, StringFormat='Sensor: {0}'}" />
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="8">
+            <Button Content="Reset" Command="{Binding ResetCommand}" Width="70" Margin="4,0" />
+            <Button Content="Apply" Command="{Binding ApplyCommand}" Width="70" />
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="8">
+                <TextBlock Text="Color (#RRGGBB)" />
+                <TextBox Text="{Binding ColorHex, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Outer Half-Angle (°)" Margin="0,8,0,0" />
+                <TextBox Text="{Binding OuterHalfAngleDeg, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Inner Half-Angle (°)" Margin="0,8,0,0" />
+                <TextBox Text="{Binding InnerHalfAngleDeg, UpdateSourceTrigger=PropertyChanged}" />
+
+                <CheckBox Content="Show Intersection" Margin="0,8,0,0"
+                          IsChecked="{Binding ShowIntersection}" />
+
+                <TextBlock Text="Pointing Mode" Margin="0,8,0,0" />
+                <ComboBox x:Name="PointingCombo"
+                          SelectedItem="{Binding Pointing}" />
+
+                <TextBlock Text="Azimuth (°)" Margin="0,8,0,0" />
+                <TextBox Text="{Binding FixedAzimuthDeg, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Elevation (°)" Margin="0,8,0,0" />
+                <TextBox Text="{Binding FixedElevationDeg, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Target Path" Margin="0,8,0,0" />
+                <TextBox Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

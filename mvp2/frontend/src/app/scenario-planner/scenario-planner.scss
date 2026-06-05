@@ -1,0 +1,55 @@
+.scenario-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+
+    span { margin-bottom: 3px; }
+
+    input {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      padding: 6px 8px;
+      font-size: 12px;
+      min-width: 190px;
+      text-transform: none;
+      letter-spacing: 0;
+
+      &:focus { outline: none; border-color: var(--accent); }
+    }
+  }
+
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 120ms, border-color 120ms;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+
+    &:hover:not(:disabled) { background: var(--accent-hv); }
+    &:disabled { opacity: .5; cursor: not-allowed; }
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+
+    &:hover { color: var(--text); border-color: var(--text-dim); }
+  }
+}

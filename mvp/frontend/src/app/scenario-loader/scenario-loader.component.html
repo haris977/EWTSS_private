@@ -1,0 +1,68 @@
+<h3 class="panel-title">CZML MVP Loader</h3>
+
+<!-- ── Full pipeline flow ─────────────────────────── -->
+<label class="field-label">Exercise name</label>
+<input class="text-input" [(ngModel)]="exerciseName">
+
+<button type="button"
+        class="btn-primary"
+        (click)="runFullFlow()"
+        [disabled]="status === 'creating' || status === 'computing' || status === 'loading'">
+  <ng-container [ngSwitch]="status">
+    <span *ngSwitchCase="'creating'">Creating…</span>
+    <span *ngSwitchCase="'computing'">Computing…</span>
+    <span *ngSwitchCase="'loading'">Loading CZML…</span>
+    <span *ngSwitchDefault>Run Full Flow</span>
+  </ng-container>
+</button>
+
+<div *ngIf="exerciseId" class="exercise-id">ID: {{ exerciseId }}</div>
+
+<!-- ── Divider ────────────────────────────────────── -->
+<div class="or-divider"><span>or</span></div>
+
+<!-- ── STK scenario file loader ───────────────────── -->
+<label class="field-label">Load STK scenario (.sc / .vdf)</label>
+
+<label class="file-btn">
+  Browse…
+  <input type="file"
+         accept=".sc,.vdf"
+         class="file-input-hidden"
+         (change)="runFromStkFile($event)"
+         [disabled]="status === 'computing' || status === 'loading'">
+</label>
+
+<div *ngIf="stkFileName" class="file-name">{{ stkFileName }}</div>
+
+<!-- ── Divider ────────────────────────────────────── -->
+<div class="or-divider"><span>or</span></div>
+
+<!-- ── Local CZML file loader ─────────────────────── -->
+<label class="field-label">Load local CZML file</label>
+
+<label class="file-btn">
+  Browse…
+  <input type="file"
+         accept=".czml,.json"
+         class="file-input-hidden"
+         (change)="loadLocalCzml($event)">
+</label>
+
+<div *ngIf="localFileName" class="file-name">{{ localFileName }}</div>
+
+<!-- ── Status banners ─────────────────────────────── -->
+<div *ngIf="status === 'ready'" class="banner banner-ok">
+  CZML loaded — the platform should be animating on the globe.
+</div>
+<div *ngIf="status === 'error'" class="banner banner-err">
+  Check the log below and verify sg-service is running on port 8001.
+</div>
+
+<!-- ── Activity log ───────────────────────────────── -->
+<div class="log-box">
+  <div *ngFor="let line of log">{{ line }}</div>
+  <div *ngIf="log.length === 0" class="log-empty">
+    Click "Run Full Flow" or load a local CZML file to start.
+  </div>
+</div>

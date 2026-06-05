@@ -1,0 +1,13 @@
+﻿<UserControl x:Class="Sg.Mvp4.App.Views.Shell.StkDisplayHost"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration">
+    <TabControl>
+        <TabItem Header="3D Globe">
+            <wfi:WindowsFormsHost x:Name="Host3D" />
+        </TabItem>
+        <TabItem Header="2D Map">
+            <wfi:WindowsFormsHost x:Name="Host2D" />
+        </TabItem>
+    </TabControl>
+</UserControl>

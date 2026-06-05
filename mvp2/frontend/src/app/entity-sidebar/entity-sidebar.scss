@@ -1,0 +1,117 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  padding: 16px 14px;
+  overflow-y: auto;
+
+  h4 {
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-dim);
+  }
+
+  .empty {
+    margin: 0 0 16px;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .entity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .entity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-elev);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 100ms, border-color 100ms;
+
+    &:hover { background: #222a45; }
+
+    &.selected {
+      background: rgba(74, 125, 219, 0.18);
+      border-color: var(--accent);
+    }
+  }
+
+  .type {
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    min-width: 72px;
+  }
+
+  .name {
+    flex: 1;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .del {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 4px;
+
+    &:hover { color: var(--danger); }
+  }
+
+  .sensor-form {
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    input {
+      width: 100%;
+      margin-top: 4px;
+      padding: 6px 8px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-size: 12px;
+
+      &:focus { outline: none; border-color: var(--accent); }
+    }
+
+    .btn-primary {
+      width: 100%;
+      margin-top: 4px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: 500;
+
+      &:hover { background: var(--accent-hv); }
+    }
+  }
+}

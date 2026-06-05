@@ -1,0 +1,11 @@
+variant: rdfs
+parser_lib: parsers/rdfs/parser.dll
+ports:
+  command:  { host: 0.0.0.0, port: 5001, protocol: tcp }
+  response: { host: 0.0.0.0, port: 5002, protocol: udp }
+time_signal:
+  embedded_in_messages: true
+  periodic_distribution:
+    enabled: false
+    interval_ms: null
+  precision_required_ms: 10

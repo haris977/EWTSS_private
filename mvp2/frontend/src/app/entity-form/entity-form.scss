@@ -1,0 +1,66 @@
+.entity-form {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(74, 125, 219, 0.06);
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .type {
+    flex: 1;
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .close {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 4px;
+
+    &:hover { color: var(--text); }
+  }
+
+  label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: var(--text-dim);
+
+    input {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      padding: 6px 8px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      font-size: 12px;
+
+      &:focus { outline: none; border-color: var(--accent); }
+    }
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .hint {
+    margin: 6px 0 0;
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+}

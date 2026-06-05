@@ -1,0 +1,79 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build mvp4 (Release)",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/mvp4/Sg.sln",
+        "-c",
+        "Release",
+        "--nologo"
+      ],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile",
+      "presentation": { "panel": "shared", "showReuseMessage": false, "clear": true }
+    },
+    {
+      "label": "test mvp4 — unit tier",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/mvp4/Sg.sln",
+        "-c",
+        "Release",
+        "--filter",
+        "Category=Unit",
+        "--nologo"
+      ],
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": "$msCompile",
+      "presentation": { "panel": "shared", "showReuseMessage": false, "clear": true }
+    },
+    {
+      "label": "test mvp4 — integration tier (requires STK)",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/mvp4/Sg.sln",
+        "-c",
+        "Release",
+        "--filter",
+        "Category=Integration",
+        "--nologo"
+      ],
+      "group": "test",
+      "problemMatcher": "$msCompile",
+      "presentation": { "panel": "shared", "showReuseMessage": false, "clear": true }
+    },
+    {
+      "label": "run Sg.App (Release)",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/mvp4/Sg.App",
+        "--configuration",
+        "Release",
+        "--no-build"
+      ],
+      "dependsOn": "build mvp4 (Release)",
+      "presentation": { "panel": "shared", "showReuseMessage": false, "clear": true }
+    },
+    {
+      "label": "verify markdown links (docs)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-c",
+        "import re,os; roots=['docs']; broken=[]; checked=0\nfor root in roots:\n  for d,_,fs in os.walk(root):\n    for f in fs:\n      if not f.endswith('.md'): continue\n      p=os.path.join(d,f)\n      with open(p,'r',encoding='utf-8',errors='replace') as fh: c=fh.read()\n      for m in re.finditer(r'\\]\\(([^)]+\\.md)(?:#[^)]*)?\\)',c):\n        u=m.group(1)\n        if u.startswith('http'): continue\n        t=os.path.normpath(os.path.join(d,u))\n        checked+=1\n        if not os.path.isfile(t): broken.append((p,u,t))\nprint(f'Checked: {checked}'); print(f'Broken: {len(broken)}')\nfor s,u,t in broken: print(f'  {s} -> {u}')"
+      ],
+      "presentation": { "panel": "shared", "showReuseMessage": false, "clear": true }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+; parsers/cpp/comm_df/comm_df.def
+; Explicit DLL export list — only these 4 symbols are visible outside the DLL.
+; Everything else (helpers, static functions, internal data) is hidden.
+LIBRARY libcomm_df
+EXPORTS
+    extract_frame
+    parse_message
+    format_response
+    free_result

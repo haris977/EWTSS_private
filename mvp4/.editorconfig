@@ -1,0 +1,8 @@
+# Sg.Mvp4.Domain.Contracts.* is the JSON-shaped surface for browser-future.
+# Disallow any AGI.* using directive inside that namespace.
+[Sg.Mvp4.Domain/Contracts/**.cs]
+# IDE0005 = Using directive is unnecessary
+# Note: full enforcement is done by Task 20's unit test, which scans Contracts
+# files for "using AGI." prefixes. The .editorconfig rule below is documentation
+# of the convention; the test is the actual gate.
+dotnet_diagnostic.IDE0005.severity = warning

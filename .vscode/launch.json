@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Sg.App (Debug)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build mvp4 (Release)",
+      "program": "${workspaceFolder}/mvp4/Sg.App/bin/Release/net8.0-windows/Sg.App.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/mvp4/Sg.App",
+      "console": "integratedTerminal",
+      "stopAtEntry": false,
+      "env": {
+        "MVP4_BACKEND": "InProcess"
+      }
+    },
+    {
+      "name": "Sg.App (Debug + diagnostic logging)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build mvp4 (Release)",
+      "program": "${workspaceFolder}/mvp4/Sg.App/bin/Release/net8.0-windows/Sg.App.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/mvp4/Sg.App",
+      "console": "integratedTerminal",
+      "stopAtEntry": false,
+      "env": {
+        "MVP4_BACKEND": "InProcess",
+        "MVP4_DIAG": "1"
+      }
+    },
+    {
+      "name": "Attach to .NET process",
+      "type": "coreclr",
+      "request": "attach"
+    }
+  ]
+}

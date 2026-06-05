@@ -1,0 +1,8 @@
+; parsers/cpp/rdfs/rdfs.def
+; Explicit DLL export list — only these 4 symbols are visible outside the DLL.
+LIBRARY librdfs
+EXPORTS
+    extract_frame
+    parse_message
+    format_response
+    free_result

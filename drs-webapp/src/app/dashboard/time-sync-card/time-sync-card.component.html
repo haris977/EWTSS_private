@@ -1,0 +1,13 @@
+<div class="card" [style.border-color]="statusColor">
+  <h3>Time Sync</h3>
+  <div class="status-row">
+    <span class="dot" [style.background-color]="statusColor"></span>
+    <span>{{ status?.status || 'loading...' }}</span>
+  </div>
+  <ng-container *ngIf="status">
+    <p>Offset: <strong>{{ status.ntp_offset_ms | number:'1.2-2' }} ms</strong></p>
+    <p>Jitter: <strong>{{ status.ntp_jitter_ms | number:'1.2-2' }} ms</strong></p>
+    <p>Peer: <strong>{{ status.ntp_peer ?? 'n/a' }}</strong></p>
+    <p>Last sync: <strong>{{ status.last_sync }}</strong></p>
+  </ng-container>
+</div>

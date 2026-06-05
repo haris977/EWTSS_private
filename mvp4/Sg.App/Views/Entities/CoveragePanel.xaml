@@ -1,0 +1,69 @@
+<UserControl x:Class="Sg.App.Views.Entities.CoveragePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Margin="8" FontWeight="Bold"
+                   Text="{Binding EntityName, StringFormat='Coverage: {0}'}" />
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="8">
+            <Button Content="Reset" Command="{Binding ResetCommand}" Width="70" Margin="4,0" />
+            <Button Content="Apply" Command="{Binding ApplyCommand}" Width="70" />
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="8">
+
+                <!-- Grid bounds -->
+                <TextBlock Text="Grid Bounds" FontWeight="SemiBold" Margin="0,0,0,4" />
+
+                <TextBlock Text="Lat Min (°)" />
+                <TextBox Text="{Binding LatMin, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Lat Max (°)" Margin="0,6,0,0" />
+                <TextBox Text="{Binding LatMax, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Lon Min (°)" Margin="0,6,0,0" />
+                <TextBox Text="{Binding LonMin, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Lon Max (°)" Margin="0,6,0,0" />
+                <TextBox Text="{Binding LonMax, UpdateSourceTrigger=PropertyChanged}" />
+
+                <!-- Resolution -->
+                <TextBlock Text="Resolution" FontWeight="SemiBold" Margin="0,12,0,4" />
+
+                <TextBlock Text="Lat Step (°)" />
+                <TextBox Text="{Binding LatStep, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Lon Step (°)" Margin="0,6,0,0" />
+                <TextBox Text="{Binding LonStep, UpdateSourceTrigger=PropertyChanged}" />
+
+                <!-- Constraints -->
+                <TextBlock Text="Constraints" FontWeight="SemiBold" Margin="0,12,0,4" />
+
+                <TextBlock Text="Min Altitude (m)" />
+                <TextBox Text="{Binding MinAltitude, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="Min Elevation Angle (°)" Margin="0,6,0,0" />
+                <TextBox Text="{Binding MinElevationAngle, UpdateSourceTrigger=PropertyChanged}" />
+
+                <!-- Assets -->
+                <TextBlock Text="Asset Paths (one per line)" FontWeight="SemiBold" Margin="0,12,0,4" />
+                <TextBlock Text="Available:" />
+                <ListBox x:Name="AvailableList"
+                         ItemsSource="{Binding AvailableAssetPaths}"
+                         SelectionMode="Multiple"
+                         Height="120"
+                         Margin="0,0,0,4" />
+                <TextBlock Text="Selected (edit directly):" Margin="0,4,0,0" />
+                <TextBox x:Name="AssetPathsBox"
+                         Height="80"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         TextWrapping="Wrap"
+                         TextChanged="AssetPathsBox_TextChanged" />
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

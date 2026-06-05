@@ -1,0 +1,16 @@
+.dashboard {
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+
+  h2 {
+    margin: 0 0 16px 0;
+    font-size: 20px;
+    color: #2c3645;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+}

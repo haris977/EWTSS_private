@@ -1,0 +1,43 @@
+<Window x:Class="Sg.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Sg.App"
+        xmlns:conv="clr-namespace:Sg.App.Converters"
+        mc:Ignorable="d"
+        Title="EWTSS — Sg.App (v2)" Height="600" Width="960">
+    <Window.Resources>
+        <conv:BannerLevelToBrushConverter      x:Key="BannerLevelToBrushConverter"/>
+        <conv:BannerLevelToVisibilityConverter x:Key="BannerLevelToVisibilityConverter"/>
+    </Window.Resources>
+    <DockPanel>
+        <!-- Time-sync banner host. Visibility is driven by Banner.CurrentBanner. -->
+        <Border x:Name="BannerHost"
+                DockPanel.Dock="Top"
+                Background="{Binding Banner.CurrentBanner, Converter={StaticResource BannerLevelToBrushConverter}}"
+                Visibility="{Binding Banner.CurrentBanner, Converter={StaticResource BannerLevelToVisibilityConverter}}"
+                Padding="8">
+            <TextBlock Text="{Binding Banner.CurrentMessage}" Foreground="White" FontWeight="SemiBold"/>
+        </Border>
+
+        <!-- Exercise-control button bar. Placeholder for Phase 5. -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8" Background="#EEF1F5">
+            <Button Content="Start Exercise"  Command="{Binding StartExerciseCommand}"  Margin="0,0,8,0" Padding="8,4"/>
+            <Button Content="Pause"           Command="{Binding PauseExerciseCommand}"  Margin="0,0,8,0" Padding="8,4"/>
+            <Button Content="Resume"          Command="{Binding ResumeExerciseCommand}" Margin="0,0,8,0" Padding="8,4"/>
+            <Button Content="Stop"            Command="{Binding StopExerciseCommand}"   Margin="0,0,8,0" Padding="8,4"/>
+            <TextBlock VerticalAlignment="Center" Margin="16,0,0,0">
+                <Run Text="Exercise state:"/>
+                <Run Text="{Binding CurrentState}" FontWeight="SemiBold"/>
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Main content area. Admin views, tactical surfaces, etc. land here. -->
+        <Grid Background="White">
+            <TextBlock Text="Production v2 Sg.App scaffold. Tactical / Admin surfaces land here in future B1.x work."
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="#8895A5" FontStyle="Italic"/>
+        </Grid>
+    </DockPanel>
+</Window>

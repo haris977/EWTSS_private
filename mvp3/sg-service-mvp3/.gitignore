@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+czml_output/
+fom_images/
+*.whl
+.pytest_cache/
+
+# mvp3/frontend .venv isn't used; node_modules excluded via root .gitignore

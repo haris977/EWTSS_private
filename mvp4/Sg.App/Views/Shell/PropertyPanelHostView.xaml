@@ -1,0 +1,31 @@
+<UserControl x:Class="Sg.App.Views.Shell.PropertyPanelHostView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Sg.Domain.ViewModels;assembly=Sg.Domain"
+             xmlns:entities="clr-namespace:Sg.App.Views.Entities">
+    <UserControl.Resources>
+        <DataTemplate DataType="{x:Type vm:EmptySelectionViewModel}">
+            <TextBlock Text="{Binding Message}" Margin="12" Foreground="#888" TextWrapping="Wrap" />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AircraftViewModel}">
+            <entities:AircraftPanel />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:FacilityViewModel}">
+            <entities:FacilityPanel />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AreaTargetViewModel}">
+            <entities:AreaTargetPanel />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SensorViewModel}">
+            <entities:SensorPanel />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CoverageDefinitionViewModel}">
+            <entities:CoveragePanel />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:FigureOfMeritViewModel}">
+            <entities:FomPanel />
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ContentControl x:Name="PanelSlot" Content="{Binding Current}" />
+</UserControl>

@@ -1,0 +1,80 @@
+# EWTSS v2 — Documentation Set
+
+Audience-targeted documentation for the EWTSS v2 architecture. Each doc has a
+specific reader in mind. Pick the one that matches your role and read time.
+
+| Doc | For | Read time | What you'll get |
+|---|---|---|---|
+| [Executive Brief](executive-brief.md) | CEO, CTO, customer execs | 5 min | The pitch, the decision, cost, timeline, top 3 risks. Slide-ready single-pager. |
+| [Design Review Brief](design-review-brief.md) | CEO + engineering team together (design review meeting) | 25 min | Pre-read for a design-review-grade conversation. Goes deeper than the Executive Brief on architecture, constraints, performance-evolution concerns, known design limitations, future expansion, slip risks, and the standardization-for-reuse opportunity. |
+| [Operator Playbook](operator-playbook.md) | SG Operators, DRS Engineers, customer reviewers, design-review participants, training material authors | 30 min | Workflow-level description of what operators do with EWTSS v2, anchored on RFQ Annexure A.1 scope. Two personas (SG Operator + DRS Engineer) + Control Center as external integration boundary. Includes RFQ → v2 traceability matrix (spine for the SRS deliverable) and the consolidated open-design-questions list for Milestone-1 wireframe work. |
+| [Architecture Overview](architecture-overview.md) | CTO, customer architects, new tech hires | 20 min | The chosen architecture in enough depth to assess, plan integrations, and onboard. No alternatives analysis. |
+| [Architecture Diagram](architecture-diagram.md) | Anyone reading the doc set; PNG-source owner | 5 min | Version-controlled Mermaid diagram (renders in GitHub) + redraw spec for whoever maintains the binary PNG outside the repo. Authoritative when it disagrees with the PNG. |
+| [Command Flows](command-flows.md) | Engineering team, architecture lead, SRS / ATP authors | 30 min | End-to-end Mermaid sequence diagrams for all major command flows (auth, scenario authoring, exercise execution per mode, DRS Engineer workflows, error recovery, admin). Spine for SRS / ATP — every sequence maps to an RFQ requirement + downstream Milestone deliverable. |
+| [Decision Record](decision-record.md) | Architects, technical reviewers, future maintainers, auditors | 30 min (reference) | 19 ADRs covering every architectural commitment. One section per decision; states what was chosen, why, what was rejected. |
+| [Deployment Guide](deployment-guide.md) | Ops engineers, customer integrators, support | 30 min (reference) | What runs where, hardware requirements, licences, install procedures, troubleshooting. |
+| [Developer Handbook](developer-handbook.md) | Engineering team | 60 min full read; grep daily | Codebase tour, build/test/run, conventions, STK COM gotchas, debugging scenarios, full DB schema, drs-bridge / drs-server / Mode A internal layered designs, how to extend. |
+| [v2 Execution Plan](v2-execution-plan.md) | Project lead, eng leads, customer programme manager | 15 min | Staffing, parallel workstreams week-by-week, critical path, acceptance gates for the v2 hardening phase. |
+| [Risk Register](risk-register.md) | Project sponsor, programme manager, project lead | 10 min (reference) | Consolidated active / retired / deferred risk view with likelihood, impact, owner, mitigation. |
+| [Design Backlog](design-backlog.md) | Project lead, architecture lead, engineering team | 15 min (reference) | Tracked Milestone-1 design items required before / alongside the v2 hardening phase. Headline item: detailed UX wireframes (RFQ Milestone-1 deliverable). Plus deferred items and resolved-items audit trail. |
+| [Design Post-Mortem](design-postmortem.md) | Project lead, architecture lead, customer programme manager, eng leads | 25 min (reference) | Pre-mortem analysis of gaps and failure modes across development, testing, and production stages. Anchored on RFQ + v1 legacy reference. Ranks gaps by severity × likelihood; surfaces 13 additional backlog items (B1.17–B1.29) and 8 recommended pre-build actions. Read before the design-review meeting to internalise what's still loose. |
+| [ICD reference — COMM DF Receiver](icd-reference-comm-df.md) | C++ developer, integration reviewers | 20 min (reference) | Concrete worked example of one ICD: transport, framing, command groups, parser-API mapping, YAML profile, Kafka topics, TimescaleDB columns. The template for documenting future variants. |
+| [v1 Legacy System Audit](legacy-system-audit.md) | v2 reviewers, auditors, future maintainers | 15 min | Curated lessons-learned from the v1 production system: anti-pattern catalogue (AP-1…AP-15) with file:line citations, tech-stack misuses (TS-1…TS-6), performance findings — each mapped to v2's structural fix. The audit chain behind v2's design choices. |
+
+## Reading paths by question
+
+- *"Should we approve this project?"* → Executive Brief.
+- *"What do I bring into the leadership design-review meeting?"* → Design Review Brief.
+- *"What does the operator actually do with the system?"* → Operator Playbook.
+- *"Why this architecture and not something else?"* → Decision Record.
+- *"How does the system fit together?"* → Architecture Overview.
+- *"How do I install this at a customer site?"* → Deployment Guide.
+- *"How do I work in this codebase?"* → Developer Handbook.
+- *"How will we actually execute the v2 build?"* → v2 Execution Plan.
+- *"What could go wrong, what are we doing about it?"* → Risk Register.
+- *"What design work is still outstanding before the build can fully cover scope?"* → Design Backlog.
+- *"What's most likely to break this design — where, why, and at which stage?"* → Design Post-Mortem.
+- *"What's the end-to-end sequence for command X (e.g. compute, scenario execution, DRS hardware restart)?"* → Command Flows.
+- *"How do I implement a parser for hardware variant X?"* → ICD reference (as worked example) + Developer Handbook §9 (procedure).
+- *"What was wrong with v1 / why this design?"* → v1 Legacy System Audit (curated lessons + AP-X / TS-X mapping to v2 fixes).
+
+## Pre-v2 baseline (legacy v1 audit material)
+
+The v1 production system has its own documentation set under [`legacy/`](legacy/) — the authoritative source for "what v1 does today" and "what was found wrong with it." The [v1 Legacy System Audit](legacy-system-audit.md) above is the curated bridge to the v2 doc set; the four documents below are the underlying material:
+
+- [`legacy/ARCHITECTURE.md`](legacy/ARCHITECTURE.md) — v1 architecture documented as it stands today.
+- [`legacy/ARCHITECTURE_ANALYSIS.md`](legacy/ARCHITECTURE_ANALYSIS.md) — strengths / weaknesses / alternatives analysis across 7 dimensions.
+- [`legacy/CODE_ANALYSIS.md`](legacy/CODE_ANALYSIS.md) — code-quality findings prioritised Critical / High / Medium / Lower.
+- [`legacy/ANTI_PATTERNS_AND_PERFORMANCE.md`](legacy/ANTI_PATTERNS_AND_PERFORMANCE.md) — anti-pattern catalogue with file:line code citations + tech-stack misuses + performance improvement plan. The AP-N / TS-N references throughout the v2 docs cite this file.
+
+The v1 codebase itself (the live `drs_bridge/`, `drs_server/`, and `ewtss-backend/` services with their own READMEs) lives in the separate internal v1 repo, not in this one — see the top-level [`README.md`](../../README.md) "What this repo is NOT" section. The `legacy/` material above is the curated audit of v1 that drove the v2 design.
+
+## Design specs (active design records, in [`specs/`](specs/))
+
+The audience-targeted docs above distil the load-bearing decisions; the underlying design specs sit alongside in [`specs/`](specs/) for the reader who needs the detail behind a decision. These are the active design records the v2 doc set draws from:
+
+- [v2 tech-stack archive](specs/v2-tech-stack-archive.md) — the original exhaustive analysis (~5,000 lines). Source of the AP-N citations, §17 Mode B technical design, §21 per-service layered models, §25 MVP findings.
+- [Hybrid design spec](specs/hybrid-frontend-design.md) — full proposal for the chosen frontend architecture (Mode A primary, Mode B opt-in future).
+- [MVP4 STK-native embedded design](specs/mvp4-stk-native-embedded-design.md) — the C# WPF + STK ActiveX design (Option D2) that the Hybrid's desktop deliverable builds on.
+- [MVP4 map-first interaction addendum](specs/mvp4-map-first-interaction-addendum.md) — amends the MVP4 design with click-to-place authoring, drag handles via `StartObjectEditing`, the interaction state machine.
+- [MVP4.5 design spec](specs/mvp4.5-dto-boundary-and-perf-design.md) — DTO boundary, `IScenarioBackend`, namespace fence, browser-future readiness §5.
+- [ICD codegen tool design](specs/icd-codegen-tool-design.md) — the Excel-ICD-to-C++/YAML/TypeScript skeleton generator that accelerates new hardware-variant onboarding.
+- [Metadata-driven entity editor (evaluated, deferred)](specs/metadata-driven-entity-editor-evaluation.md) — the rejected option referenced from [ADR-007](decision-record.md), with explicit revisit triggers.
+
+## v2 subsystem specs + implementation plans (B1.x work)
+
+Sub-system specs that the [Design Backlog](design-backlog.md) tracks under B1.x live alongside this README in [`specs/`](specs/) (design) and [`plans/`](plans/) (implementation). Each plan that has been executed against the repo carries an adjacent `*-corrigenda.md` capturing the spec-validation findings — read the corrigenda first when picking up a B1.x item; it identifies the blockers that have already been fixed in the plan and the ones still open.
+
+- [B1.3 Time Synchronisation — design spec](specs/time-sync-design.md) — Meinberg NTP for internal SG↔WS2 sync; three-tier `SyncStateEngine` in drs-server; per-variant precision overrides; banner host + exercise gating + SYNC_LOST auto-pause in Sg.App.
+- [B1.3 Time Synchronisation — implementation plan](plans/time-sync-plan.md) — 27 tasks across 8 phases. Phases 1, 2, 3, 5 have been exercised; Phase 4 (drs-bridge), Phase 6 (DRS webapp), and Phase 7 (load test) are open.
+- [B1.3 Time Synchronisation — corrigenda](plans/time-sync-corrigenda.md) — 19 findings from the spec-validation run that updated the plan (path drift, deprecated APIs, callback contract gaps, missing scaffolding prerequisites, …).
+- [Reference C++ parser template — implementation plan](plans/reference-parser-template.md) — 5-task plan (executed 2026-05-21) that shipped [`drs-bridge/parsers/reference/`](../../drs-bridge/parsers/reference/): canonical 4-symbol C ABI header + CMake project + pytest integration test exercising the ctypes binding end-to-end on CI. Closes the §2.1 "C++ parser ABI" gap from the [Design Post-Mortem](design-postmortem.md). New variants copy + modify this template per [Developer Handbook §9.3](developer-handbook.md#93-c-parser-interface-contract).
+- [Kafka infrastructure layer — design spec](specs/kafka-infra-layer-design.md) + [implementation plan](plans/kafka-infra-layer-plan.md) — data-shape-independent Kafka layer (executed 2026-05-21): single-node KRaft broker in [`infrastructure/docker-compose.yml`](../../infrastructure/docker-compose.yml), idempotent control-plane topic provisioner, real-broker integration test (skips if broker absent), and Developer Handbook §11.x codifying the producer/consumer patterns the existing 400-line control-plane scaffolding demonstrates. Data-plane (`hw.<variant>.<kind>` topics, `measurements` hypertable, payload shape) deliberately deferred to first-IRS work.
+- [Scenario management — design spec](specs/scenario-management-design.md) — closes the [B1.19](design-backlog.md) gap. Defines the `scenarios` library on WS2 PostgreSQL with state machine NOT_COMPUTED → COMPUTED → STALE, partitioned `content_json` (compute_inputs vs metadata) for precise edit-invalidation, immutable `scenario_compute_snapshots` history so reports stay reproducible, and REPLACE-on-recompute semantics for the `computed_links` hypertable. Single-site delivery — no cross-deployment portability. Implementation owned by B (Sg.App) + F (schema).
+- [Plan pre-flight checklist](plan-preflight-checklist.md) — 4-pass checklist (environment & scope, skeleton mapping, content sanity, reviewer-handoff) derived from the B1.3 corrigenda findings. Run against any new B1.x plan before saving. Mirrored as self-review checks 4–10 in the cached `superpowers:writing-plans` skill.
+
+## What lives outside this set
+
+The earlier MVP design specs (MVP2 draw-first planning, MVP3 DataProvider-driven CZML) and the paired implementation plans for **MVP1 through MVP4.5** remain at [`../superpowers/`](../superpowers/) — they're preserved as the chronological design pipeline (spec → plan → implementation) that produced the work the v2 doc set now describes. They're not referenced from the active v2 docs; the [MVP roadmap in Architecture Overview §10](architecture-overview.md#10-mvp-roadmap--how-the-architecture-was-validated) summarises what each MVP validated.
+
+The audience-targeted docs in this directory are the **canonical, current** read. The underlying detail lives in two sibling subfolders: [`specs/`](specs/) carries the design specs (MVP4/4.5 frontend + entity-editor archive + active B1.x subsystem designs), and [`plans/`](plans/) carries the active B1.x implementation plans + corrigenda. The MVP1–MVP4.5 design pipeline under `../superpowers/` is preserved-as-evidence rather than load-bearing for current readers.

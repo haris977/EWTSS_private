@@ -1,0 +1,63 @@
+# drs-server REST/WS contract — BASELINE (implemented surface only).
+# Source of truth for sg-app, drs-webapp, and drs-bridge consumers.
+#
+# Generated from the live FastAPI app (drs_server.main:app) on 2026-05-31 and
+# then curated (the `status` field is pinned to the SyncStatus enum here, even
+# though the app emits a bare string). The implemented surface today is
+# /health + /time/status (B1.3). Designed-but-unimplemented endpoints
+# (WebSocket telemetry, scenario publisher, /measurements, /reports, /auth/*)
+# are listed in contracts/README.md and command-flows.md; add them here as they
+# land. Owner: F (drs-server). Freeze gate: week 2 of the hardening phase.
+openapi: 3.1.0
+info:
+  title: EWTSS drs-server
+  version: 0.1.0
+  description: >-
+    Implemented-surface baseline. See contracts/README.md for the full planned
+    surface and per-endpoint freeze status.
+paths:
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+              example: { status: ok }
+  /time/status:
+    get:
+      tags: [timesync]
+      summary: Get Time Status
+      operationId: get_time_status_time_status_get
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeStatusResponse"
+components:
+  schemas:
+    TimeStatusResponse:
+      type: object
+      required:
+        [current_time, ntp_offset_ms, ntp_jitter_ms, ntp_peer, last_sync, status]
+      properties:
+        current_time: { type: string, format: date-time }
+        ntp_offset_ms: { type: number }
+        ntp_jitter_ms: { type: number }
+        ntp_peer:
+          anyOf:
+            - { type: string }
+            - { type: "null" }
+        last_sync: { type: string, format: date-time }
+        status:
+          type: string
+          description: SyncStatus state-machine value.
+          enum: [healthy, warming, drift_warn, drift_alert, sync_lost]

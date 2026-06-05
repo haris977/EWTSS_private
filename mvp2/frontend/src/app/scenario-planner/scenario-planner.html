@@ -1,0 +1,14 @@
+<div class="scenario-bar">
+  <label>
+    <span>Start</span>
+    <input [(ngModel)]="startTime"/>
+  </label>
+  <label>
+    <span>Stop</span>
+    <input [(ngModel)]="stopTime"/>
+  </label>
+  <button type="button" class="btn btn-primary" [disabled]="running" (click)="submit()">
+    {{ running ? 'Computing...' : 'Run Scenario' }}
+  </button>
+  <button type="button" class="btn btn-ghost" (click)="clearScenario()">Clear</button>
+</div>
