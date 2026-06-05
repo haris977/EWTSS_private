@@ -1,0 +1,9 @@
+<UserControl x:Class="Sg.App.Views.Admin.AdminShellView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <TextBlock Text="Admin shell host. Task 20 will dock the Time Sync view here."
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="#8895A5" FontStyle="Italic"/>
+    </Grid>
+</UserControl>

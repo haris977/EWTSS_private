@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- CS8600/CS8602: COM PIA types (AGI.STKObjects) lack nullable annotations; casts to
+         COM interfaces via IAgStkObject return produce false-positive nullable warnings. -->
+    <NoWarn>CS8600;CS8602</NoWarn>
+    <RootNamespace>Sg.Mvp4.Domain</RootNamespace>
+    <AssemblyName>Sg.Mvp4.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- StkDisplayHost reaches StkScenarioBackend.Root (internal) for SceneManager
+         access; this is desktop/COM only. Tests project also gets internals access
+         so future integration tests can drive the concrete backend directly. -->
+    <InternalsVisibleTo Include="Sg.Mvp4.App" />
+    <InternalsVisibleTo Include="Sg.Mvp4.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="AGI.STKObjects.Interop">
+      <HintPath>C:\Program Files\AGI\STK 12\bin\Primary Interop Assemblies\AGI.STKObjects.Interop.dll</HintPath>
+      <Private>true</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="AGI.STKUtil.Interop">
+      <HintPath>C:\Program Files\AGI\STK 12\bin\Primary Interop Assemblies\AGI.STKUtil.Interop.dll</HintPath>
+      <Private>true</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="AGI.STKVgt.Interop">
+      <HintPath>C:\Program Files\AGI\STK 12\bin\Primary Interop Assemblies\AGI.STKVgt.Interop.dll</HintPath>
+      <Private>true</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="AGI.STKX.Interop">
+      <HintPath>C:\Program Files\AGI\STK 12\bin\Primary Interop Assemblies\AGI.STKX.Interop.dll</HintPath>
+      <Private>true</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,35 @@
+﻿<UserControl x:Class="Sg.Mvp4.App.Views.Entities.AircraftPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Margin="8" FontWeight="Bold"
+                   Text="{Binding EntityName, StringFormat='Aircraft: {0}'}" />
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="8">
+            <Button Content="Edit on Map" Click="EditOnMap_Click" Width="100" Margin="0,0,12,0" />
+            <Button Content="Reset" Command="{Binding ResetCommand}" Width="70" Margin="4,0" />
+            <Button Content="Apply" Command="{Binding ApplyCommand}" Width="70" />
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="8">
+                <TextBlock Text="Color (#RRGGBB)" />
+                <TextBox Text="{Binding ColorHex, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox Content="Show path" IsChecked="{Binding PathVisible}" Margin="0,8" />
+
+                <TextBlock Text="Waypoints" FontWeight="Bold" Margin="0,8,0,4" />
+                <DataGrid ItemsSource="{Binding Waypoints}" AutoGenerateColumns="False"
+                          CanUserAddRows="False" MinHeight="120" MaxHeight="240">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Lat °"   Binding="{Binding LatitudeDeg}"    Width="80" />
+                        <DataGridTextColumn Header="Lon °"   Binding="{Binding LongitudeDeg}"   Width="80" />
+                        <DataGridTextColumn Header="Alt m"   Binding="{Binding AltitudeMeters}" Width="80" />
+                        <DataGridTextColumn Header="Speed"   Binding="{Binding SpeedMps}"       Width="70" />
+                    </DataGrid.Columns>
+                </DataGrid>
+                <Button Content="+ Add waypoint" Command="{Binding AddWaypointCommand}" Margin="0,4" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

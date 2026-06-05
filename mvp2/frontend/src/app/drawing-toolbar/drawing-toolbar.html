@@ -1,0 +1,27 @@
+<div class="toolbar">
+  <h4>Drawing Tools</h4>
+
+  <button type="button" [class.active]="mode() === 'AreaTarget'" (click)="setMode('AreaTarget')">
+    <span class="ic">⬡</span><span>Area Target</span>
+  </button>
+  <button type="button" [class.active]="mode() === 'Aircraft'" (click)="setMode('Aircraft')">
+    <span class="ic">✈</span><span>Aircraft Route</span>
+  </button>
+  <button type="button" [class.active]="mode() === 'Facility'" (click)="setMode('Facility')">
+    <span class="ic">●</span><span>Facility</span>
+  </button>
+  <button type="button" [class.active]="mode() === 'Sensor'" (click)="setMode('Sensor')">
+    <span class="ic">◢</span><span>Sensor</span>
+  </button>
+
+  @if (mode() !== 'none') {
+    <div class="hint">
+      @switch (mode()) {
+        @case ('Facility')   { Click on the globe to place a site. }
+        @case ('Aircraft')   { Click waypoints on the globe; double-click to finish. }
+        @case ('AreaTarget') { Click vertices on the globe; double-click to close. }
+        @case ('Sensor')     { Fill the sensor form in the right panel. }
+      }
+    </div>
+  }
+</div>

@@ -1,0 +1,47 @@
+<div class="toolbar">
+  <button type="button" class="btn"         (click)="rewind()"       title="Restart">⏮</button>
+  <button type="button" class="btn"         (click)="stepBack()"     title="Step back 1 min">◀</button>
+  <button type="button"
+          [class.btn-primary]="!isPlaying"
+          [class.btn-playing]="isPlaying"
+          (click)="togglePause()"
+          [title]="isPlaying ? 'Pause' : 'Play'">
+    {{ isPlaying ? '⏸' : '▶' }}
+  </button>
+  <button type="button" class="btn"         (click)="stepForward()"  title="Step forward 1 min">▶</button>
+
+  <span class="toolbar-sep">│</span>
+  <span class="toolbar-label">Speed:</span>
+  <button type="button" class="btn-speed" (click)="setSpeed(1)">1×</button>
+  <button type="button" class="btn-speed" (click)="setSpeed(30)">30×</button>
+  <button type="button" class="btn-speed" (click)="setSpeed(60)">60×</button>
+  <button type="button" class="btn-speed" (click)="setSpeed(300)">300×</button>
+
+  <span class="toolbar-sep">│</span>
+  <span class="toolbar-label">Map:</span>
+  <button type="button" class="btn-speed" [class.btn-active]="imageryMode === 'street'"    (click)="setImagery('street')">Street</button>
+  <button type="button" class="btn-speed" [class.btn-active]="imageryMode === 'satellite'" (click)="setImagery('satellite')">Satellite</button>
+
+  <span class="toolbar-sep">│</span>
+  <span class="toolbar-label">Terrain:</span>
+  <button type="button" class="btn-speed" [class.btn-active]="terrainMode === 'flat'" (click)="setTerrain('flat')">Flat</button>
+  <button type="button" class="btn-speed" [class.btn-active]="terrainMode === '3d'"  (click)="setTerrain('3d')">3D</button>
+</div>
+
+<!-- Timeline scrubber row -->
+<div class="timeline-bar">
+  <span class="time-label">{{ simTimeLabel }}</span>
+  <input
+    type="range"
+    class="scrubber"
+    title="Timeline scrubber"
+    min="0"
+    [max]="scrubberMax"
+    [value]="scrubberValue"
+    step="1"
+    (input)="onScrub($event)"
+  />
+  <span class="time-label end-time">{{ scrubberMax | number:'1.0-0' }}s</span>
+</div>
+
+<div id="cesiumContainer"></div>

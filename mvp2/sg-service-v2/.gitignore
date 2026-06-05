@@ -1,0 +1,14 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Generated outputs
+czml_output/
+fom_images/
+
+# PySTK / agi.stk13 wheels (local installs, do not commit)
+*.whl
+
+# pytest cache
+.pytest_cache/

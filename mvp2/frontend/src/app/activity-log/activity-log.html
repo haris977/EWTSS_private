@@ -1,0 +1,12 @@
+<div class="activity-log">
+  <h4>Activity</h4>
+  @if (lines().length === 0) {
+    <p class="empty">Click <em>Run Scenario</em> to compute.</p>
+  } @else {
+    <div class="lines">
+      @for (line of lines(); track $index) {
+        <div class="line">{{ line }}</div>
+      }
+    </div>
+  }
+</div>

@@ -1,0 +1,155 @@
+:host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 260px;
+  height: 100vh;
+  overflow-y: auto;
+  background: #161b22;
+  color: #e6edf3;
+  border-right: 1px solid #30363d;
+  padding: 16px;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  z-index: 10;
+}
+
+.panel-title {
+  margin: 0 0 12px;
+  color: #79c0ff;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.field-label {
+  font-size: 12px;
+  color: #8b949e;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 6px 8px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 8px;
+  background: #1f6feb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.exercise-id {
+  margin-top: 10px;
+  font-size: 10px;
+  color: #484f58;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+/* ── Or divider ── */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  color: #484f58;
+  font-size: 11px;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #30363d;
+  }
+}
+
+/* ── File picker ── */
+.file-btn {
+  display: block;
+  width: 100%;
+  padding: 7px;
+  background: #21262d;
+  color: #8b949e;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  box-sizing: border-box;
+
+  &:hover {
+    background: #30363d;
+    color: #e6edf3;
+  }
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.file-name {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #484f58;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+/* ── Status banners ── */
+.banner {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.banner-ok {
+  background: rgba(86, 211, 100, 0.1);
+  border: 1px solid rgba(86, 211, 100, 0.3);
+  color: #56d364;
+}
+
+.banner-err {
+  background: rgba(255, 123, 114, 0.1);
+  border: 1px solid rgba(255, 123, 114, 0.3);
+  color: #ff7b72;
+}
+
+/* ── Activity log ── */
+.log-box {
+  margin-top: 14px;
+  font-size: 11px;
+  color: #8b949e;
+  height: 240px;
+  overflow-y: auto;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+  padding: 8px;
+  font-family: 'Courier New', monospace;
+  line-height: 1.6;
+}
+
+.log-empty {
+  color: #484f58;
+}

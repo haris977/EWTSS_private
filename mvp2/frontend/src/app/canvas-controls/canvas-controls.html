@@ -1,0 +1,12 @@
+<div class="canvas-controls">
+  <div class="mode-toggle">
+    <button type="button" [class.active]="is3D()"  (click)="setMode(true)">3D</button>
+    <button type="button" [class.active]="!is3D()" (click)="setMode(false)">2D</button>
+  </div>
+
+  <div class="zoom-cluster">
+    <button type="button" title="Zoom in"    (click)="zoomIn()">+</button>
+    <button type="button" title="Zoom out"   (click)="zoomOut()">−</button>
+    <button type="button" title="Reset view" (click)="resetView()">⌂</button>
+  </div>
+</div>

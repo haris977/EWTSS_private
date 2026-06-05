@@ -1,0 +1,95 @@
+# CI for the EWTSS v2 spec-validation repo.
+#
+# Covers 4 of the 5 active suites in the repo:
+#   • drs-server   (Python 3.11 + FastAPI)   — Linux
+#   • drs-bridge   (Python 3.11 + asyncio)   — Linux
+#   • drs-webapp   (Angular 18 + Karma)      — Linux + ChromeHeadless
+#   • sg-app       (.NET 8 WPF)              — Windows
+#
+# mvp4 is DELIBERATELY EXCLUDED. Its csproj files reference
+# `AGI.STK*.Interop.dll` via HintPaths under
+# `C:\Program Files\AGI\STK 12\bin\Primary Interop Assemblies\`.
+# These licence-restricted assemblies are not present on GitHub-hosted
+# runners and cannot be redistributed in this repo. mvp4 builds + tests
+# on a developer workstation with STK 12 installed; see
+# `docs/ewtss/decision-record.md` ADR-019 for the rationale.
+#
+# Phase 7 (30-min sustained load) and B1.20 (lab acceptance) are
+# hardware-bound and likewise out of CI scope.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-suites:
+    name: Python — ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [drs-server, drs-bridge]
+    defaults:
+      run:
+        working-directory: ${{ matrix.suite }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: ${{ matrix.suite }}/pyproject.toml
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Build reference C++ parser (drs-bridge only)
+        if: matrix.suite == 'drs-bridge'
+        working-directory: drs-bridge/parsers/reference
+        run: |
+          cmake -S . -B build
+          cmake --build build --config Release
+      - name: Run pytest
+        run: pytest -v
+
+  drs-webapp:
+    name: Angular — drs-webapp
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: drs-webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: drs-webapp/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npx ng build --configuration development
+      - name: Test (headless)
+        run: npx ng test --watch=false --browsers=ChromeHeadless
+
+  sg-app:
+    name: .NET — sg-app
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: sg-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore sg-app.sln
+      - name: Build
+        run: dotnet build sg-app.sln --no-restore --nologo
+      - name: Test (Unit category only)
+        run: dotnet test sg-app.sln --filter Category=Unit --no-build --nologo

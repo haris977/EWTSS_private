@@ -1,0 +1,22 @@
+<div class="playback-bar">
+  <button type="button"
+          class="play-btn"
+          [disabled]="!hasRange()"
+          [title]="playing() ? 'Pause' : 'Play'"
+          (click)="togglePlay()">
+    {{ playing() ? '❚❚' : '▶' }}
+  </button>
+
+  <div class="time">{{ currentLabel() }}</div>
+
+  <input type="range"
+         class="seek"
+         min="0" max="1000" step="1"
+         [disabled]="!hasRange()"
+         [value]="progress()"
+         (pointerdown)="onSeekStart()"
+         (pointerup)="onSeekEnd()"
+         (input)="onSeekInput($event)"/>
+
+  <div class="time">{{ stopLabel() }}</div>
+</div>

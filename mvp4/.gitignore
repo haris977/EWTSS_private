@@ -1,0 +1,12 @@
+## .NET build artefacts
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Test runner output (vstest --blame, NUnit, etc.)
+TestResults/
+diag.log
+diag.host.*.log
+diag.datacollector.*.log

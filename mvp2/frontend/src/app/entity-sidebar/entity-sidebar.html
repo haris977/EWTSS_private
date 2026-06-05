@@ -1,0 +1,34 @@
+<div class="sidebar">
+  <h4>Entities ({{ entities().length }})</h4>
+
+  @if (entities().length === 0) {
+    <p class="empty">Draw entities on the globe, then click a row to edit.</p>
+  } @else {
+    <div class="entity-list">
+      @for (e of entities(); track e.properties.name) {
+        <div class="entity-row"
+             [class.selected]="e.properties.name === selectedName()"
+             (click)="select(e.properties.name)">
+          <span class="type">{{ e.properties.entityType }}</span>
+          <span class="name">{{ e.properties.name }}</span>
+          <button type="button" class="del" title="Remove"
+                  (click)="delete(e.properties.name, $event)">×</button>
+        </div>
+      }
+    </div>
+  }
+
+  @if (drawState.mode() === 'Sensor') {
+    <div class="sensor-form">
+      <h4>New Sensor</h4>
+      <label>Name <input [(ngModel)]="sensorName" placeholder="Snsr1"/></label>
+      <label>Parent entity <input [(ngModel)]="sensorParent" placeholder="Aircraft name"/></label>
+      <label>Half-angle (°)
+        <input type="number" [(ngModel)]="sensorHalfAngle" min="1" max="90"/>
+      </label>
+      <button type="button" class="btn-primary" (click)="addSensor()">Add Sensor</button>
+    </div>
+  }
+
+  <app-entity-form/>
+</div>

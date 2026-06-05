@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ewtss/contracts/kafka/system.health.schema.json",
+  "title": "system.health",
+  "description": "Per-variant / system health events (e.g. tick-lag warnings, hardware errors) published by drs-bridge and drs-server. Envelope is { event, ...payload }: every message carries a string `event` type; the remaining payload fields vary by event type and stay OPEN until the data-plane spec fixes per-event payloads. drs-bridge per-instance events (B1.43) feed the Plan-2 /exercise/readiness connection-presence ('reachable') field: 'instance.connected' { instance_id }, 'instance.framing_mismatch' { instance_id, reason }, 'instance.failed_bind' { instance_id, reason }.",
+  "type": "object",
+  "required": ["event"],
+  "additionalProperties": true,
+  "properties": {
+    "event": {
+      "type": "string",
+      "description": "Health event type, e.g. 'tick_lag_warn', 'tick_lag_alert', 'hardware_error'."
+    }
+  }
+}

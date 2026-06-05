@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ewtss/contracts/scenario-content-json.schema.json",
+  "title": "scenario.content_json",
+  "description": "Shape of the scenarios.content_json JSONB column. Partitioned into compute_inputs (hashed for edit-invalidation: any change flips compute_state to STALE and deletes computed_links) and metadata (edits UPDATE the row without transitioning state). Mirrors docs/ewtss/specs/scenario-management-design.md §4.1. BASELINE: the two-partition structure is pinned; inner entity/emitter/antenna field shapes are owned by the typed-entity DTO spec (Transmitter/Receiver/Antenna) and the EW Library (backlog B1.7) and will be tightened as those land.",
+  "type": "object",
+  "required": ["compute_inputs", "metadata"],
+  "additionalProperties": false,
+  "properties": {
+    "compute_inputs": {
+      "type": "object",
+      "description": "Hashed partition (sha256 -> scenarios.compute_inputs_hash). Drives edit-invalidation.",
+      "properties": {
+        "entities": { "type": "array", "items": { "type": "object" } },
+        "emitters": { "type": "array", "items": { "$ref": "#/$defs/emitterRef" } },
+        "antennas": { "type": "array", "items": { "type": "object" } },
+        "environment": {
+          "type": "object",
+          "description": "Precipitation / fog / atmospheric settings feeding the link budget (B1.8)."
+        },
+        "time_window": {
+          "type": "object",
+          "properties": {
+            "start": { "type": "string", "format": "date-time" },
+            "stop": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Non-hashed partition. Edits here do not transition compute_state.",
+      "properties": {
+        "description": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "operator_notes": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "emitterRef": {
+      "type": "object",
+      "description": "Reference to an EW Library template plus per-instance overrides (scenario-management-design §4.8).",
+      "required": ["template_id"],
+      "properties": {
+        "template_id": { "type": ["string", "integer"] },
+        "instance_overrides": { "type": "object" }
+      }
+    }
+  }
+}

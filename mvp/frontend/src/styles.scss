@@ -1,0 +1,16 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0d1117;
+}
+
+// Angular custom elements are display:inline by default.
+// app-root needs explicit block + height so the flex layout propagates down.
+app-root {
+  display: block;
+  height: 100%;
+}
+// app-cesium-viewer sizing is handled by its own :host rule in the component stylesheet.

@@ -1,0 +1,19 @@
+<div class="loader">
+  <div class="times">
+    <label>Start <input [(ngModel)]="startTime"/></label>
+    <label>Stop  <input [(ngModel)]="stopTime"/></label>
+  </div>
+  <button type="button"
+          class="btn-primary"
+          [disabled]="running()"
+          (click)="runFullFlow()">
+    {{ running() ? 'Computing…' : 'Run Full Flow' }}
+  </button>
+  @if (log().length > 0) {
+    <div class="log">
+      @for (line of log(); track $index) {
+        <div class="line">{{ line }}</div>
+      }
+    </div>
+  }
+</div>

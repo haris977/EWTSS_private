@@ -1,0 +1,8 @@
+variant: rdfs
+parser_lib: parsers/rdfs/parser.dll
+time_signal:
+  embedded_in_messages: true
+  periodic_distribution:
+    enabled: false
+    interval_ms: null
+  precision_required_ms: 10
