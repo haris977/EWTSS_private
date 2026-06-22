@@ -4,7 +4,8 @@ Each variant's parser ships as a Windows DLL exporting four symbols:
 
     int     extract_frame(const uint8_t* buf, size_t length,
                           uint8_t** out_frame, size_t* out_len);
-    int     parse_message(void* frame, char** out_json, size_t* out_len);
+    int     parse_message(const uint8_t* frame, size_t frame_len,
+                          char** out_json, size_t* out_len);
     int     format_response(const char* kind, const char* kwargs_json,
                             uint8_t** out_buf, size_t* out_len);
     void    free_result(void* ptr);
@@ -48,6 +49,15 @@ class ParserHandle:
         ]
         self._extract_frame.restype = ctypes.c_int
 
+        self._parse_message = lib.parse_message
+        self._parse_message.argtypes = [
+            ctypes.POINTER(ctypes.c_uint8),                   # frame
+            ctypes.c_size_t,                                   # frame_len
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_char)),    # out_json (char**)
+            ctypes.POINTER(ctypes.c_size_t),                  # out_len
+        ]
+        self._parse_message.restype = ctypes.c_int
+
     def format_response(self, kind: str, timestamp_ns: int, **kwargs) -> bytes:
         payload = json.dumps({"timestamp_ns": timestamp_ns, **kwargs}).encode("utf-8")
         out_buf = ctypes.POINTER(ctypes.c_uint8)()
@@ -64,8 +74,31 @@ class ParserHandle:
         finally:
             self._free_result(ctypes.cast(out_buf, ctypes.c_void_p))
 
-    def parse_message(self, frame_ptr) -> dict:
-        raise NotImplementedError("parse_message wiring lands when a real parser ships")
+    def parse_message(self, frame: bytes) -> dict | None:
+        """Decode a complete frame (from extract_frame) into a dict.
+
+        Called by the TCP layer for every frame received from the hardware.
+        Returns the parsed message as a dict, or None on malformed input.
+        The DLL-allocated JSON buffer is freed before this method returns.
+        """
+        if not frame:
+            return None
+        in_buf = (ctypes.c_uint8 * len(frame)).from_buffer_copy(frame)
+        out_json = ctypes.POINTER(ctypes.c_char)()
+        out_len = ctypes.c_size_t(0)
+        rc = self._parse_message(
+            ctypes.cast(in_buf, ctypes.POINTER(ctypes.c_uint8)),
+            ctypes.c_size_t(len(frame)),
+            ctypes.byref(out_json),
+            ctypes.byref(out_len),
+        )
+        if rc != 0:
+            return None
+        try:
+            raw = ctypes.string_at(out_json, out_len.value)
+            return json.loads(raw.decode("utf-8"))
+        finally:
+            self._free_result(ctypes.cast(out_json, ctypes.c_void_p))
 
     def extract_frame(self, buf: bytes) -> tuple[int, bytes | None]:
         """Scan `buf` for a complete frame. Returns (rc, frame_bytes).
