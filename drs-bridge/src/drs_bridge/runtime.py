@@ -10,6 +10,9 @@ import logging
 from pathlib import Path
 from typing import Callable
 
+from drs_bridge.aus_integration import AusIntegration
+from drs_bridge.aus_poller import AusConfig
+from drs_bridge.aus_publisher import AusPublisher
 from drs_bridge.bridge import Bridge
 from drs_bridge.control_publisher import ControlPublisher
 from drs_bridge.health_publisher import HealthPublisher
@@ -54,6 +57,7 @@ class Runtime:
         self._producer = None
         self._command_servers: list = []
         self._senders: list = []
+        self._aus_integrations: list[AusIntegration] = []
         self.bridge: Bridge | None = None
         self._stop_event = asyncio.Event()
 
@@ -69,6 +73,44 @@ class Runtime:
 
         profiles = load_profiles(self._profiles_dir)
         for variant, profile in profiles.items():
+
+            # ── HTTP-polling variant (e.g. AUS-C2) ─────────────────────
+            if profile.http_source is not None:
+                if profile.parser_lib is None:
+                    logger.error(
+                        "HTTP variant=%s has no parser_lib — skipping (no DLL to parse JSON)",
+                        variant,
+                    )
+                    continue
+
+                parser = self._parser_factory(self._profiles_dir / profile.parser_lib)
+                aus_cfg = AusConfig(
+                    host=profile.http_source.host,
+                    port=profile.http_source.port,
+                    username=profile.http_source.username,
+                    password=profile.http_source.password,
+                    poll_interval_s=profile.http_source.poll_interval_s,
+                    api_version=profile.http_source.api_version,
+                )
+                aus_pub = AusPublisher(
+                    producer=self._producer,
+                    variant=variant,
+                    topic=profile.kafka_topic or "aus.detections",
+                )
+                aus = AusIntegration(
+                    config=aus_cfg,
+                    parser=parser,
+                    publisher=aus_pub,
+                    control=control,
+                    variant=variant,
+                )
+                await aus.start()
+                self._aus_integrations.append(aus)
+                logger.info("registered HTTP+DLL variant=%s host=%s dll=%s",
+                            variant, aus_cfg.host, profile.parser_lib)
+                continue
+
+            # ── DLL / binary-frame variant ──────────────────────────────
             parser = self._parser_factory(self._profiles_dir / profile.parser_lib)
 
             _sender_result = self._sender_factory(
@@ -87,7 +129,7 @@ class Runtime:
             self._command_servers.append(server)
 
             await self.bridge.register_variant(profile=profile, parser=parser, sender=sender)
-            logger.info("registered variant=%s", variant)
+            logger.info("registered DLL variant=%s", variant)
 
     async def run_until_stopped(self) -> None:
         await self._stop_event.wait()
@@ -97,6 +139,8 @@ class Runtime:
 
     async def shutdown(self) -> None:
         logger.info("Runtime shutting down")
+        for aus in self._aus_integrations:
+            await aus.stop()
         if self.bridge is not None:
             await self.bridge.shutdown()
         for s in self._senders:

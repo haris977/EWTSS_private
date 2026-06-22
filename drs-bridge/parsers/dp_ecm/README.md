@@ -45,28 +45,30 @@ Without CMake (quick check):
 g++ -std=c++17 -Iinclude tests/test_frames.cpp src/sdfc_frame.cpp src/dp_ecm_hf_parser.cpp -o test_dp_ecm && ./test_dp_ecm
 ```
 
-## Status (increment 1)
+## Status
 
-Done: ABI, endian helpers, frame scanner + validation, JSON writer; HF parser
-with fully-worked decoders for **System Version (100/2)** and **FH Detection
-(101/40)**, ACK encoder in `format_response`, and a safe `raw_hex` fallback for
-every other unit. 16 golden-frame tests pass.
+| File | Status |
+|---|---|
+| `dp_ecm_hf_parser.cpp` | **Increment 2** — decoders: 100/2 Version, 100/10 Temperature, 101/40 FH Detection, 101/44 Wideband FFT. 18 tests pass. |
+| `dp_ecm_vu_parser.cpp` | **Increment 1** — decoders: 100/2 Version, 101/40 FH Detection, 200/2,4,6,8 Jam ACKs. 12 tests pass. |
 
 ## Adding the next per-unit decoder
 
-1. Open `ICD-Understanding-DP-ECM-1071-HF.md` and find the unit's payload table.
-2. Write a `decode_<name>(const uint8_t* p, int n, JsonWriter& w)` in
-   `dp_ecm_hf_parser.cpp`, reading fields with the `load_*le` helpers at explicit
+1. Open the relevant ICD understanding doc and find the unit's payload table.
+2. Write a `decode_<name>(const uint8_t* p, int n, JsonWriter& w)` in the
+   variant `.cpp`, reading fields with `load_*le` helpers at explicit byte
    offsets, converting to SI units, bound-checking every array `count`.
-3. Add a `case` in `parse_message`'s `(group_id, unit_id)` dispatch.
-4. Add a golden-frame test in `test_frames.cpp`.
+3. Add an `else if` in `parse_message`'s `(group_id, unit_id)` dispatch.
+4. Add a golden-frame test in the matching `test_frames*.cpp`.
 
 ## Next steps / open items
 
+- HF increment 3: 101/70 FF Detection, 101/84 Burst Detection, 106/* Jamming,
+  109/12 Date-Time, 111/* Group 11 operations.
+- VU increment 2: 101/44 Wideband FFT, 101/70 FF Detection, 101/84 Burst,
+  112/2 Fast Scan, 111/14 Protected Scan, 111/22 Signal BITE.
 - Noise-tolerant `extract_frame` resync (scan past a bad candidate magic).
 - Stream-socket entry for frame type 3 (IQ on ports 10021–10028).
 - Replace the flat-int extractor in `format_response` with nlohmann/json (MIT).
 - Confirm endianness + status field width against a live capture.
 - Reconcile the Python host `parser_loader.py` to this ABI (status: R1).
-- VU variant: copy `dp_ecm_hf_parser.cpp` → `dp_ecm_vu_parser.cpp`, change
-  `HW_NAME`, add VU-specific groups (200) and wider band ranges.

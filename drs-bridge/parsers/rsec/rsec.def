@@ -1,0 +1,10 @@
+; drs-bridge/parsers/rsec/rsec.def
+; Explicit DLL export list — only these 4 ABI symbols are visible outside the DLL.
+; Device: HIMSHAKTI Radar Segment Entity Controller (RSEC)
+; IRS: DLRL/HIMSHAKTI/RSEC/2025/IRS Version 1.0
+LIBRARY rsec
+EXPORTS
+    extract_frame
+    parse_message
+    format_response
+    free_result

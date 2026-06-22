@@ -21,26 +21,43 @@ public:
     JsonWriter() { buf_ += '{'; }
 
     void key_str(const char* k, const std::string& v) {
-        sep(); quote(k); buf_ += ':'; quote(v);
+        sep(); 
+        quote(k); 
+        buf_ += ':'; 
+        quote(v);
     }
     void key_int(const char* k, long long v) {
-        sep(); quote(k); buf_ += ':'; buf_ += std::to_string(v);
+        sep(); 
+        quote(k); 
+        buf_ += ':'; 
+        buf_ += std::to_string(v);
     }
     void key_uint(const char* k, unsigned long long v) {
-        sep(); quote(k); buf_ += ':'; buf_ += std::to_string(v);
+        sep(); 
+        quote(k); 
+        buf_ += ':'; 
+        buf_ += std::to_string(v);
     }
     void key_double(const char* k, double v) {
-        sep(); quote(k); buf_ += ':';
+        sep(); 
+        quote(k); 
+        buf_ += ':';
         char tmp[64];
         std::snprintf(tmp, sizeof(tmp), "%.6g", v);
         buf_ += tmp;
     }
     void key_bool(const char* k, bool v) {
-        sep(); quote(k); buf_ += ':'; buf_ += (v ? "true" : "false");
+        sep(); 
+        quote(k); 
+        buf_ += ':'; 
+        buf_ += (v ? "true" : "false");
     }
     // Begin a raw nested value (caller supplies a valid JSON fragment).
     void key_raw(const char* k, const std::string& json_fragment) {
-        sep(); quote(k); buf_ += ':'; buf_ += json_fragment;
+        sep(); 
+        quote(k); 
+        buf_ += ':'; 
+        buf_ += json_fragment;
     }
 
     // Finalize and return the JSON text.

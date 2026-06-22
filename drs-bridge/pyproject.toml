@@ -9,6 +9,7 @@ description = "EWTSS v2 per-variant adapter (Python). Drives C++ parser librarie
 requires-python = ">=3.11"
 dependencies = [
     "aiokafka>=0.10",
+    "aiohttp>=3.9",
     "pydantic>=2.6",
     "pydantic-settings>=2.0",
     "PyYAML>=6.0",

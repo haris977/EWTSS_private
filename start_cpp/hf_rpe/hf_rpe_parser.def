@@ -1,0 +1,8 @@
+; start_cpp/hf_rpe/hf_rpe_parser.def
+; MSVC DLL export list — exactly the 4 ABI symbols.
+LIBRARY hf_rpe_parser
+EXPORTS
+    extract_frame
+    parse_message
+    format_response
+    free_result

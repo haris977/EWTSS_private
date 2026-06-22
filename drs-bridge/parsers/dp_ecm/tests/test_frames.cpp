@@ -51,51 +51,61 @@ static std::vector<uint8_t> build_resp(int16_t status, uint16_t group, uint16_t 
 }
 
 int main() {
-    std::vector<uint8_t> outbuf(MAX_FRAME_BUFFER_BYTES);
-    int out_len = 0;
-
-    // 1. Command frame, no payload -> extract returns type 1.
+    // 1. Command frame -> extract returns 0, frame_type visible in JSON.
     {
         auto f = build_cmd(101, 25, {});
-        int t = extract_frame(f.data(), (int)f.size(), outbuf.data(), &out_len);
-        CHECK(t == FRAME_COMMAND, "command frame -> type 1");
-        CHECK(out_len == (int)f.size(), "command out_len == frame size");
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);
+        CHECK(rc == 0,                "command frame -> extract returns 0");
+        CHECK(flen == f.size(),       "command out_len == frame size");
+        char* j = nullptr; size_t jlen = 0;
+        parse_message(frame_buf, flen, &j, &jlen);
+        CHECK(contains(j, "\"frame_type\":\"command\""), "command frame -> frame_type command");
+        free_result(j);
+        free_result(frame_buf);
     }
 
-    // 2. Incomplete frame (one byte short) -> 0.
+    // 2. Incomplete frame (one byte short) -> -1.
     {
         auto f = build_cmd(101, 25, {0x01, 0x02, 0x03, 0x04});
-        int t = extract_frame(f.data(), (int)f.size() - 1, outbuf.data(), &out_len);
-        CHECK(t == FRAME_INCOMPLETE, "truncated frame -> incomplete (0)");
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        int rc = extract_frame(f.data(), f.size() - 1, &frame_buf, &flen);
+        CHECK(rc == -1, "truncated frame -> -1");
     }
 
-    // 3. Bad footer -> corrupt (-1).
+    // 3. Bad footer -> -1.
     {
         auto f = build_cmd(101, 25, {0xAA});
-        f.back() = 0x00; // corrupt footer
-        int t = extract_frame(f.data(), (int)f.size(), outbuf.data(), &out_len);
-        CHECK(t == FRAME_CORRUPT, "bad footer -> corrupt (-1)");
+        f.back() = 0x00;
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);
+        CHECK(rc == -1, "bad footer -> -1");
     }
 
-    // 4. Unknown magic -> corrupt.
+    // 4. Unknown magic -> -1.
     {
         uint8_t junk[16] = {0x00,0x11,0x22,0x33, 0,0,0,0, 0,0,0,0, 0,0,0,0};
-        int t = extract_frame(junk, 16, outbuf.data(), &out_len);
-        CHECK(t == FRAME_CORRUPT, "unknown magic -> corrupt (-1)");
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        int rc = extract_frame(junk, 16, &frame_buf, &flen);
+        CHECK(rc == -1, "unknown magic -> -1");
     }
 
     // 5. System Version response (100/2, 20-byte payload) parses with version fields.
     {
         std::vector<uint8_t> p(20, 0);
-        store_u32le(p.data() + 0, 0x00020401);  // fw raw
-        store_u16le(p.data() + 16, 7);          // processor id
+        store_u32le(p.data() + 0, 0x00020401);  // sjc_fw_version (float raw)
+        store_u16le(p.data() + 12, 7);          // processor_id at offset 12
         auto f = build_resp(0, 100, 2, p);
-        int t = extract_frame(f.data(), (int)f.size(), outbuf.data(), &out_len);
-        CHECK(t == FRAME_RESPONSE, "sysver frame -> type 2");
-        const char* j = parse_message(outbuf.data(), out_len, t);
-        CHECK(contains(j, "\"group_id\":100"), "sysver json group 100");
-        CHECK(contains(j, "\"processor_id\":7"), "sysver json processor_id 7");
-        CHECK(contains(j, "\"status\":0"), "sysver json status 0");
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);
+        CHECK(rc == 0, "sysver frame -> extract ok");
+        char* j = nullptr; size_t jlen = 0;
+        int prc = parse_message(frame_buf, flen, &j, &jlen);
+        free_result(frame_buf);
+        CHECK(prc == 0,                           "sysver parse ok");
+        CHECK(contains(j, "\"group_id\":100"),    "sysver json group 100");
+        CHECK(contains(j, "\"processor_id\":7"),  "sysver json processor_id 7");
+        CHECK(contains(j, "\"status\":0"),         "sysver json status 0");
         free_result(j);
     }
 
@@ -106,13 +116,15 @@ int main() {
         p.insert(p.end(), hc, hc + 4);
         std::vector<uint8_t> hop(40, 0);
         store_u32le(hop.data() + 0, 3);                 // hopper number
-        // min freq 5.0 MHz as float
         float fmin = 5.0f; uint32_t b; std::memcpy(&b, &fmin, 4); store_u32le(hop.data() + 4, b);
         store_u16le(hop.data() + 32, 1);                // active
         p.insert(p.end(), hop.begin(), hop.end());
         auto f = build_resp(0, 101, 40, p);
-        int t = extract_frame(f.data(), (int)f.size(), outbuf.data(), &out_len);
-        const char* j = parse_message(outbuf.data(), out_len, t);
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        extract_frame(f.data(), f.size(), &frame_buf, &flen);
+        char* j = nullptr; size_t jlen = 0;
+        parse_message(frame_buf, flen, &j, &jlen);
+        free_result(frame_buf);
         CHECK(contains(j, "\"hopper_count\":1"), "fh json hopper_count 1");
         CHECK(contains(j, "\"hopper_number\":3"), "fh json hopper_number 3");
         CHECK(contains(j, "\"min_freq_hz\":5e+06") || contains(j, "\"min_freq_hz\":5000000"),
@@ -124,18 +136,77 @@ int main() {
     // 7. format_response builds a valid ACK frame that extract_frame round-trips.
     {
         const char* jr = "{\"group_id\":101,\"unit_id\":26,\"status\":0}";
-        int n = format_response(jr, outbuf.data());
-        CHECK(n == RESP_OVERHEAD, "format_response ACK length == 18");
-        int t = extract_frame(outbuf.data(), n, std::vector<uint8_t>(MAX_FRAME_BUFFER_BYTES).data(), &out_len);
-        CHECK(t == FRAME_RESPONSE, "round-trip ACK -> type 2");
+        uint8_t* resp_buf = nullptr; size_t resp_len = 0;
+        int rc = format_response("response", jr, &resp_buf, &resp_len);
+        CHECK(rc == 0,                            "format_response ACK ok");
+        CHECK(resp_len == (size_t)RESP_OVERHEAD,  "format_response ACK length == 18");
+        uint8_t* frame_buf2 = nullptr; size_t flen2 = 0;
+        int rc2 = extract_frame(resp_buf, resp_len, &frame_buf2, &flen2);
+        free_result(resp_buf);
+        CHECK(rc2 == 0, "round-trip ACK -> extract ok");
+        char* j2 = nullptr; size_t jlen2 = 0;
+        parse_message(frame_buf2, flen2, &j2, &jlen2);
+        free_result(frame_buf2);
+        CHECK(contains(j2, "\"frame_type\":\"response\""), "round-trip ACK -> response");
+        free_result(j2);
     }
 
     // 8. Unknown unit -> raw_hex fallback, never crashes.
     {
         auto f = build_resp(0, 101, 999, {0xDE, 0xAD, 0xBE, 0xEF});
-        int t = extract_frame(f.data(), (int)f.size(), outbuf.data(), &out_len);
-        const char* j = parse_message(outbuf.data(), out_len, t);
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        extract_frame(f.data(), f.size(), &frame_buf, &flen);
+        char* j = nullptr; size_t jlen = 0;
+        parse_message(frame_buf, flen, &j, &jlen);
+        free_result(frame_buf);
         CHECK(contains(j, "\"raw_hex\":\"deadbeef\""), "unknown unit -> raw_hex");
+        free_result(j);
+    }
+
+    // 9. Temperature response (100/10, 36-byte payload) decodes temp fields.
+    {
+        std::vector<uint8_t> p(36, 0);
+        float t_int = 35.5f, t_ext = 28.0f, t_cpu = 52.1f, t_fpga = 61.3f;
+        uint32_t b;
+        std::memcpy(&b, &t_int,  4); store_u32le(p.data() +  0, b);
+        std::memcpy(&b, &t_ext,  4); store_u32le(p.data() +  4, b);
+        std::memcpy(&b, &t_cpu,  4); store_u32le(p.data() +  8, b);
+        std::memcpy(&b, &t_fpga, 4); store_u32le(p.data() + 12, b);
+        auto f = build_resp(0, 100, 10, p);
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);
+        CHECK(rc == 0, "hf: temp frame -> extract ok");
+        char* j = nullptr; size_t jlen = 0;
+        parse_message(frame_buf, flen, &j, &jlen);
+        free_result(frame_buf);
+        CHECK(contains(j, "\"group_id\":100"),   "hf: temp group 100");
+        CHECK(contains(j, "\"unit_id\":10"),     "hf: temp unit 10");
+        CHECK(contains(j, "internal_temp_c"),    "hf: temp has internal_temp_c");
+        CHECK(contains(j, "fpga_temp_c"),        "hf: temp has fpga_temp_c");
+        free_result(j);
+    }
+
+    // 10. Wideband FFT response (101/44) — header fields + first power value.
+    {
+        std::vector<uint8_t> p(16 + 3 * 4, 0);
+        store_u32le(p.data() +  0, 1);    // start 1 MHz
+        store_u32le(p.data() +  4, 30);   // stop 30 MHz
+        store_u32le(p.data() +  8, 1000); // step 1000 kHz = 1 MHz
+        store_u32le(p.data() + 12, 3);    // 3 points
+        float pw0 = -45.5f; uint32_t b; std::memcpy(&b, &pw0, 4);
+        store_u32le(p.data() + 16, b);    // power[0] = -45.5 dBm
+        auto f = build_resp(0, 101, 44, p);
+        uint8_t* frame_buf = nullptr; size_t flen = 0;
+        int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);
+        CHECK(rc == 0, "hf: fft frame -> extract ok");
+        char* j = nullptr; size_t jlen = 0;
+        parse_message(frame_buf, flen, &j, &jlen);
+        free_result(frame_buf);
+        CHECK(contains(j, "\"unit_id\":44"),           "hf: fft unit 44");
+        CHECK(contains(j, "\"point_count\":3"),        "hf: fft point_count 3");
+        CHECK(contains(j, "\"start_freq_hz\":1e+06") ||
+              contains(j, "\"start_freq_hz\":1000000"), "hf: fft start_freq_hz 1 MHz");
+        CHECK(contains(j, "power_dbm"),                "hf: fft has power_dbm array");
         free_result(j);
     }
 

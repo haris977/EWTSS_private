@@ -1,0 +1,23 @@
+variant: aus
+
+# C++ DLL — parses the raw JSON bytes from AUS-C2 REST API
+parser_lib: parsers/aus/aus.dll
+
+# HTTP transport — polls AUS-C2 GET /api/v4.2/system
+http_source:
+  host: 192.168.23.60       # AUS-C2 IP on the Himashakti subnet
+  port: 5000
+  username: admin
+  password: admin
+  poll_interval_s: 1.0
+  api_version: v4.2
+
+kafka_topic: aus.detections
+
+# AUS-C2 timestamps are wall-clock at poll time (~1 s granularity).
+time_signal:
+  embedded_in_messages: false
+  periodic_distribution:
+    enabled: false
+    interval_ms: null
+  precision_required_ms: 1000

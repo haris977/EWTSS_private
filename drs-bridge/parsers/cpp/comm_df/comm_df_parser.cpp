@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include <algorithm>
 
 using namespace comm_df;
@@ -248,86 +249,101 @@ static void parse_group_gnss(const uint8_t* payload, int payload_len,
 extern "C" {
 
 __declspec(dllexport)
-int extract_frame(const uint8_t* buf, int buf_len,
-                  uint8_t* out_frame, int* out_len) {
+int extract_frame(const uint8_t* buf, size_t buf_len,
+                  uint8_t** out_frame, size_t* out_len) {
 
     if (!buf || buf_len < 2 || !out_frame || !out_len) return -1;
 
+    int ibuf = static_cast<int>(buf_len);
+
     // ── SDFC->DRS command frame ───────────────────────────────────────────────
     // First 4 bytes: 0xAA 0xAB 0xBA 0xBB
-    if (buf_len >= 4 && match_magic(buf, CMD_HEADER, 4)) {
-        if (buf_len < CMD_OVERHEAD) return 0; // wait for more bytes
+    if (ibuf >= 4 && match_magic(buf, CMD_HEADER, 4)) {
+        if (ibuf < CMD_OVERHEAD) return -1;
 
         uint32_t payload_len = read_u32(buf + OFFSET_LENGTH);
         if (payload_len > static_cast<uint32_t>(MAX_PAYLOAD)) return -1;
 
         int total = CMD_OVERHEAD + static_cast<int>(payload_len);
-        if (buf_len < total) return 0;
+        if (ibuf < total) return -1;
 
-        // Validate footer
         if (!match_magic(buf + total - 4, CMD_FOOTER, 4)) return -1;
-
-        // Validate CRC (covers bytes 4 to total-6)
         if (!validate_crc(buf, total - 6)) return -1;
 
-        std::memcpy(out_frame, buf, static_cast<std::size_t>(total));
-        *out_len = total;
-        return 1;
+        auto* p = static_cast<uint8_t*>(std::malloc(static_cast<std::size_t>(total)));
+        if (!p) return -1;
+        std::memcpy(p, buf, static_cast<std::size_t>(total));
+        *out_frame = p;
+        *out_len   = static_cast<size_t>(total);
+        return 0;
     }
 
     // ── DRS->SDFC response frame ──────────────────────────────────────────────
     // First 4 bytes: 0xEE 0xEF 0xFE 0xFF
-    if (buf_len >= 4 && match_magic(buf, RESP_HEADER, 4)) {
-        if (buf_len < RESP_OVERHEAD) return 0;
+    if (ibuf >= 4 && match_magic(buf, RESP_HEADER, 4)) {
+        if (ibuf < RESP_OVERHEAD) return -1;
 
         uint32_t payload_len = read_u32(buf + OFFSET_LENGTH);
         if (payload_len > static_cast<uint32_t>(MAX_PAYLOAD)) return -1;
 
         int total = RESP_OVERHEAD + static_cast<int>(payload_len);
-        if (buf_len < total) return 0;
+        if (ibuf < total) return -1;
 
         if (!match_magic(buf + total - 4, RESP_FOOTER, 4)) return -1;
         if (!validate_crc(buf, total - 6)) return -1;
 
-        std::memcpy(out_frame, buf, static_cast<std::size_t>(total));
-        *out_len = total;
-        return 2;
+        auto* p = static_cast<uint8_t*>(std::malloc(static_cast<std::size_t>(total)));
+        if (!p) return -1;
+        std::memcpy(p, buf, static_cast<std::size_t>(total));
+        *out_frame = p;
+        *out_len   = static_cast<size_t>(total);
+        return 0;
     }
 
     // ── SCD compact frame ─────────────────────────────────────────────────────
     // First 2 bytes: 0xAA 0xAA
     // NOTE: shares first byte with CMD_HEADER (0xAA) — second byte differs
-    if (buf_len >= 2 && match_magic(buf, SCD_HEADER, 2)) {
-        if (buf_len < SCD_OVERHEAD) return 0;
+    if (ibuf >= 2 && match_magic(buf, SCD_HEADER, 2)) {
+        if (ibuf < SCD_OVERHEAD) return -1;
 
         uint16_t payload_len = read_u16(buf + 2);
         if (payload_len > static_cast<uint16_t>(MAX_PAYLOAD)) return -1;
 
         int total = SCD_OVERHEAD + static_cast<int>(payload_len);
-        if (buf_len < total) return 0;
+        if (ibuf < total) return -1;
 
         if (!match_magic(buf + total - 2, SCD_FOOTER, 2)) return -1;
 
-        // SCD uses XOR checksum over bytes [2 .. total-3)
         uint8_t computed = xor_checksum(buf + 2, total - 5);
         uint8_t stored   = buf[total - 3];
         if (computed != stored) return -1;
 
-        std::memcpy(out_frame, buf, static_cast<std::size_t>(total));
-        *out_len = total;
-        return 3;
+        auto* p = static_cast<uint8_t*>(std::malloc(static_cast<std::size_t>(total)));
+        if (!p) return -1;
+        std::memcpy(p, buf, static_cast<std::size_t>(total));
+        *out_frame = p;
+        *out_len   = static_cast<size_t>(total);
+        return 0;
     }
 
-    // No recognised header at buf[0]
     return -1;
 }
 
 
 __declspec(dllexport)
-const char* parse_message(const uint8_t* frame, int frame_len, int frame_type) {
+int parse_message(const uint8_t* frame, size_t frame_len,
+                  char** out_json, size_t* out_len) {
 
-    if (!frame || frame_len < 4) return nullptr;
-    if (frame_type < 1 || frame_type > 3) return nullptr;
+    if (!frame || frame_len < 4 || !out_json || !out_len) return -1;
+
+    int iframe = static_cast<int>(frame_len);
+
+    // Infer frame type from magic bytes (same detection as extract_frame)
+    int frame_type;
+    if (match_magic(frame, CMD_HEADER, 4)) frame_type = 1;
+    else if (match_magic(frame, RESP_HEADER, 4)) frame_type = 2;
+    else if (iframe >= 2 && match_magic(frame, SCD_HEADER, 2)) frame_type = 3;
+    else return -1;
 
     JsonWriter w;
 
@@ -340,17 +356,16 @@ const char* parse_message(const uint8_t* frame, int frame_len, int frame_type) {
 
     // ── CMD and RESP frames ───────────────────────────────────────────────────
     if (frame_type == 1 || frame_type == 2) {
-        if (frame_len < 12) return nullptr;
+        if (iframe < 12) return -1;
 
         uint16_t group_id = read_u16(frame + OFFSET_GROUP_ID);
         uint16_t unit_id  = read_u16(frame + OFFSET_UNIT_ID);
         w.set("group_id", (int32_t)group_id);
         w.set("unit_id",  (int32_t)unit_id);
 
-        // Payload starts after the frame header
         int payload_offset = CMD_HEADER_SIZE;
         if (frame_type == 2) {
-            if (frame_len < 14) return nullptr;
+            if (iframe < 14) return -1;
             uint16_t status = read_u16(frame + OFFSET_STATUS);
             w.set("status", (int32_t)status);
             payload_offset = RESP_HEADER_SIZE;
@@ -382,30 +397,38 @@ const char* parse_message(const uint8_t* frame, int frame_len, int frame_type) {
 
     // ── SCD compact frame ─────────────────────────────────────────────────────
     else if (frame_type == 3) {
-        if (frame_len < SCD_OVERHEAD) return nullptr;
+        if (iframe < SCD_OVERHEAD) return -1;
         uint16_t       payload_len = read_u16(frame + 2);
         const uint8_t* payload     = frame + SCD_HEADER_SIZE;
         w.set("payload_len", (int32_t)payload_len);
-        // SCD payload is hardware-variant specific — decode per ICD section 5
         char* hex = to_hex_string(payload, payload_len);
         w.set("raw_hex", hex);
         delete[] hex;
     }
 
-    if (!w.ok()) return nullptr;
-    return w.finish(); // heap-allocated — caller MUST call free_result()
+    if (!w.ok()) return -1;
+    const char* raw = w.finish(); // new char[] — must copy to malloc'd buffer
+    if (!raw) return -1;
+    std::size_t len = std::strlen(raw);
+    char* out = static_cast<char*>(std::malloc(len + 1));
+    if (!out) { delete[] raw; return -1; }
+    std::memcpy(out, raw, len + 1);
+    delete[] raw;
+    *out_json = out;
+    *out_len  = len;
+    return 0;
 }
 
 
 __declspec(dllexport)
-int format_response(const char* json_response, uint8_t* out_frame) {
+int format_response(const char* /*kind*/, const char* kwargs_json,
+                    uint8_t** out_buf, size_t* out_len) {
 
-    if (!json_response || !out_frame) return -1;
+    if (!kwargs_json || !out_buf || !out_len) return -1;
 
     // Extract the three mandatory fields from JSON using sscanf.
-    // Avoids pulling in a full JSON parser dependency.
     int group_id = -1, unit_id = -1, status = -1;
-    const char* p = json_response;
+    const char* p = kwargs_json;
     while (*p) {
         if (std::sscanf(p, "\"group_id\":%d", &group_id) == 1) {}
         if (std::sscanf(p, "\"unit_id\":%d",  &unit_id)  == 1) {}
@@ -414,31 +437,34 @@ int format_response(const char* json_response, uint8_t* out_frame) {
     }
     if (group_id < 0 || unit_id < 0 || status < 0) return -1;
 
-    // Build DRS->SDFC response frame (0-payload minimal response)
+    // DRS->SDFC response frame (0-payload minimal response)
     // Layout: [header:4][length:4][group_id:2][unit_id:2][status:2][crc:2][footer:4]
-    uint8_t* out = out_frame;
+    auto* frame = static_cast<uint8_t*>(std::malloc(static_cast<std::size_t>(RESP_OVERHEAD)));
+    if (!frame) return -1;
+    uint8_t* out = frame;
 
-    std::memcpy(out, RESP_HEADER, 4);                          out += 4;
-    write_u32(out, 0);                                         out += 4; // payload length = 0
-    write_u16(out, static_cast<uint16_t>(group_id));           out += 2;
-    write_u16(out, static_cast<uint16_t>(unit_id));            out += 2;
-    write_u16(out, static_cast<uint16_t>(status));             out += 2;
+    std::memcpy(out, RESP_HEADER, 4);                        out += 4;
+    write_u32(out, 0);                                       out += 4; // payload length = 0
+    write_u16(out, static_cast<uint16_t>(group_id));         out += 2;
+    write_u16(out, static_cast<uint16_t>(unit_id));          out += 2;
+    write_u16(out, static_cast<uint16_t>(status));           out += 2;
 
     // CRC over bytes [4 .. current position)
-    uint16_t crc = crc16_ccitt(out_frame + 4,
-                                static_cast<int>(out - out_frame) - 4);
-    write_u16(out, crc);                                       out += 2;
+    uint16_t crc = crc16_ccitt(frame + 4,
+                                static_cast<int>(out - frame) - 4);
+    write_u16(out, crc);                                     out += 2;
 
-    std::memcpy(out, RESP_FOOTER, 4);                          out += 4;
+    std::memcpy(out, RESP_FOOTER, 4);                        out += 4;
 
-    return static_cast<int>(out - out_frame);
+    *out_buf = frame;
+    *out_len = static_cast<size_t>(out - frame);
+    return 0;
 }
 
 
 __declspec(dllexport)
-void free_result(const char* result) {
-    delete[] result; // matches new char[] in JsonWriter::finish()
-    // delete[] nullptr is a safe no-op in C++11 and later
+void free_result(void* ptr) {
+    std::free(ptr);
 }
 
 } // extern "C"

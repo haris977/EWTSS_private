@@ -9,9 +9,9 @@
 //   hardcoded. Replace TODO_CRC values with real CRC when hardware is available.
 //
 // Running tests validates:
-//   1. extract_frame correctly identifies and copies frames
+//   1. extract_frame correctly identifies and malloc-allocates frames
 //   2. parse_message produces correct SI-unit JSON fields
-//   3. format_response produces a valid binary response frame
+//   3. format_response produces a valid malloc-allocated binary response frame
 //   4. free_result is safe to call (no crash, no double-free)
 #include <gtest/gtest.h>
 #include <cstdint>
@@ -74,21 +74,23 @@ static std::vector<uint8_t> make_resp_frame(uint16_t group_id, uint16_t unit_id,
 // extract_frame TESTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-TEST(CommDfExtractFrame, CompleteCommandFrame_ReturnsType1) {
+TEST(CommDfExtractFrame, CompleteCommandFrame_Returns0) {
     auto frame = make_cmd_frame(comm_df::GROUP_SYSTEM_MGMT,
                                 comm_df::CMD_GET_SYSTEM_VERSION,
                                 nullptr, 0);
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
-    int     out_len = 0;
+    uint8_t* out    = nullptr;
+    size_t out_len  = 0;
 
-    int result = extract_frame(frame.data(), (int)frame.size(), out, &out_len);
+    int result = extract_frame(frame.data(), frame.size(), &out, &out_len);
 
-    EXPECT_EQ(result, 1);
-    EXPECT_EQ(out_len, (int)frame.size());
+    ASSERT_EQ(result, 0);
+    ASSERT_NE(out, nullptr);
+    EXPECT_EQ(out_len, frame.size());
     EXPECT_EQ(std::memcmp(out, frame.data(), frame.size()), 0);
+    free_result(out);
 }
 
-TEST(CommDfExtractFrame, CompleteResponseFrame_ReturnsType2) {
+TEST(CommDfExtractFrame, CompleteResponseFrame_Returns0) {
     // RESP_SYSTEM_VERSION payload: fw_major=1 fw_minor=4 fw_patch=12 hw_rev=2 serial=12345
     uint8_t payload[11];
     write_u16(payload + 0, 1);      // fw_major
@@ -101,26 +103,29 @@ TEST(CommDfExtractFrame, CompleteResponseFrame_ReturnsType2) {
                                  comm_df::RESP_SYSTEM_VERSION,
                                  comm_df::STATUS_OK,
                                  payload, sizeof(payload));
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
-    int     out_len = 0;
+    uint8_t* out   = nullptr;
+    size_t out_len = 0;
 
-    int result = extract_frame(frame.data(), (int)frame.size(), out, &out_len);
+    int result = extract_frame(frame.data(), frame.size(), &out, &out_len);
 
-    EXPECT_EQ(result, 2);
-    EXPECT_EQ(out_len, (int)frame.size());
+    ASSERT_EQ(result, 0);
+    ASSERT_NE(out, nullptr);
+    EXPECT_EQ(out_len, frame.size());
+    free_result(out);
 }
 
-TEST(CommDfExtractFrame, IncompleteFrame_Returns0) {
+TEST(CommDfExtractFrame, IncompleteFrame_ReturnsMinus1) {
     auto frame = make_cmd_frame(comm_df::GROUP_SYSTEM_MGMT,
                                 comm_df::CMD_GET_SYSTEM_VERSION,
                                 nullptr, 0);
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
-    int     out_len = 0;
+    uint8_t* out   = nullptr;
+    size_t out_len = 0;
 
     // Only provide 6 bytes — too few to determine payload length
-    int result = extract_frame(frame.data(), 6, out, &out_len);
+    int result = extract_frame(frame.data(), 6, &out, &out_len);
 
-    EXPECT_EQ(result, 0);
+    EXPECT_EQ(result, -1);
+    EXPECT_EQ(out, nullptr);
 }
 
 TEST(CommDfExtractFrame, CorruptHeader_ReturnsMinus1) {
@@ -129,12 +134,13 @@ TEST(CommDfExtractFrame, CorruptHeader_ReturnsMinus1) {
                                 nullptr, 0);
     frame[0] = 0xFF; // corrupt the first header byte
 
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
-    int     out_len = 0;
+    uint8_t* out   = nullptr;
+    size_t out_len = 0;
 
-    int result = extract_frame(frame.data(), (int)frame.size(), out, &out_len);
+    int result = extract_frame(frame.data(), frame.size(), &out, &out_len);
 
     EXPECT_EQ(result, -1);
+    EXPECT_EQ(out, nullptr);
 }
 
 TEST(CommDfExtractFrame, CorruptCRC_ReturnsMinus1) {
@@ -146,28 +152,28 @@ TEST(CommDfExtractFrame, CorruptCRC_ReturnsMinus1) {
     frame[crc_pos]     ^= 0xFF;
     frame[crc_pos + 1] ^= 0xFF;
 
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
-    int     out_len = 0;
+    uint8_t* out   = nullptr;
+    size_t out_len = 0;
 
-    int result = extract_frame(frame.data(), (int)frame.size(), out, &out_len);
+    int result = extract_frame(frame.data(), frame.size(), &out, &out_len);
 
     EXPECT_EQ(result, -1);
 }
 
 TEST(CommDfExtractFrame, NullBuffer_ReturnsMinus1) {
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
-    int     out_len = 0;
+    uint8_t  buf[16] = {};
+    uint8_t* out     = nullptr;
+    size_t   out_len = 0;
 
-    EXPECT_EQ(extract_frame(nullptr, 10, out, &out_len), -1);
-    EXPECT_EQ(extract_frame(out, 10, nullptr, &out_len), -1);
-    EXPECT_EQ(extract_frame(out, 10, out, nullptr),      -1);
+    EXPECT_EQ(extract_frame(nullptr, 10, &out, &out_len), -1);
+    EXPECT_EQ(extract_frame(buf, 10, nullptr, &out_len),  -1);
+    EXPECT_EQ(extract_frame(buf, 10, &out, nullptr),      -1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// parse_message TESTS
+// JSON field helpers for parse_message tests
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Helper: simple JSON field extractor for tests (avoids pulling in nlohmann/json)
 static std::string extract_json_string(const char* json, const char* key) {
     std::string s(json);
     std::string k = std::string("\"") + key + "\":\"";
@@ -190,6 +196,10 @@ static int extract_json_int(const char* json, const char* key) {
     return static_cast<int>(extract_json_double(json, key));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// parse_message TESTS
+// ─────────────────────────────────────────────────────────────────────────────
+
 TEST(CommDfParseMessage, SystemVersionResponse_CorrectFields) {
     uint8_t payload[11];
     write_u16(payload + 0, 2);       // fw_major = 2
@@ -203,17 +213,19 @@ TEST(CommDfParseMessage, SystemVersionResponse_CorrectFields) {
                                  comm_df::STATUS_OK,
                                  payload, sizeof(payload));
 
-    const char* json = parse_message(frame.data(), (int)frame.size(), 2);
+    char*  json     = nullptr;
+    size_t json_len = 0;
+    ASSERT_EQ(parse_message(frame.data(), frame.size(), &json, &json_len), 0);
     ASSERT_NE(json, nullptr);
 
     EXPECT_EQ(extract_json_string(json, "frame_type"), "response");
-    EXPECT_EQ(extract_json_int(json, "group_id"),   100);
-    EXPECT_EQ(extract_json_int(json, "unit_id"),    2);
-    EXPECT_EQ(extract_json_int(json, "status"),     0);
-    EXPECT_EQ(extract_json_int(json, "fw_major"),   2);
-    EXPECT_EQ(extract_json_int(json, "fw_minor"),   7);
-    EXPECT_EQ(extract_json_int(json, "fw_patch"),   3);
-    EXPECT_EQ(extract_json_int(json, "hw_revision"),1);
+    EXPECT_EQ(extract_json_int(json, "group_id"),    100);
+    EXPECT_EQ(extract_json_int(json, "unit_id"),     2);
+    EXPECT_EQ(extract_json_int(json, "status"),      0);
+    EXPECT_EQ(extract_json_int(json, "fw_major"),    2);
+    EXPECT_EQ(extract_json_int(json, "fw_minor"),    7);
+    EXPECT_EQ(extract_json_int(json, "fw_patch"),    3);
+    EXPECT_EQ(extract_json_int(json, "hw_revision"), 1);
     EXPECT_EQ(extract_json_int(json, "serial_number"), 98765);
 
     free_result(json);
@@ -221,10 +233,9 @@ TEST(CommDfParseMessage, SystemVersionResponse_CorrectFields) {
 
 TEST(CommDfParseMessage, ScanResult_FrequencyConvertedToHz) {
     // frequency = 102400 kHz = 102400000 Hz
-    // power = -80 dBuV tenths = -800 raw -> -800/10 = -80.0 dBuV -> -80-107=-187 dBm
     uint8_t payload[11];
     write_u32(payload + 0, 102400);  // frequency_khz
-    write_u16(payload + 4, static_cast<uint16_t>(static_cast<int16_t>(-800))); // power raw
+    write_u16(payload + 4, static_cast<uint16_t>(static_cast<int16_t>(-800)));
     write_u8 (payload + 6, 95);     // confidence
     write_u32(payload + 7, 123456); // timestamp_ms
 
@@ -233,10 +244,11 @@ TEST(CommDfParseMessage, ScanResult_FrequencyConvertedToHz) {
                                  comm_df::STATUS_OK,
                                  payload, sizeof(payload));
 
-    const char* json = parse_message(frame.data(), (int)frame.size(), 2);
+    char*  json     = nullptr;
+    size_t json_len = 0;
+    ASSERT_EQ(parse_message(frame.data(), frame.size(), &json, &json_len), 0);
     ASSERT_NE(json, nullptr);
 
-    // 102400 kHz -> 102400000 Hz
     EXPECT_DOUBLE_EQ(extract_json_double(json, "frequency_hz"), 102400000.0);
     EXPECT_EQ(extract_json_int(json, "confidence_pct"), 95);
     EXPECT_EQ(extract_json_int(json, "timestamp_ms"), 123456);
@@ -246,18 +258,19 @@ TEST(CommDfParseMessage, ScanResult_FrequencyConvertedToHz) {
 
 TEST(CommDfParseMessage, AoaResult_DegreesConvertedFromTenths) {
     // azimuth = 2143 tenths = 214.3 degrees
-    // elevation = 31 tenths = 3.1 degrees
     uint8_t payload[5];
-    write_u16(payload + 0, 2143);    // azimuth_tenths
-    write_u16(payload + 2, static_cast<uint16_t>(static_cast<int16_t>(31)));  // elevation_tenths
-    write_u8 (payload + 4, 88);      // quality
+    write_u16(payload + 0, 2143);
+    write_u16(payload + 2, static_cast<uint16_t>(static_cast<int16_t>(31)));
+    write_u8 (payload + 4, 88);
 
     auto frame = make_resp_frame(comm_df::GROUP_MEASUREMENT,
                                  comm_df::RESP_AOA_RESULT,
                                  comm_df::STATUS_OK,
                                  payload, sizeof(payload));
 
-    const char* json = parse_message(frame.data(), (int)frame.size(), 2);
+    char*  json     = nullptr;
+    size_t json_len = 0;
+    ASSERT_EQ(parse_message(frame.data(), frame.size(), &json, &json_len), 0);
     ASSERT_NE(json, nullptr);
 
     EXPECT_NEAR(extract_json_double(json, "azimuth_deg"),   214.3, 0.01);
@@ -267,19 +280,24 @@ TEST(CommDfParseMessage, AoaResult_DegreesConvertedFromTenths) {
     free_result(json);
 }
 
-TEST(CommDfParseMessage, NullFrame_ReturnsNullptr) {
-    const char* json = parse_message(nullptr, 0, 1);
+TEST(CommDfParseMessage, NullFrame_ReturnsMinus1) {
+    char*  json     = nullptr;
+    size_t json_len = 0;
+    EXPECT_EQ(parse_message(nullptr, 0, &json, &json_len), -1);
     EXPECT_EQ(json, nullptr);
-    free_result(json); // must not crash
 }
 
-TEST(CommDfParseMessage, InvalidFrameType_ReturnsNullptr) {
+TEST(CommDfParseMessage, UnrecognisedMagic_ReturnsMinus1) {
+    // Corrupt magic bytes so frame type cannot be inferred
     auto frame = make_cmd_frame(comm_df::GROUP_SYSTEM_MGMT,
                                 comm_df::CMD_GET_SYSTEM_VERSION,
                                 nullptr, 0);
-    const char* json = parse_message(frame.data(), (int)frame.size(), 99);
+    frame[0] = 0x00; frame[1] = 0x00; // wipe magic
+
+    char*  json     = nullptr;
+    size_t json_len = 0;
+    EXPECT_EQ(parse_message(frame.data(), frame.size(), &json, &json_len), -1);
     EXPECT_EQ(json, nullptr);
-    free_result(json);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,12 +305,13 @@ TEST(CommDfParseMessage, InvalidFrameType_ReturnsNullptr) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST(CommDfFormatResponse, MinimalResponse_ProducesValidFrame) {
-    const char* json = R"({"group_id":101,"unit_id":2,"status":0})";
-    uint8_t     out[MAX_FRAME_BUFFER_BYTES];
+    const char* kwargs = R"({"group_id":101,"unit_id":2,"status":0})";
+    uint8_t* out    = nullptr;
+    size_t out_len  = 0;
 
-    int bytes = format_response(json, out);
-
-    ASSERT_GT(bytes, 0);
+    ASSERT_EQ(format_response(nullptr, kwargs, &out, &out_len), 0);
+    ASSERT_NE(out, nullptr);
+    ASSERT_GT(out_len, 0u);
 
     // Header must be DRS->SDFC response header
     EXPECT_EQ(out[0], 0xEE);
@@ -307,27 +326,29 @@ TEST(CommDfFormatResponse, MinimalResponse_ProducesValidFrame) {
     // status at offset 12
     EXPECT_EQ(read_u16(out + 12), 0);
 
-    // Footer must be at end
-    EXPECT_EQ(out[bytes - 4], 0xFF);
-    EXPECT_EQ(out[bytes - 3], 0xFE);
-    EXPECT_EQ(out[bytes - 2], 0xEF);
-    EXPECT_EQ(out[bytes - 1], 0xEE);
+    // Footer at end
+    EXPECT_EQ(out[out_len - 4], 0xFF);
+    EXPECT_EQ(out[out_len - 3], 0xFE);
+    EXPECT_EQ(out[out_len - 2], 0xEF);
+    EXPECT_EQ(out[out_len - 1], 0xEE);
+
+    free_result(out);
 }
 
 TEST(CommDfFormatResponse, MissingField_ReturnsMinus1) {
     // Missing status field
-    const char* json = R"({"group_id":101,"unit_id":2})";
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
+    const char* kwargs = R"({"group_id":101,"unit_id":2})";
+    uint8_t* out    = nullptr;
+    size_t out_len  = 0;
 
-    int bytes = format_response(json, out);
-
-    EXPECT_EQ(bytes, -1);
+    EXPECT_EQ(format_response(nullptr, kwargs, &out, &out_len), -1);
 }
 
 TEST(CommDfFormatResponse, NullInputs_ReturnsMinus1) {
-    uint8_t out[MAX_FRAME_BUFFER_BYTES];
-    EXPECT_EQ(format_response(nullptr, out),  -1);
-    EXPECT_EQ(format_response("{}", nullptr), -1);
+    uint8_t* out   = nullptr;
+    size_t out_len = 0;
+    EXPECT_EQ(format_response(nullptr, nullptr, &out, &out_len), -1);
+    EXPECT_EQ(format_response(nullptr, "{}", nullptr, nullptr),  -1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -335,18 +356,18 @@ TEST(CommDfFormatResponse, NullInputs_ReturnsMinus1) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST(CommDfFreeResult, NullPointer_DoesNotCrash) {
-    // delete[] nullptr is defined behavior — must not crash
     EXPECT_NO_THROW(free_result(nullptr));
 }
 
 TEST(CommDfFreeResult, ValidPointer_ReleasesMemory) {
-    // parse a frame to get a real allocation, then free it
     auto frame = make_resp_frame(comm_df::GROUP_SYSTEM_MGMT,
                                  comm_df::RESP_RESET,
                                  comm_df::STATUS_OK,
                                  nullptr, 0);
 
-    const char* json = parse_message(frame.data(), (int)frame.size(), 2);
+    char*  json     = nullptr;
+    size_t json_len = 0;
+    ASSERT_EQ(parse_message(frame.data(), frame.size(), &json, &json_len), 0);
     ASSERT_NE(json, nullptr);
     EXPECT_NO_THROW(free_result(json));
 }
