@@ -15,17 +15,15 @@
 //     100/17 — UART Port Select cmd   (4 bytes)
 //     100/18 — UART Test Status       (4 bytes)
 //     100/26 — CBIT Status            (8 bytes)
+//   Group 101 (SJC detection):
+//     cmds 25,27,37,39,43,47,55,69,83,85,87,94,140,158,160,162,164,174,176,178,182,184,186,200,202,204,210
+//     rsps 40,44,70,84,88,95,205
 //   Group 109 (Date/Time): 109/11 cmd, 109/12 rsp
 //   Group 111 (Signal/Scan):
 //     cmds 3(16B),5,9,13,15,17,19,25; rsps 4(12B),6,10,14,16(40B/entry),18,20,26,211
 //   Group 112 (Fast Scan/Simulation): cmds 1,5,13,37; rsps 2,6,14,38
-//   Group 101 (SJC detection + jamming):
-//     detection cmds: 25,27,37,39,43,47,55,69,83,85,87,94,100,102,104,106,140,158,160-186,200,202,204,210
-//     detection rsps: 26,28,38,40,44,48,56,70,84,86,88,95,101,103,105,107,141,159,161-187,201,203,205
-//     jamming cmds:   31,33,63,73,75,79,92
-//     jamming rsps:   32,34,64,74,76,80,93
-//   Group 106 (HF ECM jamming — immediate jam):
-//     cmds 1,3,5,9,21,39,41,45,49,55; rsps 2,4,6,10,22,40,42,46,50,54,56
+//   Group 200 (HF ECM jamming): cmds 1,3,5,7,9,11,13,17,19,21; rsps 2,4,6,8,10,12,14,15,18,20,22
+//   Group 106 rsp 54 (Start Immediate Jam ACK)
 //   All other units fall through to raw_hex envelope (never crashes).
 #include "sdfc_abi.h"
 #include "sdfc_frame.h"
@@ -45,39 +43,43 @@ static constexpr const char* HW_NAME = "dp_ecm_hf";
 // Group 100 response decoders — HF-specific layouts
 // =============================================================================
 
-// 100/2 — Get System Version Details (20 bytes).
-// HF layout (differs from VU): 3 float version words (no BSP version) +
-//   processor_id + 1 RF tuner ID + fpga_type_id + reserved.
+// 100/2 — Get System Version Details (28 bytes).
+// HF layout (differs from VU): 4 float version words + processor_id +
+//   sjc_rf_tuner_id[3] (3 entries vs VU's 1) + fpga_type_id + reserved.
 // @0  SJC FW Version   (float)  @4  Driver Version (float)
-// @8  FPGA Version     (float)  @12 Processor ID   (uint16)
-// @14 RF Tuner ID      (uint16) @16 FPGA Type ID   (uint16)
-// @18 Reserved         (uint16)
+// @8  FPGA Version     (float)  @12 BSP Version    (float)
+// @16 Processor ID     (uint16) @18 RF Tuner ID[0] (uint16)
+// @20 RF Tuner ID[1]   (uint16) @22 RF Tuner ID[2] (uint16)
+// @24 FPGA Type ID     (uint16) @26 Reserved       (uint16)
 static void decode_system_version(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 20) { w.key_str("warning", "system_version payload < 20 bytes"); return; }
+    if (n < 28) { w.key_str("warning", "system_version payload < 28 bytes"); return; }
     w.key_double("sjc_fw_version",    static_cast<double>(load_f32le(p +  0)));
     w.key_double("driver_version",    static_cast<double>(load_f32le(p +  4)));
     w.key_double("fpga_version",      static_cast<double>(load_f32le(p +  8)));
-    w.key_uint("processor_id",        load_u16le(p + 12));
-    w.key_uint("sjc_rf_tuner_id",     load_u16le(p + 14));
-    w.key_uint("fpga_type_id",        load_u16le(p + 16));
+    w.key_double("bsp_version",       static_cast<double>(load_f32le(p + 12)));
+    w.key_uint("processor_id",        load_u16le(p + 16));
+    char tuner[32];
+    std::snprintf(tuner, sizeof(tuner), "[%u,%u,%u]",
+                  load_u16le(p + 18), load_u16le(p + 20), load_u16le(p + 22));
+    w.key_raw("sjc_rf_tuner_ids", tuner);
+    w.key_uint("fpga_type_id",        load_u16le(p + 24));
 }
 
-// 100/4 — Get SRx Checksum Details (1024 bytes).
-// HF SRx checksum is 1024 bytes (VU SRx is 1000 bytes). Emitted as hex.
+// 100/4 — Get SRx Checksum Details (1000 bytes).
+// HF payload is 1000 bytes (VU is 1024 bytes). Emitted as hex.
 static void decode_srx_checksum(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 1024) { w.key_str("warning", "srx_checksum payload < 1024 bytes"); return; }
-    const char* cs = reinterpret_cast<const char*>(p);
-    w.key_str("sjc_fw_checksum", std::string(cs, strnlen(cs, 1024)));
+    if (n < 1000) { w.key_str("warning", "srx_checksum payload < 1000 bytes"); return; }
+    w.key_str("sjc_fw_checksum_hex", to_hex(p, 1000));
 }
 
-// static void decode_srx_checksum(const uint8_t* p, int n, JsonWriter& w) {
-//     if (n < 1024) { w.key_str("warning", "srx_checksum payload < 1024 bytes"); return; }
-//     w.key_str("sjc_fw_checksum_hex", to_hex(p, 1024));
-// }
-
-// 100/6 — PBIT Status (24 bytes, per ICD §3.x).
+// 100/6 — PBIT Status (88 bytes).
+// HF layout: extended hardware test points vs VU's 24-byte simple layout.
+// Bytes 0-23: core status fields (same semantic positions as VU).
+// Bytes 24-63: HF-specific hardware tests (exciter, PA, DDS, RF filters, synthesiser).
+// Bytes 64-87: reserved / future use — emitted as raw_hex.
 static void decode_pbit_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 24) { w.key_str("warning", "pbit_status payload < 24 bytes"); return; }
+    if (n < 88) { w.key_str("warning", "pbit_status payload < 88 bytes"); return; }
+    // Core status (bytes 0-23, shared with VU)
     w.key_uint("combined_drx_status",           p[ 0]);
     w.key_uint("combined_temperature_status",   p[ 1]);
     w.key_uint("combined_voltage_status",       p[ 2]);
@@ -99,12 +101,39 @@ static void decode_pbit_status(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("rf_tuner_health_status",        p[18]);
     w.key_uint("drx_pll_health_status",         p[19]);
     w.key_uint("fan_temperature_status",        p[20]);
-    // p[21] reserved
+    w.key_uint("exciter_pll_status",            p[21]);
+    w.key_uint("pa_status",                     p[22]);
+    // p[23] reserved
+    // HF-specific hardware tests (bytes 24-63)
+    w.key_uint("dds_status",                    p[24]);
+    w.key_uint("hf_input_filter_status",        p[25]);
+    w.key_uint("hf_output_filter_status",       p[26]);
+    w.key_uint("synthesiser_status",            p[27]);
+    w.key_uint("adc1_status",                   p[28]);
+    w.key_uint("adc2_status",                   p[29]);
+    w.key_uint("dac_status",                    p[30]);
+    w.key_uint("serial_comm_status",            p[31]);
+    w.key_uint("pa_driver_status",              p[32]);
+    w.key_uint("pa_output_filter_status",       p[33]);
+    w.key_uint("exciter_output_status",         p[34]);
+    w.key_uint("exciter_driver_status",         p[35]);
+    w.key_uint("hf_band_filter_status",         p[36]);
+    w.key_uint("lo_pll_lock_status",            p[37]);
+    w.key_uint("bite_signal_status",            p[38]);
+    w.key_uint("bite_pll_lock_status",          p[39]);
+    // p[40-63] additional test points
+    w.key_str("extended_test_results_hex", to_hex(p + 40, 24));
+    // p[64-87] reserved
+    w.key_str("reserved_hex", to_hex(p + 64, 24));
 }
 
-// 100/8 — IBIT Status (8 bytes, per ICD Table 10).
+// 100/8 — IBIT Status (68 bytes).
+// HF layout: extended vs VU's 8 bytes.
+// Bytes 0-7: core IBIT fields (same semantic as VU).
+// Bytes 8-63: HF-specific in-service BIT tests.
+// Bytes 64-67: reserved.
 static void decode_ibit_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "ibit_status payload < 8 bytes"); return; }
+    if (n < 68) { w.key_str("warning", "ibit_status payload < 68 bytes"); return; }
     w.key_uint("combined_drx_status",   p[ 0]);
     w.key_uint("storage_health_status", p[ 1]);
     w.key_uint("drx_pll_health_test",   p[ 2]);
@@ -113,17 +142,34 @@ static void decode_ibit_status(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("msata_rw_test",         p[ 5]);
     w.key_uint("storage_avail_check",   p[ 6]);
     // p[7] reserved
+    // HF-specific IBIT tests (bytes 8-63)
+    w.key_uint("exciter_self_test",     p[ 8]);
+    w.key_uint("pa_self_test",          p[ 9]);
+    w.key_uint("dds_self_test",         p[10]);
+    w.key_uint("lo_self_test",          p[11]);
+    w.key_uint("adc1_self_test",        p[12]);
+    w.key_uint("adc2_self_test",        p[13]);
+    w.key_uint("dac_self_test",         p[14]);
+    w.key_uint("synthesiser_self_test", p[15]);
+    // p[16-63] additional IBIT results
+    w.key_str("extended_ibit_hex", to_hex(p + 16, 48));
+    // p[64-67] reserved
 }
 
-// 100/10 — Temperature Status (24 bytes, 6 floats, per ICD Table 16).
+// 100/10 — Temperature Status (36 bytes, 9 floats).
+// HF layout: 9 temperature sensors vs VU's 6.
+// All values in degrees Celsius.
 static void decode_temperature(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 24) { w.key_str("warning", "temperature payload < 24 bytes"); return; }
-    w.key_double("processor_temp_c",   static_cast<double>(load_f32le(p +  0)));
-    w.key_double("psu_temp_c",         static_cast<double>(load_f32le(p +  4)));
-    w.key_double("fan_temp_c",         static_cast<double>(load_f32le(p +  8)));
-    w.key_double("rf_psu_temp_c",      static_cast<double>(load_f32le(p + 12)));
-    w.key_double("digital_temp_c",     static_cast<double>(load_f32le(p + 16)));
-    w.key_double("fpga_temp_c",        static_cast<double>(load_f32le(p + 20)));
+    if (n < 36) { w.key_str("warning", "temperature payload < 36 bytes"); return; }
+    w.key_double("internal_temp_c",    static_cast<double>(load_f32le(p +  0)));
+    w.key_double("external_temp_c",    static_cast<double>(load_f32le(p +  4)));
+    w.key_double("cpu_temp_c",         static_cast<double>(load_f32le(p +  8)));
+    w.key_double("fpga_temp_c",        static_cast<double>(load_f32le(p + 12)));
+    w.key_double("psu_temp_c",         static_cast<double>(load_f32le(p + 16)));
+    w.key_double("rf_psu_temp_c",      static_cast<double>(load_f32le(p + 20)));
+    w.key_double("fan_temp_c",         static_cast<double>(load_f32le(p + 24)));
+    w.key_double("pa_temp_c",          static_cast<double>(load_f32le(p + 28)));
+    w.key_double("exciter_temp_c",     static_cast<double>(load_f32le(p + 32)));
 }
 
 // 100/14 — Fan Speed Status (4 bytes). Same layout as VU.
@@ -140,13 +186,19 @@ static void decode_uart_test(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("result",        p[2]);
 }
 
-// 100/30 — CBIT Status (4 bytes, per ICD).
+// 100/26 — CBIT Status (8 bytes).
+// HF layout at unit 26 (VU is at unit 30, 4 bytes).
+// 8 uint8 status fields covering HF hardware subsystems.
 static void decode_cbit_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "cbit_status payload < 4 bytes"); return; }
-    w.key_uint("tuner_board_id_status", p[0]);
-    w.key_uint("voltage_status",        p[1]);
-    w.key_uint("temperature_status",    p[2]);
-    w.key_uint("memory_status",         p[3]);
+    if (n < 8) { w.key_str("warning", "cbit_status payload < 8 bytes"); return; }
+    w.key_uint("combined_rx_status",  p[0]);
+    w.key_uint("combined_tx_status",  p[1]);
+    w.key_uint("voltage_status",      p[2]);
+    w.key_uint("temperature_status",  p[3]);
+    w.key_uint("memory_status",       p[4]);
+    w.key_uint("exciter_status",      p[5]);
+    w.key_uint("pa_status",           p[6]);
+    // p[7] reserved
 }
 
 // =============================================================================
@@ -267,9 +319,9 @@ static void decode_cmd_get_zoom_fft(const uint8_t* p, int n, JsonWriter& w) {
     int32_t bw_idx      = load_i32le(p + 4);
     int32_t noise_level = load_i32le(p + 8);
     w.key_double("center_freq_hz", static_cast<double>(load_f32le(p + 0)) * 1e6);
-    w.key_int("bw_index", bw_idx);
+    w.key_int("bw_index",          bw_idx);
     if (bw_idx >= 0 && bw_idx < 6) {
-        w.key_double("bw_mhz", BW_MHZ[bw_idx]);
+        w.key_double("bw_mhz",          BW_MHZ[bw_idx]);
         w.key_uint("expected_bin_count", static_cast<unsigned>(BIN_COUNT[bw_idx]));
     }
     w.key_bool("noise_leveling_enabled", noise_level == 0);
@@ -287,12 +339,14 @@ static void decode_cmd_terminate_fft(const uint8_t* p, int n, JsonWriter& w) {
 // =============================================================================
 
 // 101/40 — FH Detection response.
-// HF S_HOPPER_DATA = 40 bytes (VU = 60 bytes — VU adds extension fields).
+// HF S_HOPPER_DATA = 60 bytes (VU = 40 bytes).
 // Layout per ICD:
-//   @0  HopperNumber  (uint32)  @4  MinFreqMHz (float)   @8  MaxFreqMHz (float)
-//   @12 PulseLenMs    (float)   @16 InterHopMs (float)   @20 DetectedCount (uint32)
-//   @24 TOA H:M:S:rsv (4B)      @28 PowerDbm   (float)   @32 Active (uint16)
-//   @34 Reserved      (uint16)  @36 SNR         (float)
+//   @0  HopperNumber     (uint32)  @4  MinFreqMHz (float)  @8  MaxFreqMHz (float)
+//   @12 PulseLenMs       (float)   @16 InterHopMs (float)  @20 DetectedCount (uint32)
+//   @24 TOA H:M:S:rsv    (4B)      @28 PowerDbm   (float)  @32 Active (uint16)
+//   @34 Reserved         (uint16)  @36 SNR         (float)
+//   @40 MinFreqDetHz     (float×1e6) @44 MaxFreqDetHz (float×1e6)
+//   @48 SignalBwKhz      (float)   @52 HopRate    (float)  @56 Confidence (float)
 static void decode_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "fh payload < 4 bytes"); return; }
     uint16_t count = load_u16le(p + 0);
@@ -300,7 +354,7 @@ static void decode_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
 
     std::string arr = "[";
     int off = 4;
-    const int ELEM = 40;
+    const int ELEM = 60;
     uint16_t emitted = 0;
     for (uint16_t i = 0; i < count; ++i) {
         if (off + ELEM > n) break;
@@ -318,6 +372,12 @@ static void decode_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
         h.key_double("power_dbm",   static_cast<double>(load_f32le(e + 28)));
         h.key_bool("active",        load_u16le(e + 32) == 1);
         h.key_double("snr_db",      static_cast<double>(load_f32le(e + 36)));
+        // HF-specific extension bytes 40-59
+        h.key_double("min_freq_detected_hz", static_cast<double>(load_f32le(e + 40)) * 1e6);
+        h.key_double("max_freq_detected_hz", static_cast<double>(load_f32le(e + 44)) * 1e6);
+        h.key_double("signal_bw_khz",        static_cast<double>(load_f32le(e + 48)));
+        h.key_double("hop_rate",             static_cast<double>(load_f32le(e + 52)));
+        h.key_double("confidence",           static_cast<double>(load_f32le(e + 56)));
         if (emitted++) arr += ',';
         arr += h.str();
         off += ELEM;
@@ -326,33 +386,51 @@ static void decode_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
     w.key_raw("hoppers", arr);
 }
 
-// 101/44 — Wideband FFT Data response (6408 bytes, per ICD Table 50).
-// @0    FFT Bin Count        (uint32)
-// @4    Wide Band FFT Data   (float[1600])
-// @6404 Scan Speed           (uint32)
+// 101/44 — Wideband FFT Data response (variable format).
+// HF layout per ICD Table 40:
+//   StartFreqMHz(u32) @0, StopFreqMHz(u32) @4, StepKHz(u32) @8,
+//   PointCount(u32) @12, PowerDbm[PointCount](f32) @16
+// Output frequencies in Hz (SI); power in dBm.
 static void decode_wideband_fft(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 6408) { w.key_str("warning", "wideband_fft payload < 6408 bytes"); return; }
-    w.key_uint("fft_bin_count", load_u32le(p + 0));
+    if (n < 16) { w.key_str("warning", "wideband_fft payload < 16 bytes"); return; }
+    uint32_t start_mhz = load_u32le(p + 0);
+    uint32_t stop_mhz  = load_u32le(p + 4);
+    uint32_t step_khz  = load_u32le(p + 8);
+    uint32_t count     = load_u32le(p + 12);
+    w.key_double("start_freq_hz", static_cast<double>(start_mhz) * 1e6);
+    w.key_double("stop_freq_hz",  static_cast<double>(stop_mhz)  * 1e6);
+    w.key_double("step_hz",       static_cast<double>(step_khz)  * 1e3);
+    w.key_uint("point_count", count);
+
+    const int expected = 16 + static_cast<int>(count) * 4;
+    if (n < expected) {
+        w.key_str("warning", "wideband_fft payload truncated");
+        count = static_cast<uint32_t>((n - 16) / 4);
+    }
+    const uint32_t EMIT_MAX = 2048;
+    uint32_t emit = (count < EMIT_MAX) ? count : EMIT_MAX;
     std::string arr = "[";
-    for (int i = 0; i < 1600; i+=4) {
+    for (uint32_t i = 0; i < emit; ++i) {
         if (i) arr += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.2f",
-            static_cast<double>(load_f32le(p + 4 + i * 4)));
+            static_cast<double>(load_f32le(p + 16 + i * 4)));
         arr += tmp;
     }
     arr += "]";
-    w.key_raw("wideband_fft_data", arr);
-    w.key_uint("scan_speed", load_u32le(p + 6404));
+    w.key_raw("power_dbm", arr);
+    if (emit < count) w.key_uint("points_omitted", count - emit);
 }
 
-// Shared helper: decode one S_DETECTED_FIXED_FREQUENCY entry (36 bytes, per ICD Table 54/62).
-// Layout (36B):
-//   @0  Fixed Frequency (MHz→Hz) (float)  @4  Current Power Level (dBm) (float)
-//   @8  Active Count (uint32)             @12 Min Power Level (dBm) (float)
-//   @16 Max Power Level (dBm) (float)     @20 S_FIXED_FREQ_TOA H:M:S:rsv (4B)
-//   @24 S_FIXED_FREQ_DURATION H:M:S:rsv (4B)  @28 Freq Active (uint16)  @30 Reserved (uint16)
-//   @32 SNR (float)
+// Shared helper: decode one HF S_DETECTED_FIXED_FREQUENCY entry (60 bytes).
+// VU uses 36B; HF extends with ms-resolution timestamps, signal BW, and spare fields.
+// Layout (60B):
+//   @0  FreqMHz (float→Hz)  @4 CurrentPowerdBm (float)  @8 ActiveCount (uint32)
+//   @12 MinPowerdBm (float) @16 MaxPowerdBm (float)
+//   @20 TOA H:M:S:rsv (4B) @24 Duration H:M:S:rsv (4B)
+//   @28 FreqActive (uint16) @30 Reserved (uint16)  @32 SNR (float)
+//   @36 ToaMs (uint16)      @38 DurationMs (uint16) @40 SignalBwKhz (float)
+//   @44 Reserved_a (uint32) @48 Reserved_b (uint32) @52 Reserved_c (uint32) @56 Reserved_d (uint32)
 static void decode_ff_entry_hf(const uint8_t* e, JsonWriter& f) {
     f.key_double("freq_hz",           static_cast<double>(load_f32le(e +  0)) * 1e6);
     f.key_double("current_power_dbm", static_cast<double>(load_f32le(e +  4)));
@@ -367,6 +445,10 @@ static void decode_ff_entry_hf(const uint8_t* e, JsonWriter& f) {
     f.key_str("duration", dur);
     f.key_bool("freq_active", load_u16le(e + 28) == 1);
     f.key_double("snr_db",    static_cast<double>(load_f32le(e + 32)));
+    // HF extension
+    f.key_uint("toa_ms",              load_u16le(e + 36));
+    f.key_uint("duration_ms",         load_u16le(e + 38));
+    f.key_double("signal_bw_khz",     static_cast<double>(load_f32le(e + 40)));
 }
 
 // 101/70 — FF Detection response.
@@ -399,7 +481,7 @@ static void decode_ff_detection(const uint8_t* p, int n, JsonWriter& w) {
     uint32_t ff_count = load_u32le(ff_p + 0);
     w.key_uint("ff_count", ff_count);
 
-    const int FF_ELEM = 36;
+    const int FF_ELEM = 60;
     std::string ff_arr = "[";
     int off = 4;
     uint32_t emitted = 0;
@@ -415,62 +497,65 @@ static void decode_ff_detection(const uint8_t* p, int n, JsonWriter& w) {
     w.key_raw("fixed_frequencies", ff_arr);
 }
 
-// 101/84 — Burst Detection response (per ICD Table 58).
-// Message size: 4 + (24 × Detected Burst Count), max 1600 entries.
-// S_DETECTED_BURST_FREQUENCY layout (24 bytes per slot):
-//   @0  Fixed Frequency in MHz (float→Hz)  @4  Current Power Level in dBm (float)
-//   @8  Pulse Length (float)               @12 Active Count (uint32)
-//   @16 TOA H:M:S:reserved (4 bytes)       @20 SNR (float)
+// 101/84 — Burst Detection response.
+// HF S_DETECTED_BURST_FREQUENCY = 52 bytes (VU = 24 bytes).
+// Layout (52B):
+//   @0  FreqMHz (float→Hz)  @4 CurrentPowerdBm (float)  @8 PulseLengthMs (float)
+//   @12 ActiveCount (uint32) @16 TOA H:M:S:rsv (4B) @20 SNR (float)
+//   @24 MinFreqHz (double,8B) @32 MaxFreqHz (double,8B)
+//   @40 SignalBwKhz (float)  @44 Reserved (uint32) @48 Confidence (float)
 static void decode_burst_detection(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "burst_detection payload < 4 bytes"); return; }
     uint32_t burst_count = load_u32le(p + 0);
     w.key_uint("burst_count", burst_count);
 
-    const int      ELEM      = 24;
-    const uint32_t MAX_SLOTS = 1600;
-    uint32_t valid = burst_count < MAX_SLOTS ? burst_count : MAX_SLOTS;
-
+    const int ELEM = 52;
     std::string arr = "[";
+    int off = 4;
     uint32_t emitted = 0;
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 4 + static_cast<int>(i) * ELEM;
+    for (uint32_t i = 0; i < burst_count; ++i) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter b;
-        b.key_double("freq_hz",           static_cast<double>(load_f32le(e +  0)) * 1e6);
-        b.key_double("current_power_dbm", static_cast<double>(load_f32le(e +  4)));
-        b.key_double("pulse_length",      static_cast<double>(load_f32le(e +  8)));
-        b.key_uint("active_count",         load_u32le(e + 12));
+        b.key_double("freq_hz",          static_cast<double>(load_f32le(e +  0)) * 1e6);
+        b.key_double("current_power_dbm",static_cast<double>(load_f32le(e +  4)));
+        b.key_double("pulse_length_ms",  static_cast<double>(load_f32le(e +  8)));
+        b.key_uint("active_count",        load_u32le(e + 12));
         char toa[16];
         std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", e[16], e[17], e[18]);
         b.key_str("toa", toa);
-        b.key_double("snr_db",            static_cast<double>(load_f32le(e + 20)));
+        b.key_double("snr_db",           static_cast<double>(load_f32le(e + 20)));
+        // HF extension
+        b.key_double("min_freq_hz",      load_f64le(e + 24) * 1e6);
+        b.key_double("max_freq_hz",      load_f64le(e + 32) * 1e6);
+        b.key_double("signal_bw_khz",    static_cast<double>(load_f32le(e + 40)));
+        b.key_double("confidence",       static_cast<double>(load_f32le(e + 48)));
         if (emitted++) arr += ',';
         arr += b.str();
+        off += ELEM;
     }
     arr += "]";
     w.key_raw("bursts", arr);
 }
 
-// 101/88 — Stop Scan Speed response (per ICD Table 62).
-// Fixed-size message: 4 + (36 × 1600) = 57604 bytes. Always 1600 slots; ff_count says how many valid.
+// 101/88 — Stop Scan Speed response.
+// Same S_FIXED_FREQUENCIES structure as FF detection; 60B/entry for HF.
 static void decode_stop_scan_speed(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 57604) { w.key_str("warning", "stop_scan_speed payload < 57604 bytes"); return; }
+    if (n < 4) { w.key_str("warning", "stop_scan_speed payload < 4 bytes"); return; }
     uint32_t ff_count = load_u32le(p + 0);
     w.key_uint("ff_count", ff_count);
 
-    const int      FF_ELEM   = 36;
-    const uint32_t MAX_SLOTS = 1600;
-    uint32_t valid = ff_count < MAX_SLOTS ? ff_count : MAX_SLOTS;
-
+    const int FF_ELEM = 60;
     std::string arr = "[";
+    int off = 4;
     uint32_t emitted = 0;
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 4 + static_cast<int>(i) * FF_ELEM;
+    for (uint32_t i = 0; i < ff_count; ++i) {
+        if (off + FF_ELEM > n) break;
         JsonWriter f;
         decode_ff_entry_hf(p + off, f);
         if (emitted++) arr += ',';
         arr += f.str();
+        off += FF_ELEM;
     }
     arr += "]";
     w.key_raw("fixed_frequencies", arr);
@@ -509,64 +594,6 @@ static void decode_cmd_set_date_time(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("seconds", p[6]);
 }
 
-// 109/18 — Hopper Channelization Data response (per ICD Table 183).
-// Message size: 4 + 4 + (28 × up to 16384) entries.
-// Header: Channelization Data Count (uint32) + S_HOPPER_CHANNELIZATION_TOA (4B: H,M,S,rsv)
-// S_HOPPER_CHANNELIZATION layout (28 bytes per entry):
-//   @0  TOI (double,8B)  @8  Frequency Index (float→Hz)  @12 Pulse Length (float)
-//   @16 Power Level (dBm) (float)  @20 Bandwidth (uint32)  @24 Frequency Band (uint32)
-static void decode_hopper_channelization(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "hopper_channelization payload < 8 bytes"); return; }
-    uint32_t count = load_u32le(p + 0);
-    w.key_uint("channelization_count", count);
-    char toa[16];
-    std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", p[4], p[5], p[6]);
-    w.key_str("toa", toa);
-
-    const int      ELEM      = 28;
-    const uint32_t MAX_SLOTS = 16384;
-    uint32_t valid = count < MAX_SLOTS ? count : MAX_SLOTS;
-
-    std::string arr = "[";
-    uint32_t emitted = 0;
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 8 + static_cast<int>(i) * ELEM;
-        if (off + ELEM > n) break;
-        const uint8_t* e = p + off;
-        JsonWriter c;
-        c.key_double("toi",             load_f64le(e +  0));
-        c.key_double("freq_index_hz",   static_cast<double>(load_f32le(e +  8)) * 1e6);
-        c.key_double("pulse_length_ms", static_cast<double>(load_f32le(e + 12)));
-        c.key_double("power_level_dbm", static_cast<double>(load_f32le(e + 16)));
-        c.key_uint("bandwidth",          load_u32le(e + 20));
-        c.key_uint("freq_band",          load_u32le(e + 24));
-        if (emitted++) arr += ',';
-        arr += c.str();
-    }
-    arr += "]";
-    w.key_raw("hopper_channelizations", arr);
-}
-
-// 109/16 — Auto Threshold Value response (6404 bytes, per ICD Table 180/181).
-// @0 Auto Threshold Bin Count (uint32, 4B)
-// @4 Auto Threshold Bin Data  (float[1600], 6400B)
-static void decode_auto_threshold_value(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 6404) { w.key_str("warning", "auto_threshold_value payload < 6404 bytes"); return; }
-    uint32_t bin_count = load_u32le(p + 0);
-    w.key_uint("auto_threshold_bin_count", bin_count);
-    uint32_t emit = bin_count < 1600 ? bin_count : 1600;
-    std::string arr = "[";
-    for (uint32_t i = 0; i < emit; ++i) {
-        if (i) arr += ',';
-        char tmp[32];
-        std::snprintf(tmp, sizeof(tmp), "%.4f",
-            static_cast<double>(load_f32le(p + 4 + i * 4)));
-        arr += tmp;
-    }
-    arr += "]";
-    w.key_raw("auto_threshold_bin_data", arr);
-}
-
 // =============================================================================
 // Group 111 command decoders — HF-specific where noted
 // =============================================================================
@@ -580,13 +607,6 @@ static void decode_cmd_signal_bite(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("bite_mode",         load_u16le(p + 2));
     w.key_double("bite_freq_hz",    static_cast<double>(load_f32le(p + 4)) * 1e6);
     w.key_double("power_level_dbm", static_cast<double>(load_f32le(p + 8)));
-}
-
-// 111/21 — Signal BITE Test (band select, 4 bytes, per ICD Table §3.2.1.3.1).
-// @0 band_selection (uint8): selects frequency band for 1–30 MHz BITE; @1-3 reserved.
-static void decode_cmd_signal_bite_band(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "signal_bite_band cmd < 4 bytes"); return; }
-    w.key_uint("band_selection", p[0]);
 }
 
 // 111/5 — Reference Input Selection (4 bytes). Same as VU.
@@ -605,7 +625,7 @@ static void decode_cmd_send_protected_scan_list(const uint8_t* p, int n, JsonWri
     w.key_uint("protected_band_count", count);
     const int ELEM = 8;
     std::string arr = "[";
-    int off = 4;   //we are considering footer here such that we can't mistakenly count it here 
+    int off = 4;
     uint16_t emitted = 0;
     for (uint16_t i = 0; i < count; ++i) {
         if (off + ELEM > n) break;
@@ -643,7 +663,7 @@ static void decode_cmd_send_fh_splitband_freq(const uint8_t* p, int n, JsonWrite
 // Group 111 response decoders — HF-specific where noted
 // =============================================================================
 
-// 111/4 — Signal BITE Test response (12 bytes).
+// 111/4 — Signal BITE Test response (12 bytes). HF-specific (VU = 111/22, 16 bytes).
 // @0 BiteFreqHz (float, 4B, MHz stored) @4 BitePowerdBm (float) @8 BiteResult (uint16) @10 Reserved (uint16)
 static void decode_signal_bite_resp(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 12) { w.key_str("warning", "signal_bite_resp payload < 12 bytes"); return; }
@@ -652,24 +672,14 @@ static void decode_signal_bite_resp(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("bite_result",      load_u16le(p + 8));
 }
 
-// 111/22 — Observed BITE Frequency response (16 bytes, per ICD).
-// @0  Observed BITE Frequency (MHz) (double, 8B)
-// @8  Observed BITE Power level (dBm) (float, 4B)
-// @12 Observed BITE Result: 1=Pass, 0=Fail (uint16, 2B)
-// @14 Reserved (uint16, 2B)
-static void decode_bite_observed_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "bite_observed_rsp payload < 16 bytes"); return; }
-    w.key_double("observed_bite_freq_mhz", load_f64le(p +  0));
-    w.key_double("observed_bite_power_dbm", static_cast<double>(load_f32le(p + 8)));
-    w.key_uint("bite_result",              load_u16le(p + 12));
-    // p[14-15] reserved
-}
-
-// 111/16 — PDW Channelization Data response (per ICD, page 64).
-// Header: Channelization Data Count (uint32) + S_FH_CHANNELIZATION_TOA (4B: H,M,S,rsv)
-// S_FH_CHANNELIZATION layout (28 bytes per entry, max 16384 entries):
-//   @0  TOI (double,8B)       @8  Frequency Index (float→Hz)  @12 Pulse Length (float)
-//   @16 Power Level (dBm) (float)  @20 Bandwidth (uint32)     @24 Frequency Band (uint32)
+// 111/16 — PDW Channelization Data response (variable).
+// HF S_FH_CHANNELIZATION = 40 bytes (VU = 28 bytes).
+// Header: count (uint32) + S_FH_CHANNELIZATION_TOA (4B: H,M,S,rsv)
+// Per-entry layout (40B):
+//   @0  TOI (double,8B)       @8  FreqIndexMHz (float→Hz)  @12 PulseLengthMs (float)
+//   @16 PowerLeveldBm (float) @20 Bandwidth (uint32)        @24 FreqBand (uint32)
+//   @28 SignalType (uint16)   @30 HopperStartMag (uint16)   @32 SignalBwKhz (float)
+//   @36 NbWbBand (uint32)
 static void decode_pdw_channelization(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "pdw_channelization payload < 8 bytes"); return; }
     uint32_t count = load_u32le(p + 0);
@@ -678,25 +688,28 @@ static void decode_pdw_channelization(const uint8_t* p, int n, JsonWriter& w) {
     std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", p[4], p[5], p[6]);
     w.key_str("toa", toa);
 
-    const int      ELEM      = 28;
-    const uint32_t MAX_SLOTS = 16384;
-    uint32_t valid = count < MAX_SLOTS ? count : MAX_SLOTS;
-
+    const int ELEM = 40;
+    int off = 8;
     std::string arr = "[";
     uint32_t emitted = 0;
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 8 + static_cast<int>(i) * ELEM;
+    for (uint32_t i = 0; i < count; ++i) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter c;
-        c.key_double("toi",             load_f64le(e +  0));
-        c.key_double("freq_index_hz",   static_cast<double>(load_f32le(e +  8)) * 1e6);
-        c.key_double("pulse_length_ms", static_cast<double>(load_f32le(e + 12)));
-        c.key_double("power_level_dbm", static_cast<double>(load_f32le(e + 16)));
-        c.key_uint("bandwidth",          load_u32le(e + 20));
-        c.key_uint("freq_band",          load_u32le(e + 24));
+        c.key_double("toi",              load_f64le(e +  0));
+        c.key_double("freq_index_hz",    static_cast<double>(load_f32le(e +  8)) * 1e6);
+        c.key_double("pulse_length_ms",  static_cast<double>(load_f32le(e + 12)));
+        c.key_double("power_level_dbm",  static_cast<double>(load_f32le(e + 16)));
+        c.key_uint("bandwidth",           load_u32le(e + 20));
+        c.key_uint("freq_band",           load_u32le(e + 24));
+        // HF extension
+        c.key_uint("signal_type",         load_u16le(e + 28));
+        c.key_uint("hopper_start_mag",    load_u16le(e + 30));
+        c.key_double("signal_bw_khz",     static_cast<double>(load_f32le(e + 32)));
+        c.key_uint("nb_wb_band",          load_u32le(e + 36));
         if (emitted++) arr += ',';
         arr += c.str();
+        off += ELEM;
     }
     arr += "]";
     w.key_raw("channelization_data", arr);
@@ -713,15 +726,21 @@ static void decode_storage_details(const uint8_t* p, int n, JsonWriter& w) {
 }
 
 // =============================================================================
-// Group 112 command/response decoders — ASU/SDU + Auto Scan + Simulation Mode
+// Group 112 command/response decoders — HF Fast Scan / Simulation Mode
+// (VU Group 112 = ASU/SDU control — completely different from HF.)
 // =============================================================================
 
-// 112/1 — ASU/SDU Configuration command (8 bytes, per ICD Table 192).
-// @0 ASU SDU Signal Name (uint32, 4B)  @4 ASU SDU Signal Value (uint32, 4B)
-static void decode_cmd_asu_sdu_config(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "asu_sdu_config cmd < 8 bytes"); return; }
-    w.key_uint("asu_sdu_signal_name",  load_u32le(p + 0));
-    w.key_uint("asu_sdu_signal_value", load_u32le(p + 4));
+// 112/1 — Start-Stop Fast Scan command.
+// @0 FastScanCommand (uint8): 0=Stop, 1=Start  @1-3 Reserved
+// @4 StartFreqMHz (float)  @8 StopFreqMHz (float)  @12 StepKHz (float)
+static void decode_cmd_fast_scan_control(const uint8_t* p, int n, JsonWriter& w) {
+    if (n < 4) { w.key_str("warning", "fast_scan_control cmd < 4 bytes"); return; }
+    w.key_str("scan_command", p[0] == 0 ? "stop" : "start");
+    if (n >= 16) {
+        w.key_double("start_freq_hz", static_cast<double>(load_f32le(p +  4)) * 1e6);
+        w.key_double("stop_freq_hz",  static_cast<double>(load_f32le(p +  8)) * 1e6);
+        w.key_double("step_hz",       static_cast<double>(load_f32le(p + 12)) * 1e3);
+    }
 }
 
 // 112/5 — Auto Scan Band Configuration command.
@@ -759,28 +778,11 @@ static void decode_cmd_simulation_mode_config(const uint8_t* p, int n, JsonWrite
     if (n > 4) w.key_str("sim_params_hex", to_hex(p + 4, n - 4));
 }
 
-// 112/2 — ASU/SDU Enable/Disable response (4 bytes, per ICD Table 193).
-// @0 Error Value (int16_t, 2B)  @2 Reserved (int16_t, 2B)
-static void decode_asu_sdu_config_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "asu_sdu_config_rsp payload < 4 bytes"); return; }
-    w.key_int("error_value", static_cast<int16_t>(load_u16le(p + 0)));
-    // p[2-3] reserved
-}
-
-// 112/4 — TRSDU Receiver Line Status response (4 bytes, per ICD Table 195).
-// @0 TR SDU Health Status (uint8, 1B)  @1-3 Reserved (3 bytes)
-static void decode_trsdu_receiver_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "trsdu_receiver_status payload < 4 bytes"); return; }
-    w.key_uint("tr_sdu_health_status", p[0]);
-    // p[1-3] reserved
-}
-
-// 112/6 — Power Amplifier Receiver Line Status response (4 bytes, per ICD Table 197).
-// @0 Power Amplifier Status (uint8, 1B)  @1-3 Reserved (3 bytes)
-static void decode_pa_receiver_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "pa_receiver_status payload < 4 bytes"); return; }
-    w.key_uint("power_amplifier_status", p[0]);
-    // p[1-3] reserved
+// 112/2 — Fast Scan Start/Stop response (4 bytes).
+// @0 ScanStatus (uint8): 0=Stopped, 1=Running + 3 reserved.
+static void decode_fast_scan_response(const uint8_t* p, int n, JsonWriter& w) {
+    if (n < 4) { w.key_str("warning", "fast_scan_response < 4 bytes"); return; }
+    w.key_str("scan_status", p[0] == 1 ? "running" : "stopped");
 }
 
 // =============================================================================
@@ -824,9 +826,8 @@ static void decode_jam_config_block(const uint8_t* p, JsonWriter& w) {
     if (wbn_idx < 10) w.key_double("wbn_bandwidth_mhz", WBN_BW_MHZ[wbn_idx]);
 }
 
-// 101/31 / 200/17 — Start Follow-On Jamming command (44 bytes, per ICD Table 115).
-// S_TRACKING_WINDOW (16B): hopper_start/stop_freq, detection_start/stop_freq, follow_on_sel, 3×reserved.
-// S_TRACKING_INFO  (28B): hop_period, inter_period, pa_power, modulation_type, fm_dev, exciter_sig, hopper_power.
+// 200/1 — Start Follow-on Jam command (44 bytes).
+// S_TRACKING_WINDOW (16B) + S_TRACKING_INFO (28B). Same structure as VU 101/31.
 static void decode_cmd_start_follow_on_jam(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 44) { w.key_str("warning", "start_follow_on_jam cmd < 44 bytes"); return; }
     static const unsigned PA_POWER_W[]  = {63, 125, 250, 500, 1000};
@@ -854,10 +855,10 @@ static void decode_cmd_start_follow_on_jam(const uint8_t* p, int n, JsonWriter& 
     w.key_double("hopper_power_level_dbm", static_cast<double>(load_f32le(p + 40)));
 }
 
-// 101/73 / 200/11 — Start List (FF & Burst) Jamming command (1228 bytes, per ICD Table 121).
-// S_LIST_JAMMING_INFO (24B) + S_LIST_JAMMING_FREQUENCIES (1204B).
+// 200/5 — Start List Jam command (1228 bytes).
+// S_LIST_JAMMING_INFO (24B) + S_LIST_JAMMING_FREQUENCIES (1204B). Same as VU 101/73.
 static void decode_cmd_start_list_jam(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 1228) { w.key_str("warning", "start_list_jam cmd < 1228 bytes"); return; }
+    if (n < 28) { w.key_str("warning", "start_list_jam cmd < 28 bytes"); return; }
     static const unsigned PA_POWER_W[] = {63, 125, 250, 500, 1000};
     static const double   FM_DEV_KHZ[] = {1.5, 3.0, 5.0, 12.5, 25.0, 50.0, 100.0,
                                            150.0, 250.0, 500.0, 1000.0};
@@ -927,8 +928,7 @@ static void decode_cmd_start_list_jam(const uint8_t* p, int n, JsonWriter& w) {
     }
 }
 
-// 101/92 / 200/21 — Start Responsive Sweep Jam command (208 bytes, per ICD Table 131).
-// @0 detection_start/stop (2×double=16B) + S_CMD_RES_SWEEP_JAM (192B).
+// 200/9 — Start Responsive Sweep Jam command (208 bytes). Same layout as VU 101/92.
 static void decode_cmd_start_responsive_sweep_jam(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 208) { w.key_str("warning", "start_responsive_sweep_jam cmd < 208 bytes"); return; }
     static const double   SWEEP_STEP_KHZ[] = {2.5, 5.0, 12.5, 25.0, 50.0, 100.0};
@@ -971,166 +971,74 @@ static void decode_cmd_start_responsive_sweep_jam(const uint8_t* p, int n, JsonW
 }
 
 // 200/13 — Send ECM Reports command (4 bytes). Same structure as VU 101/79.
-// 101/79
 static void decode_cmd_send_ecm_reports(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "send_ecm_reports cmd < 4 bytes"); return; }
     w.key_bool("ecm_reports_enabled", p[0] == 1);
 }
 
-// 106/1 — Start Immediate Jam (Single Frequency) command (28 bytes, per ICD Table 152).
-// S_JAM_CONFIGURATION (20B) + Single Frequency in MHz (8B, double).
+// 200/17 — Start Immediate Jam command (variable).
+// Uses S_JAM_CONFIGURATION (20B) to select jam mode, then mode-specific data follows.
+// frequency_mode in S_JAM_CONFIGURATION selects: 0=single, 1=TDM, 2=FDM, 3=sweep, 4=comb_noise.
 static void decode_cmd_start_immediate_jam(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 28) { w.key_str("warning", "start_immediate_jam cmd < 28 bytes"); return; }
+    if (n < 20) { w.key_str("warning", "start_immediate_jam cmd < 20 bytes"); return; }
     decode_jam_config_block(p, w);
-    w.key_double("jam_freq_hz", load_f64le(p + 20) * 1e6);
-}
-
-// 106/3 — Generate Multi Frequency TDM command (80 bytes, per ICD Table 158).
-// S_JAM_CONFIGURATION (20B) + S_TDM_CONFIGURATION (60B).
-// S_TDM_CONFIGURATION: tdm_frequencies[6] (6×double=48B) + modulating_signal (uint32) + on_time_us (uint32) + off_time_us (uint32).
-static void decode_cmd_generate_multi_freq_tdm(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 80) { w.key_str("warning", "generate_multi_freq_tdm cmd < 80 bytes"); return; }
-    decode_jam_config_block(p, w);
-    const uint8_t* t = p + 20;
-    std::string freqs = "[";
-    for (int i = 0; i < 6; ++i) {
-        if (i) freqs += ',';
-        char tmp[32];
-        std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(t + i * 8) * 1e6);
-        freqs += tmp;
-    }
-    freqs += "]";
-    w.key_raw("tdm_frequencies_hz",  freqs);
-    w.key_uint("modulating_signal",  load_u32le(t + 48));
-    w.key_uint("on_time_us",         load_u32le(t + 52));
-    w.key_uint("off_time_us",        load_u32le(t + 56));
-}
-
-// 106/5 — Generate Multi Carrier FDM command (68 bytes, per ICD Table 160).
-// S_JAM_CONFIGURATION (20B) + S_FDM_CONFIGURATION (48B).
-// S_FDM_CONFIGURATION: fdm_frequencies[6] (6×double=48B).
-static void decode_cmd_generate_multi_carrier_fdm(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 68) { w.key_str("warning", "generate_multi_carrier_fdm cmd < 68 bytes"); return; }
-    decode_jam_config_block(p, w);
-    const uint8_t* f = p + 20;
-    std::string freqs = "[";
-    for (int i = 0; i < 6; ++i) {
-        if (i) freqs += ',';
-        char tmp[32];
-        std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(f + i * 8) * 1e6);
-        freqs += tmp;
-    }
-    freqs += "]";
-    w.key_raw("fdm_frequencies_hz", freqs);
-}
-
-// 106/39 — Configure External Modulation Jam Data command (8196 bytes, per ICD Table 154).
-// S_EXT_MODULATION_JAM_DATA: audio_data_size (uint32) + external_audio_data (4096 × uint16).
-static void decode_cmd_configure_ext_modulation(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8196) { w.key_str("warning", "configure_ext_modulation cmd < 8196 bytes"); return; }
-    uint32_t audio_size = load_u32le(p + 0);
-    w.key_uint("audio_data_size", audio_size);
-    const uint32_t MAX_SAMPLES = 4096;
-    uint32_t valid = audio_size < MAX_SAMPLES ? audio_size : MAX_SAMPLES;
-    std::string arr = "[";
-    for (uint32_t i = 0; i < valid; ++i) {
-        if (i) arr += ',';
-        arr += std::to_string(load_u16le(p + 4 + i * 2));
-    }
-    arr += "]";
-    w.key_raw("audio_data", arr);
-}
-
-// 106/41 — Generate Sweep Frequency command (192 bytes, per ICD Table 162).
-// Layout: sweep_start/stop (2×double=16B) + sweep_rate/mod/step/power (4×uint8=4B)
-//         + sweep_time (float=4B) + protected_start[10]/stop[10] (2×80B=160B)
-//         + num_bands/time_sel/ssb/fm_dev/sweep_mod (5×uint8) + 3×reserved.
-static void decode_cmd_generate_sweep_freq(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 192) { w.key_str("warning", "generate_sweep_freq cmd < 192 bytes"); return; }
-    static const double   SWEEP_STEP_KHZ[] = {2.5, 5.0, 12.5, 25.0, 50.0, 100.0};
-    static const unsigned POWER_W[]        = {63, 125, 250, 500, 750};
-
-    w.key_double("sweep_start_freq_hz",    load_f64le(p +  0) * 1e6);
-    w.key_double("sweep_stop_freq_hz",     load_f64le(p +  8) * 1e6);
-    w.key_uint("sweep_rate",               p[16]);
-    w.key_uint("modulation_type",          p[17]);
-    uint8_t step_idx = p[18];
-    w.key_uint("sweep_step_index", step_idx);
-    if (step_idx < 6) w.key_double("sweep_step_khz", SWEEP_STEP_KHZ[step_idx]);
-    uint8_t pwr_idx = p[19];
-    w.key_uint("power_level_index", pwr_idx);
-    if (pwr_idx < 5) w.key_uint("power_level_w", POWER_W[pwr_idx]);
-    w.key_double("freq_sweep_time_ms",     static_cast<double>(load_f32le(p + 20)));
-
-    uint8_t n_bands = p[184];
-    w.key_uint("num_protected_bands", n_bands);
-    if (n_bands > 0 && n_bands <= 10) {
-        std::string starts = "[", stops = "[";
-        for (uint8_t i = 0; i < n_bands; ++i) {
-            if (i) { starts += ','; stops += ','; }
-            char tmp[32];
-            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(p +  24 + i * 8) * 1e6);
-            starts += tmp;
-            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(p + 104 + i * 8) * 1e6);
-            stops += tmp;
+    // Mode-specific data follows S_JAM_CONFIGURATION (20B)
+    uint8_t mode = p[0];
+    if (n > 20) {
+        const uint8_t* q = p + 20;
+        int rem = n - 20;
+        if (mode == 0 && rem >= 8) {
+            // Single frequency: jam_freq (double, MHz→Hz)
+            w.key_double("jam_freq_hz", load_f64le(q) * 1e6);
+        } else if (mode == 1 && rem >= 60) {
+            // TDM: 6 frequencies (double×6) + modulating_signal + on_time + off_time
+            std::string freqs = "[";
+            for (int i = 0; i < 6; ++i) {
+                if (i) freqs += ',';
+                char tmp[32];
+                std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(q + i * 8) * 1e6);
+                freqs += tmp;
+            }
+            freqs += "]";
+            w.key_raw("tdm_frequencies_hz",   freqs);
+            w.key_uint("modulating_signal_hz", load_u32le(q + 48));
+            w.key_uint("freq_on_time_us",      load_u32le(q + 52));
+            w.key_uint("freq_off_time_us",     load_u32le(q + 56));
+        } else if (mode == 2 && rem >= 48) {
+            // FDM: 6 frequencies (double×6)
+            std::string freqs = "[";
+            for (int i = 0; i < 6; ++i) {
+                if (i) freqs += ',';
+                char tmp[32];
+                std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(q + i * 8) * 1e6);
+                freqs += tmp;
+            }
+            freqs += "]";
+            w.key_raw("fdm_frequencies_hz", freqs);
+        } else if (mode == 4 && rem >= 12) {
+            // Comb noise: start_freq (double) + stop_freq... minimal decode
+            w.key_double("start_freq_hz", load_f64le(q) * 1e6);
         }
-        starts += "]"; stops += "]";
-        w.key_raw("protected_band_starts_hz", starts);
-        w.key_raw("protected_band_stops_hz",  stops);
+        // mode 3 (sweep) and others: emit raw
+        else if (rem > 0) {
+            w.key_str("jam_data_hex", to_hex(q, rem > 64 ? 64 : rem));
+        }
     }
-    w.key_bool("freq_sweep_time_auto",    p[185] == 0);
-    w.key_uint("ssb_type",               p[186]);
-    w.key_uint("fm_deviation",           p[187]);
-    w.key_uint("sweep_modulating_signal",p[188]);
 }
 
-// 106/55 — Generate Comb Noise command (20 bytes, per ICD Table 167).
-// @0 comb_start_freq (double, MHz→Hz) @8 comb_stop_freq (double) @16 comb_step (uint8) @17 power_level (uint8) @18-19 reserved.
-static void decode_cmd_generate_comb_noise(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 20) { w.key_str("warning", "generate_comb_noise cmd < 20 bytes"); return; }
-    static const double   COMB_STEP_KHZ[] = {1.5625, 3.125, 6.25, 12.5};
-    static const unsigned POWER_W[]       = {63, 125, 250, 500, 750};
-
-    w.key_double("comb_start_freq_hz", load_f64le(p + 0) * 1e6);
-    w.key_double("comb_stop_freq_hz",  load_f64le(p + 8) * 1e6);
-    uint8_t step_idx = p[16];
-    w.key_uint("comb_step_index", step_idx);
-    if (step_idx < 4) w.key_double("comb_step_khz", COMB_STEP_KHZ[step_idx]);
-    uint8_t pwr_idx = p[17];
-    w.key_uint("power_level_index", pwr_idx);
-    if (pwr_idx < 5) w.key_uint("power_level_w", POWER_W[pwr_idx]);
+// 200/19 — Configure External Modulation Data command (8196 bytes). Same as VU 106/39.
+static void decode_cmd_configure_ext_modulation(const uint8_t* p, int n, JsonWriter& w) {
+    if (n < 4) { w.key_str("warning", "configure_ext_modulation cmd < 4 bytes"); return; }
+    uint32_t audio_size = load_u32le(p + 0);
+    w.key_uint("audio_data_size",     audio_size);
+    w.key_bool("audio_buffer_present", n >= 4 + static_cast<int>(audio_size) * 2);
 }
 
-// 106/21 — Enable/Disable Power Amplifier command (4 bytes, per ICD Table 174).
-// @0 enable (uint8): 1=enable, 0=disable; @1-3 reserved.
-static void decode_cmd_enable_pa(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "enable_pa cmd < 4 bytes"); return; }
-    w.key_bool("pa_enabled", p[0] == 1);
-}
-
-// 106/45 — Enable/Disable PA and SDU Controls command (4 bytes, per ICD Table 172).
-// @0 enable (uint8): 1=enable, 0=disable; @1-3 reserved.
-static void decode_cmd_enable_pa_sdu(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "enable_pa_sdu cmd < 4 bytes"); return; }
-    w.key_bool("pa_sdu_enabled", p[0] == 1);
-}
-
-// 106/49 — Configure Programmable Exciter Modulating Signal command (2052 bytes, per ICD Table 156).
-// S_EXCITER_PROG_NOISE: channel_no (uint16) + data_size (uint16) + data_values (1024 × uint16).
+// 200/21 — Configure Programmable Exciter command (2052 bytes). Same as VU 106/49.
 static void decode_cmd_configure_prog_exciter(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 2052) { w.key_str("warning", "configure_prog_exciter cmd < 2052 bytes"); return; }
+    if (n < 4) { w.key_str("warning", "configure_prog_exciter cmd < 4 bytes"); return; }
     w.key_uint("channel_no", load_u16le(p + 0));
-    uint16_t data_size = load_u16le(p + 2);
-    w.key_uint("data_size", data_size);
-    const uint16_t MAX_SAMPLES = 1024;
-    uint16_t valid = data_size < MAX_SAMPLES ? data_size : MAX_SAMPLES;
-    std::string arr = "[";
-    for (uint16_t i = 0; i < valid; ++i) {
-        if (i) arr += ',';
-        arr += std::to_string(load_u16le(p + 4 + i * 2));
-    }
-    arr += "]";
-    w.key_raw("data_values", arr);
+    w.key_uint("data_size",  load_u16le(p + 2));
 }
 
 // =============================================================================
@@ -1172,14 +1080,6 @@ static void decode_ext_modulation_response(const uint8_t* p, int n, JsonWriter& 
     w.key_uint("software_buffer_size", load_u32le(p + 0));
 }
 
-// 106/10 — Stop Jamming response (4 bytes, per ICD Table 171).
-// @0 Exciter Retry Count (uint8)  @1 Reserved (3 bytes)
-static void decode_stop_immediate_jam_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "stop_immediate_jam_rsp payload < 4 bytes"); return; }
-    w.key_uint("exciter_retry_count", p[0]);
-    // p[1-3] reserved
-}
-
 // 106/54 — Start Immediate Jam ACK (8 bytes).
 // HF-specific response on Group 106 Unit 54.
 // @0 JamId (uint16)  @2 Reserved (uint16)  @4 Active (uint16)  @6 Reserved (uint16)
@@ -1191,251 +1091,6 @@ static void decode_immediate_jam_ack(const uint8_t* p, int n, JsonWriter& w) {
         w.key_str("warning", "immediate_jam_ack payload < 8 bytes");
         w.key_str("raw_hex", to_hex(p, n));
     }
-}
-
-// =============================================================================
-// Group 100 new diagnostic decoders
-// =============================================================================
-
-// 100/16 — Ethernet Test Status response (12 bytes).
-// @0 TX_Data (uint32)  @4 RX_Data (uint32)  @8 Result (uint32, 1=PASS,0=FAIL)
-static void decode_ethernet_test(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 12) { w.key_str("warning", "ethernet_test payload < 12 bytes"); return; }
-    w.key_uint("tx_data", load_u32le(p + 0));
-    w.key_uint("rx_data", load_u32le(p + 4));
-    w.key_uint("result",  load_u32le(p + 8));
-    // w.key_str("result_name", load_u32le(p + 8) == 1 ? "pass" : "fail");
-}
-
-// 100/22 — Read Fan Voltage Status response (24 bytes, 6 floats).
-static void decode_fan_voltage_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 24) { w.key_str("warning", "fan_voltage payload < 24 bytes"); return; }
-    w.key_double("fan_adc_voltage_v", static_cast<double>(load_f32le(p +  0)));
-    w.key_double("rf1_voltage_v",     static_cast<double>(load_f32le(p +  4)));
-    w.key_double("rf2_voltage_v",     static_cast<double>(load_f32le(p +  8)));
-    w.key_double("rf3_voltage_v",     static_cast<double>(load_f32le(p + 12)));
-    w.key_double("digital_5v_v",      static_cast<double>(load_f32le(p + 16)));
-    w.key_double("digital_3v3_v",     static_cast<double>(load_f32le(p + 20)));
-}
-
-// 100/24 — PPS Test Status response (16 bytes).
-static void decode_pps_test(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "pps_test payload < 16 bytes"); return; }
-    w.key_uint("on_period_us",  load_u32le(p +  0));
-    w.key_uint("off_period_us", load_u32le(p +  4));
-    w.key_uint("pps_status",    load_u32le(p +  8));
-    w.key_uint("result",        p[12]);
-    w.key_str("result_name", p[12] == 1 ? "pass" : "fail");
-}
-
-// 100/28 — FPGA Temperature Details response (4 bytes).
-static void decode_fpga_temperature_details(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "fpga_temperature < 4 bytes"); return; }
-    w.key_double("fpga_temperature", static_cast<double>(load_f32le(p + 0)));
-}
-
-// 100/11 — Set Fan Speed command (4 bytes).
-static void decode_cmd_set_fan_speed(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "set_fan_speed cmd < 4 bytes"); return; }
-    w.key_uint("fan_speed_rpm", load_u32le(p + 0));
-}
-
-// =============================================================================
-// Group 101 new detection/jamming command decoders
-// =============================================================================
-
-// 101/63 — Set Auto/Manual Tracking Configuration (4 bytes).
-static void decode_cmd_tracking_config(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "tracking_config cmd < 4 bytes"); return; }
-    w.key_uint("tracking_configuration", p[0]);
-    w.key_str("tracking_mode", p[0] == 0 ? "auto" : "manual");
-}
-
-// 101/100 — Set Flatness Mode command (12 bytes).
-// @0 FlatnessModeSelect (uint32): 0=Disable, 1=Min Point, 2=Avg Point
-// @4 StartFrequencyMHz (float)  @8 StopFrequencyMHz (float)
-static void decode_cmd_set_flatness_mode(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 12) { w.key_str("warning", "set_flatness_mode cmd < 12 bytes"); return; }
-    static const char* MODE[] = {"disable", "min_point", "avg_point"};
-    uint32_t mode = load_u32le(p + 0);
-    w.key_uint("flatness_mode", mode);
-    w.key_str("flatness_mode_name", mode < 3 ? MODE[mode] : "unknown");
-    w.key_double("start_freq_hz", static_cast<double>(load_f32le(p + 4)) * 1e6);
-    w.key_double("stop_freq_hz",  static_cast<double>(load_f32le(p + 8)) * 1e6);
-}
-
-// 101/102 — Set Integration Time command (4 bytes).
-// @0 IntegrationTimeIndex (uint32): 0=20us, 1=40us, ... 15=655360us
-static void decode_cmd_set_integration_time(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "set_integration_time cmd < 4 bytes"); return; }
-    static const uint32_t INT_US[] = {
-        20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360
-    };
-    uint32_t idx = load_u32le(p + 0);
-    w.key_uint("integration_time_index", idx);
-    if (idx < 16) w.key_uint("integration_time_us", INT_US[idx]);
-}
-
-// 101/104 — Set Multi-Band FH Mode command (4 bytes).
-// @0 MultiFHModeSelection (uint8): 0=Disable, 1=Enable + 3 reserved
-static void decode_cmd_set_multi_band_fh(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "set_multi_band_fh cmd < 4 bytes"); return; }
-    w.key_uint("multi_fh_mode", p[0]);
-    w.key_str("state", p[0] ? "enable" : "disable");
-}
-
-// 101/106 — Set Narrow Band FH command (4 bytes).
-static void decode_cmd_set_narrow_band_fh(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "set_narrow_band_fh cmd < 4 bytes"); return; }
-    w.key_uint("narrow_band_fh_mode", p[0]);
-    w.key_str("state", p[0] ? "enable" : "disable");
-}
-
-// =============================================================================
-// Group 111 new receiver command/response decoders
-// =============================================================================
-
-// 111/8 — Module HEALTH Status response (4 bytes).
-// @0 DRX_Health (uint8, 1=PASS) @1 RF_Tuner_Health (uint8) @2-3 reserved
-static void decode_module_health(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "module_health payload < 4 bytes"); return; }
-    w.key_uint("drx_health",      p[0]);
-    w.key_str("drx_health_name",  p[0] == 1 ? "pass" : "fail");
-    w.key_uint("rf_tuner_health", p[1]);
-    w.key_str("rf_tuner_health_name", p[1] == 1 ? "pass" : "fail");
-}
-
-// 111/23 — Send Spectrum Protected-Band Enable/Disable command (4 bytes).
-static void decode_cmd_spectrum_protected_band(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "spectrum_protected_band cmd < 4 bytes"); return; }
-    w.key_uint("protected_spectrum_enabled", load_u16le(p + 0));
-    w.key_str("state", load_u16le(p + 0) == 1 ? "enable" : "disable");
-}
-
-// 111/28 — Read Protected Band List response (variable).
-// count (uint16) + reserved (uint16) + S_PROTECTED_BAND_LIST × count (8B each).
-static void decode_read_protected_band_list(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "read_protected_band_list payload < 4 bytes"); return; }
-    uint16_t count = load_u16le(p + 0);
-    w.key_uint("protected_band_count", count);
-    const int ELEM = 8;
-    std::string arr = "[";
-    int off = 4;
-    uint16_t emitted = 0;
-    for (uint16_t i = 0; i < count; ++i) {
-        if (off + ELEM > n) break;
-        const uint8_t* e = p + off;
-        JsonWriter b;
-        b.key_double("start_freq_hz", static_cast<double>(load_f32le(e + 0)) * 1e6);
-        b.key_double("stop_freq_hz",  static_cast<double>(load_f32le(e + 4)) * 1e6);
-        if (emitted++) arr += ',';
-        arr += b.str();
-        off += ELEM;
-    }
-    arr += "]";
-    w.key_raw("protected_bands", arr);
-}
-
-// 111/29 — Auto Threshold Enable/Disable command (4 bytes, per ICD §3.2.1.3).
-// @0 auto_threshold_enable (uint8): 1=enable, 0=disable; @1-3 reserved.
-static void decode_cmd_auto_threshold_enable(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "auto_threshold_enable cmd < 4 bytes"); return; }
-    w.key_bool("auto_threshold_enabled", p[0] != 0);
-}
-
-// 111/31 — Hopper Channelization Enable/Disable command (16 bytes).
-// @0 HopperStartFreq (float, MHz) @4 HopperStopFreq (float, MHz)
-// @8 HopperHopPeriod (float)  @12 Enable (uint8)  @13-15 reserved
-static void decode_cmd_hopper_channelization(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "hopper_channelization cmd < 16 bytes"); return; }
-    w.key_double("hopper_start_freq_hz",  static_cast<double>(load_f32le(p +  0)) * 1e6);
-    w.key_double("hopper_stop_freq_hz",   static_cast<double>(load_f32le(p +  4)) * 1e6);
-    w.key_double("hop_period_ms",         static_cast<double>(load_f32le(p +  8)));
-    w.key_bool("channelization_enabled",  p[12] != 0);
-}
-
-// =============================================================================
-// Group 3 multi-channel status response decoder
-// =============================================================================
-
-// 3/18 — Read Channel Information response (16 bytes): 8× uint16 channel status.
-static void decode_mrx_all_channels_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "mrx_channels_rsp < 16 bytes"); return; }
-    std::string arr = "[";
-    for (int i = 0; i < 8; ++i) {
-        if (i) arr += ',';
-        char tmp[64];
-        uint16_t status = load_u16le(p + i * 2);
-        std::snprintf(tmp, sizeof(tmp),
-            "{\"channel\":%d,\"status\":%u,\"state\":\"%s\"}",
-            i + 1, status, status == 1 ? "open" : "closed");
-        arr += tmp;
-    }
-    arr += "]";
-    w.key_raw("channels", arr);
-}
-
-// 3/22 — MRX Individual Channel Init Status response (16 bytes, per ICD Table 219).
-// 8 channels × uint16: 1 = initialization success, 0 = initialization failure.
-static void decode_mrx_channel_init_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "mrx_channel_init_status < 16 bytes"); return; }
-    std::string arr = "[";
-    for (int i = 0; i < 8; ++i) {
-        if (i) arr += ',';
-        char tmp[64];
-        uint16_t status = load_u16le(p + i * 2);
-        std::snprintf(tmp, sizeof(tmp),
-            "{\"channel\":%d,\"init_status\":%u,\"state\":\"%s\"}",
-            i + 1, status, status == 1 ? "success" : "failure");
-        arr += tmp;
-    }
-    arr += "]";
-    w.key_raw("channel_init_statuses", arr);
-}
-
-// =============================================================================
-// Group 4 optical IQ command/response decoders
-// =============================================================================
-
-// 4/65 — Start IQ Data Streaming to GO2Monitor Optical command (4 bytes).
-// @0 MRX_channel (uint16)  @2 Bandwidth (uint16)
-static void decode_mrx_optical_iq_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    static const char* BW[] = {"10MHz","5MHz","2.5MHz","1MHz","240kHz","120kHz","60kHz",
-                                "30kHz","15kHz","6kHz","3kHz","1.5kHz"};
-    uint16_t bw = load_u16le(p + 2);
-    w.key_uint("mrx_channel",  load_u16le(p + 0));
-    w.key_uint("bw_selection", bw);
-    w.key_str("bandwidth_name", bw < 12 ? BW[bw] : "unknown");
-}
-
-// 4/70 — Read Optical Port Availability Status response (12 bytes).
-static void decode_mrx_optical_port_status_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 12) { w.key_str("warning", "optical_port_status < 12 bytes"); return; }
-    w.key_uint("port_number",          load_u16le(p + 0));
-    w.key_uint("port_id",              load_u16le(p + 2));
-    w.key_uint("port_alive_status",    load_u16le(p + 4));
-    w.key_str("port_alive",            load_u16le(p + 4) == 1 ? "available" : "unavailable");
-    w.key_uint("already_transmitting", load_u16le(p + 6));
-    w.key_uint("can_start_transfer",   load_u16le(p + 8));
-}
-
-// 4/72 — Read Optical Interface IP Address response (24 bytes).
-// @0 IP_Address (4× uint8)  @4 Port_IDs (9× uint16)  @22 Reserved (2B)
-static void decode_mrx_optical_ip_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 24) { w.key_str("warning", "optical_ip_rsp < 24 bytes"); return; }
-    char ip[32];
-    std::snprintf(ip, sizeof(ip), "%u.%u.%u.%u", p[0], p[1], p[2], p[3]);
-    w.key_str("ip_address", ip);
-    std::string ports = "[";
-    for (int i = 0; i < 9; ++i) {
-        if (i) ports += ',';
-        char tmp[8];
-        std::snprintf(tmp, sizeof(tmp), "%u", load_u16le(p + 4 + i * 2));
-        ports += tmp;
-    }
-    ports += "]";
-    w.key_raw("port_ids", ports);
 }
 
 // =============================================================================
@@ -1501,16 +1156,14 @@ static void decode_mrx_system_version(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("rf_tuner_id",      load_u16le(p + 12));
 }
 
-// 1/4 — Get Checksum Details response (1024 bytes, per ICD Table 201). Payload is a char array.
+// 1/4 — Get Checksum Details response (1024 bytes). Same pattern as ECM.
 static void decode_mrx_checksum(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 1024) { w.key_str("warning", "mrx_checksum payload < 1024 bytes"); return; }
-    const char* cs = reinterpret_cast<const char*>(p);
-    w.key_str("sjc_fw_checksum", std::string(cs, strnlen(cs, 1024)));
+    w.key_str("fw_checksum_hex", to_hex(p, n > 1024 ? 1024 : n));
 }
 
-// 1/6 — PBIT Status response (120 bytes, per ICD Table 203).
+// 1/6 — PBIT Status response (124 bytes).
 static void decode_mrx_pbit_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 120) { w.key_str("warning", "mrx_pbit_status < 120 bytes"); return; }
+    if (n < 124) { w.key_str("warning", "mrx_pbit_status < 124 bytes"); return; }
     w.key_uint("fpga_scratch_pad_test",    p[ 0]);
     w.key_uint("fpga_board_id_read",       p[ 1]);
     w.key_uint("processor_temp_status",    p[ 2]);
@@ -1557,15 +1210,15 @@ static void decode_mrx_ibit_status(const uint8_t* p, int n, JsonWriter& w) {
     // p[14-111] reserved blocks
 }
 
-// 1/10 — Temperature Status response (36 bytes, 9 floats, per ICD Table 212/213).
+// 1/10 — Temperature Status response (40 bytes, 10 floats). MRx-specific sensors.
 static void decode_mrx_temperature(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 36) { w.key_str("warning", "mrx_temperature < 36 bytes"); return; }
+    if (n < 40) { w.key_str("warning", "mrx_temperature < 40 bytes"); return; }
     static const char* NAMES[] = {
         "bpt_temp_c", "psu_8156_temp_c", "tuner_temp_c", "psu_7255_temp_c",
-        "processor_temp_c", "power_supply_temp_c", "control_board_temp_c",
-        "rf_psu_temp_c", "fpga_temp_c"
+        "processor_temp_c", "power_supply_temp_c", "fan_ctrl_board_temp_c",
+        "rfpsu_temp_c", "digital_temp_c", "fpga_temp_c"
     };
-    for (int i = 0; i < 9; ++i)
+    for (int i = 0; i < 10; ++i)
         w.key_double(NAMES[i], static_cast<double>(load_f32le(p + i * 4)));
 }
 
@@ -1609,10 +1262,8 @@ static void decode_mrx_cbit_status(const uint8_t* p, int n, JsonWriter& w) {
 // 3/2 — Read Board Count response (4 bytes).
 static void decode_mrx_board_count_rsp(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    uint16_t count = load_u16le(p + 0);
-    w.key_uint("board_count", count);
-    w.key_str("note", count == 1 ? "mrx_channels_accessible" : "mrx_channels_not_accessible");
-    w.key_uint("available_tuner_id", load_u16le(p + 2));
+    w.key_uint("board_count", load_u16le(p + 0));
+    w.key_str("note", load_u16le(p + 0) == 1 ? "mrx_channels_accessible" : "mrx_channels_not_accessible");
 }
 
 // 3/18 and 3/22 — Channel status response (16 bytes).
@@ -1669,13 +1320,13 @@ static void decode_mrx_set_center_freq_cmd(const uint8_t* p, int n, JsonWriter& 
     w.key_double("center_freq_hz",     load_f64le(p + 4) * 1e6);
 }
 
-// 5/3 — Attenuation Selection command (16 bytes, per ICD Table 256).
-// @0 mrx_channel(uint16) @2 reserved(uint16) @4 rf_attenuation(float) @8 if_attenuation(float) @12 cal_value_debug(4B, not decoded).
+// 5/3 — Attenuation Selections command (16 bytes).
+// ICD lists message size as 10; actual parameters total 16 (2+2+4+4+4). Use 16.
 static void decode_mrx_attenuation_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "mrx_attenuation < 16 bytes"); return; }
-    w.key_uint("mrx_channel",         load_u16le(p + 0));
-    w.key_double("rf_attenuation_db", static_cast<double>(load_f32le(p + 4)));
-    w.key_double("if_attenuation_db", static_cast<double>(load_f32le(p + 8)));
+    if (n < 12) { w.key_str("warning", "mrx_attenuation < 12 bytes"); return; }
+    w.key_uint("mrx_channel",          load_u16le(p + 0));
+    w.key_double("rf_attenuation_db",  static_cast<double>(load_f32le(p + 4)));
+    w.key_double("if_attenuation_db",  static_cast<double>(load_f32le(p + 8)));
 }
 
 // =============================================================================
@@ -1689,25 +1340,17 @@ static void decode_mrx_set_threshold_cmd(const uint8_t* p, int n, JsonWriter& w)
     w.key_double("threshold_dbm", static_cast<double>(load_f32le(p + 4)));
 }
 
-// 4/8 — Audio Data Acquisition response (per ICD Table 225).
-// Message size: 4 + (audio_data_size × 2). Max 262144 samples. 8000Hz, 16-bit unsigned samples.
+// 4/8 — Audio Data Acquisition response (variable).
+// Header: audio_data_size (uint32). Raw audio buffer follows (16-bit samples, 8kHz).
+// Buffer is not emitted in JSON — just log size.
 static void decode_mrx_audio_data_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "audio_data_rsp payload < 4 bytes"); return; }
+    if (n < 4) return;
     uint32_t audio_size = load_u32le(p + 0);
-    w.key_uint("audio_data_size", audio_size);
-
-    const uint32_t MAX_SAMPLES = 262144;
-    uint32_t valid = audio_size < MAX_SAMPLES ? audio_size : MAX_SAMPLES;
-
-    std::string arr = "[";
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 4 + static_cast<int>(i) * 2;
-        if (off + 2 > n) break;
-        if (i) arr += ',';
-        arr += std::to_string(load_u16le(p + off));
-    }
-    arr += "]";
-    w.key_raw("audio_data", arr);
+    w.key_uint("audio_data_size",    audio_size);
+    w.key_uint("audio_bytes",        audio_size * 2);
+    w.key_bool("buffer_present",     n >= 4 + static_cast<int>(audio_size) * 2);
+    w.key_str("sample_rate_hz",      "8000");
+    w.key_str("sample_bits",         "16");
 }
 
 // 4/17 — Demodulation and Bandwidth Selection command (8 bytes).
@@ -1735,12 +1378,11 @@ static void decode_mrx_memory_scan_config_cmd(const uint8_t* p, int n, JsonWrite
     uint32_t count = load_u32le(p + 4);
     w.key_uint("freq_count", count);
     const int ELEM  = 12;
-    const uint32_t MAX_ENTRIES = 10000;
-    uint32_t valid = count < MAX_ENTRIES ? count : MAX_ENTRIES;
+    const uint32_t CAP = 100;
     int off = 8;
     uint32_t emit = 0;
     std::string arr = "[";
-    for (uint32_t i = 0; i < valid; ++i) {
+    for (uint32_t i = 0; i < count && i < CAP; ++i) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter f;
@@ -1752,48 +1394,49 @@ static void decode_mrx_memory_scan_config_cmd(const uint8_t* p, int n, JsonWrite
     }
     arr += "]";
     w.key_raw("frequencies", arr);
-    if (count > MAX_ENTRIES) {
+    if (count > CAP) {
         char msg[64];
-        std::snprintf(msg, sizeof(msg), "truncated at %u of %u entries", MAX_ENTRIES, count);
+        std::snprintf(msg, sizeof(msg), "truncated at %u of %u entries", CAP, count);
         w.key_str("truncated", msg);
     }
 }
 
-// 4/42 — Read Memory Scan Data response (per ICD Table 239/240).
-// Header: Total Available Count(4) + Scan Speed(2) + Reserved(2).
-// S_RES_MEMORY_SCAN_LIST layout (20 bytes per entry, max 10000):
-//   @0  Power Level (dBm) (float)  @4  Frequency Value (double)
-//   @12 H:M:S:reserved (4B)        @16 Millisecond (uint16)  @18 Bandwidth List (uint16)
+// 4/42 — Read Memory Scan Data response (variable).
+// Header: freq_count(4) + scan_speed(2) + reserved(2).
+// Per entry (20B): power(f32,4) + freq(double,8) + H:M:S:rsv(4B) + ms(u16,2) + bw(u16,2).
 static void decode_mrx_memory_scan_data_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "memory_scan_data_rsp payload < 8 bytes"); return; }
+    if (n < 8) return;
     uint32_t count      = load_u32le(p + 0);
     uint16_t scan_speed = load_u16le(p + 4);
-    w.key_uint("total_available_count",       count);
+    w.key_uint("freq_count",    count);
     w.key_uint("scan_speed_channels_per_sec", scan_speed);
-
-    const int      ELEM      = 20;
-    const uint32_t MAX_SLOTS = 10000;
-    uint32_t valid = count < MAX_SLOTS ? count : MAX_SLOTS;
-
-    std::string arr = "[";
+    const int ELEM  = 20;
+    const uint32_t CAP = 100;
+    int off = 8;
     uint32_t emit = 0;
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 8 + static_cast<int>(i) * ELEM;
+    std::string arr = "[";
+    for (uint32_t i = 0; i < count && i < CAP; ++i) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter f;
-        f.key_double("power_dbm", static_cast<double>(load_f32le(e +  0)));
-        f.key_double("freq_hz",   load_f64le(e +  4) * 1e6);
+        f.key_double("power_dbm",  static_cast<double>(load_f32le(e +  0)));
+        f.key_double("freq_hz",    load_f64le(e +  4) * 1e6);
         char toa[24];
         std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u.%03u",
                       e[12], e[13], e[14], load_u16le(e + 16));
         f.key_str("toa", toa);
-        f.key_uint("bandwidth_list", load_u16le(e + 18));
+        f.key_uint("bw_list", load_u16le(e + 18));
         if (emit++) arr += ',';
         arr += f.str();
+        off += ELEM;
     }
     arr += "]";
     w.key_raw("scan_data", arr);
+    if (count > CAP) {
+        char msg[64];
+        std::snprintf(msg, sizeof(msg), "truncated at %u of %u entries", CAP, count);
+        w.key_str("truncated", msg);
+    }
 }
 
 // 4/61 — Read Smart Memory Scan Data command (12 bytes).
@@ -1839,7 +1482,6 @@ static void decode_mrx_iq_start_rsp(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("narrowband_iq_status", p[1]);
     w.key_uint("wideband_iq_status",   p[2]);
     w.key_str("iq_type",               p[2] ? "wideband_10MHz_to_1MHz" : "narrowband_240kHz_and_below");
-    //p[3] reserved
 }
 
 // 4/23 — Start IQ Data Logging command (20 bytes).
@@ -1912,30 +1554,31 @@ static void decode_mrx_fh_monitoring_cmd(const uint8_t* p, int n, JsonWriter& w)
 
 // 6/9 — GO2Monitor Connection Establishment command (260 bytes).
 // @0 IP Address (char[128])  @128 Port Number (char[128])  @256 mrx_channel (u16)
-// 6/9 — GO2Monitor Connection Establishment command (260 bytes, per ICD Table 258).
-// @0 ip_address(char[128]) @128 port_number(char[128]) @256 mrx_channel(uint16) @258 reserved(uint16).
 static void decode_mrx_go2monitor_connect_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 260) { w.key_str("warning", "go2monitor_connect cmd < 260 bytes"); return; }
-    const char* ip   = reinterpret_cast<const char*>(p +   0);
-    const char* port = reinterpret_cast<const char*>(p + 128);
-    w.key_str("ip_address",   std::string(ip,   strnlen(ip,   128)));
-    w.key_str("port_number",  std::string(port, strnlen(port, 128)));
-    w.key_uint("mrx_channel", load_u16le(p + 256));
+    if (n < 260) return;
+    char ip[129], port[129];
+    std::memcpy(ip,   p +   0, 128); ip[128]   = '\0';
+    std::memcpy(port, p + 128, 128); port[128] = '\0';
+    w.key_str("ip_address",    ip);
+    w.key_str("port_number",   port);
+    w.key_uint("mrx_channel",  load_u16le(p + 256));
 }
 
 // 6/13 — Start GO2Monitor Transmission command (144 bytes).
 // @0 mrx_channel(u16) @2 bw(u16) @4 reserved(u16) @6 reserved(u16)
 // @8 center_freq(double,8) @16 date(char[128])
 static void decode_mrx_start_go2monitor_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 144) { w.key_str("warning", "start_go2monitor cmd < 144 bytes"); return; }
+    if (n < 144) return;
     static const char* BW[] = {"1MHz","240kHz","120kHz","60kHz","30kHz"};
     uint16_t bw = load_u16le(p + 2);
     w.key_uint("mrx_channel",       load_u16le(p +  0));
     w.key_uint("bw_selection",      bw);
     w.key_str("bandwidth_name",     bw < 5 ? BW[bw] : "unknown");
     w.key_double("center_freq_hz",  load_f64le(p + 8) * 1e6);
-    const char* date = reinterpret_cast<const char*>(p + 16);
-    w.key_str("date", std::string(date, strnlen(date, 128)));
+    char date[129];
+    std::memcpy(date, p + 16, 128);
+    date[128] = '\0';
+    w.key_str("date", date);
 }
 
 // =============================================================================
@@ -1956,15 +1599,6 @@ static void decode_mrx_signal_bite_rsp(const uint8_t* p, int n, JsonWriter& w) {
     w.key_double("observed_power_dbm", static_cast<double>(load_f32le(p + 8)));
     w.key_uint("result",               load_u16le(p + 12));
     w.key_str("result_name",           load_u16le(p + 12) == 1 ? "pass" : "fail");
-}
-
-// 7/17 — Spectrum Average Count Selection command (8 bytes, per ICD Table 285).
-// @0 averaging_enabled(uint16) @2 avg_count(uint16) @4 mrx_channel(uint16) @6 reserved(uint16).
-static void decode_mrx_spectrum_avg_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "spectrum_avg cmd < 8 bytes"); return; }
-    w.key_bool("averaging_enabled", load_u16le(p + 0) == 1);
-    w.key_uint("avg_count",         load_u16le(p + 2));
-    w.key_uint("mrx_channel",       load_u16le(p + 4));
 }
 
 // 7/21 — Audio Squelch command (8 bytes).
@@ -2027,46 +1661,29 @@ static void decode_mrx_iq_start_cmd(const uint8_t* p, int n, JsonWriter& w) {
 // =============================================================================
 // ABI: extract_frame
 // =============================================================================
-extern "C" SDFC_EXPORT int extract_frame(const uint8_t* buf, size_t buf_len,
-                                         uint8_t** out_frame, size_t* out_len) {
-    if (!buf || !out_frame || !out_len) return -1;
-    uint8_t* tmp = static_cast<uint8_t*>(std::malloc(MAX_FRAME_BUFFER_BYTES));
-    if (!tmp) return -1;
-    int tmp_len = 0;
-    int result = extract_frame_core(buf, static_cast<int>(buf_len), tmp, &tmp_len);
-    if (result <= 0) { std::free(tmp); return -1; }
-    uint8_t* frame = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(tmp_len)));
-    if (!frame) { std::free(tmp); return -1; }
-    std::memcpy(frame, tmp, static_cast<size_t>(tmp_len));
-    std::free(tmp);
-    *out_frame = frame;
-    *out_len = static_cast<size_t>(tmp_len);
-    return 0;
+extern "C" SDFC_EXPORT int extract_frame(const uint8_t* buf, int buf_len,
+                                         uint8_t* out_frame, int* out_len) {
+    return extract_frame_core(buf, buf_len, out_frame, out_len);
 }
 
 // =============================================================================
 // ABI: parse_message
 // =============================================================================
-extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
-                                         char** out_json, size_t* out_len) {
-    if (!frame || !out_json || !out_len) return -1;
-    int frame_type = FRAME_INCOMPLETE;
-    if (frame_len >= static_cast<size_t>(MAGIC_LEN)) {
-        if (std::memcmp(frame, CMD_HEADER,  MAGIC_LEN) == 0) frame_type = FRAME_COMMAND;
-        else if (std::memcmp(frame, RESP_HEADER, MAGIC_LEN) == 0) frame_type = FRAME_RESPONSE;
-    }
-    if (frame_type == FRAME_INCOMPLETE) return -1;
+extern "C" SDFC_EXPORT const char* parse_message(const uint8_t* frame, int frame_len,
+                                                 int frame_type) {
     FrameHeader hdr;
-    if (!decode_header(frame, static_cast<int>(frame_len), frame_type, hdr)) return -1;
-    if (hdr.total_len > static_cast<int>(frame_len)) return -1;
+    if (!decode_header(frame, frame_len, frame_type, hdr)) return nullptr;
+    if (hdr.total_len > frame_len) return nullptr;
 
     const uint8_t* payload = frame + hdr.payload_off;
     int plen = static_cast<int>(hdr.payload_size);
-    if (hdr.payload_off + plen > static_cast<int>(frame_len)) return -1;
+    if (hdr.payload_off + plen > frame_len) return nullptr;
 
     JsonWriter w;
     w.key_str("hw", HW_NAME);
-    if (frame_type == FRAME_COMMAND) w.key_str("frame_type", "command");
+    w.key_str("frame_type", frame_type == FRAME_COMMAND ? "command"
+                          : frame_type == FRAME_STREAM  ? "stream"
+                          : "response");
     w.key_uint("group_id", hdr.group_id);
     w.key_uint("unit_id",  hdr.unit_id);
     w.key_uint("message_size_bytes", hdr.payload_size);
@@ -2083,15 +1700,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
     if (frame_type == FRAME_COMMAND) {
         if (hdr.group_id == 100) {
             switch (hdr.unit_id) {
-                case 11: decode_cmd_set_fan_speed(payload, plen, w);  decoded = true; break;
-                case 13: /* Fan Speed Status cmd — 0 bytes */           decoded = true; break;
-                case 15: /* Ethernet Test — 0 bytes */                  decoded = true; break;
                 case 17: decode_cmd_uart_port_select(payload, plen, w); decoded = true; break;
-                case 21: /* Fan Voltage Status — 0 bytes */             decoded = true; break;
-                case 23: /* PPS Test — 0 bytes */                       decoded = true; break;
-                case 25: /* RS422 Test — 0 bytes */                     decoded = true; break;
-                case 27: /* FPGA Temperature — 0 bytes */               decoded = true; break;
-                case 29: /* CBIT Status — 0 bytes */                    decoded = true; break;
                 default: break;
             }
         } else if (hdr.group_id == 101) {
@@ -2123,24 +1732,11 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 202: /* HF wideband cmd — 0 bytes */                        decoded = true; break;
                 case 204: /* HF data query cmd — 0 bytes; rsp on 101/205 */      decoded = true; break;
                 case 210: /* HF cmd; rsp on Group 111/211 (cross-group) */       decoded = true; break;
-                case  31: decode_cmd_start_follow_on_jam(payload, plen, w);        decoded = true; break;
-                case  33: /* Stop Follow-on Jam — 0 bytes */                        decoded = true; break;
-                case  63: decode_cmd_tracking_config(payload, plen, w);            decoded = true; break;
-                case  73: decode_cmd_start_list_jam(payload, plen, w);             decoded = true; break;
-                case  75: /* Stop List Jam — 0 bytes */                             decoded = true; break;
-                case  79: decode_cmd_send_ecm_reports(payload, plen, w);           decoded = true; break;
-                case  92: decode_cmd_start_responsive_sweep_jam(payload, plen, w); decoded = true; break;
-                case 100: decode_cmd_set_flatness_mode(payload, plen, w);          decoded = true; break;
-                case 102: decode_cmd_set_integration_time(payload, plen, w);       decoded = true; break;
-                case 104: decode_cmd_set_multi_band_fh(payload, plen, w);          decoded = true; break;
-                case 106: decode_cmd_set_narrow_band_fh(payload, plen, w);         decoded = true; break;
                 default:  break;
             }
         } else if (hdr.group_id == 109) {
             switch (hdr.unit_id) {
                 case 11: decode_cmd_set_date_time(payload, plen, w); decoded = true; break;
-                case 15: /* Send Auto Threshold Value — 0 bytes */  decoded = true; break;
-                case 17: /* Acquire Hopper Channelization — 0 bytes */ decoded = true; break;
                 default: break;
             }
         } else if (hdr.group_id == 111) {
@@ -2152,20 +1748,13 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 15: /* PDW Channelization cmd — 0 bytes */                  decoded = true; break;
                 case 17: decode_cmd_fh_splitband_enable(payload, plen, w);       decoded = true; break;
                 case 19: decode_cmd_send_fh_splitband_freq(payload, plen, w);    decoded = true; break;
-                case 21: decode_cmd_signal_bite_band(payload, plen, w);          decoded = true; break;
-                case  7: /* Module HEALTH Status — 0 bytes */                   decoded = true; break;
-                case 23: decode_cmd_spectrum_protected_band(payload, plen, w);  decoded = true; break;
                 case 25: /* Get Storage Details — 0 bytes */                     decoded = true; break;
-                case 27: /* Read Protected Band List — 0 bytes */               decoded = true; break;
-                case 29: decode_cmd_auto_threshold_enable(payload, plen, w);    decoded = true; break;
-                case 31: decode_cmd_hopper_channelization(payload, plen, w);   decoded = true; break;
                 default: break;
             }
         } else if (hdr.group_id == 112) {
             switch (hdr.unit_id) {
-                case  1: decode_cmd_asu_sdu_config(payload, plen, w);            decoded = true; break;
-                case  3: /* TRSDU Receiver Line Status — 0 bytes */           decoded = true; break;
-                case  5: /* PA Receiver Line Status — 0 bytes */              decoded = true; break;
+                case  1: decode_cmd_fast_scan_control(payload, plen, w);         decoded = true; break;
+                case  5: decode_cmd_auto_scan_band_config(payload, plen, w);     decoded = true; break;
                 case 13: decode_cmd_simulation_mode_config(payload, plen, w);    decoded = true; break;
                 case 37: /* HF-specific fast scan cmd — 0 bytes */               decoded = true; break;
                 default: break;
@@ -2186,21 +1775,6 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 41: decode_hpasu_health_status_cmd(payload, plen, w);          decoded = true; break;
                 case 54: /* PA/SDU Health Status — 0 bytes */                        decoded = true; break;
                 case 56: decode_cmd_pa_soft_reboot(payload, plen, w);               decoded = true; break;
-                default: break;
-            }
-        // ECM Group 6 — Immediate Jamming commands
-        } else if (hdr.group_id == 106) {
-            switch (hdr.unit_id) {
-                case  1: decode_cmd_start_immediate_jam(payload, plen, w);     decoded = true; break;
-                case  3: decode_cmd_generate_multi_freq_tdm(payload, plen, w);  decoded = true; break;
-                case  5: decode_cmd_generate_multi_carrier_fdm(payload, plen, w); decoded = true; break;
-                case  9: /* Stop Immediate Jamming — 0 bytes */                 decoded = true; break;
-                case 21: decode_cmd_enable_pa(payload, plen, w);                 decoded = true; break;
-                case 39: decode_cmd_configure_ext_modulation(payload, plen, w); decoded = true; break;
-                case 41: decode_cmd_generate_sweep_freq(payload, plen, w);       decoded = true; break;
-                case 45: decode_cmd_enable_pa_sdu(payload, plen, w);             decoded = true; break;
-                case 49: decode_cmd_configure_prog_exciter(payload, plen, w);  decoded = true; break;
-                case 55: decode_cmd_generate_comb_noise(payload, plen, w);       decoded = true; break;
                 default: break;
             }
         // MRx Group 1 — diagnostics
@@ -2225,7 +1799,6 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 19: decode_mrx_write_channel_cmd(payload, plen, w); decoded = true; break;
                 case 21: /* VUSHF Channel Status — 0 bytes */  decoded = true; break;
                 case 23: /* Read Tuning Details — 0 bytes */   decoded = true; break;
-                case 25: /* Get CBIT Status — 0 bytes */       decoded = true; break;
                 default: break;
             }
         // MRx Group 4 — data acquisition
@@ -2250,10 +1823,6 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 59: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
                 case 61: decode_mrx_smart_scan_read_cmd(payload, plen, w);          decoded = true; break;
                 case 63: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 65: decode_mrx_optical_iq_cmd(payload, plen, w);          decoded = true; break;
-                case 67: decode_mrx_channel_cmd(payload, plen, w);              decoded = true; break; // Stop optical IQ
-                case 69: decode_mrx_optical_iq_cmd(payload, plen, w);          decoded = true; break; // Read port status cmd
-                case 71: decode_mrx_optical_iq_cmd(payload, plen, w);          decoded = true; break; // Read IP cmd
                 default: break;
             }
         // MRx Group 5 — tuner
@@ -2285,7 +1854,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 11: decode_mrx_sel_channel_cmd("rf_squelch_sel","on","off",payload,plen,w); decoded=true; break;
                 case 13: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break; // IQ socket open
                 case 15: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break; // IQ socket close
-                case 17: decode_mrx_spectrum_avg_cmd(payload, plen, w);            decoded = true; break;
+                case 17: decode_mrx_sel_channel_cmd("avg_count_sel",nullptr,nullptr,payload,plen,w); decoded=true; break;
                 case 19: decode_mrx_sel_channel_cmd("rf_agc_sel","enable","disable",payload,plen,w); decoded=true; break;
                 case 21: decode_mrx_audio_squelch_cmd(payload, plen, w);            decoded = true; break;
                 case 23: decode_mrx_date_time_cmd(payload, plen, w);                decoded = true; break;
@@ -2295,24 +1864,17 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
     // ------------------------------------------------------------------
     // FRAME_RESPONSE dispatch
     // ------------------------------------------------------------------
-    } 
-    else if (frame_type == FRAME_RESPONSE) {
+    } else if (frame_type == FRAME_RESPONSE) {
         if (hdr.group_id == 100) {
             switch (hdr.unit_id) {
-                case  2: decode_system_version(payload, plen, w);           decoded = true; break;
-                case  4: decode_srx_checksum(payload, plen, w);             decoded = true; break;
-                case  6: decode_pbit_status(payload, plen, w);              decoded = true; break;
-                case  8: decode_ibit_status(payload, plen, w);              decoded = true; break;
-                case 10: decode_temperature(payload, plen, w);              decoded = true; break;
-                case 12: /* Set Fan Speed ACK */                              decoded = true; break;
-                case 14: decode_fan_speed_status(payload, plen, w);         decoded = true; break;
-                case 16: decode_ethernet_test(payload, plen, w);            decoded = true; break;
-                case 18: decode_uart_test(payload, plen, w);                decoded = true; break;
-                case 22: decode_fan_voltage_status(payload, plen, w);       decoded = true; break;
-                case 24: decode_pps_test(payload, plen, w);                 decoded = true; break;
-                case 26: /* RS422 Test Status — raw_hex OK */                decoded = true; break;
-                case 28: decode_fpga_temperature_details(payload, plen, w); decoded = true; break;
-                case 30: decode_cbit_status(payload, plen, w);              decoded = true; break;
+                case  2: decode_system_version(payload, plen, w);   decoded = true; break;
+                case  4: decode_srx_checksum(payload, plen, w);     decoded = true; break;
+                case  6: decode_pbit_status(payload, plen, w);      decoded = true; break;
+                case  8: decode_ibit_status(payload, plen, w);      decoded = true; break;
+                case 10: decode_temperature(payload, plen, w);      decoded = true; break;
+                case 14: decode_fan_speed_status(payload, plen, w); decoded = true; break;
+                case 18: decode_uart_test(payload, plen, w);        decoded = true; break;
+                case 26: decode_cbit_status(payload, plen, w);      decoded = true; break;
                 default: break;
             }
         } else if (hdr.group_id == 101) {
@@ -2343,50 +1905,30 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 201: /* HF wideband ACK */                      decoded = true; break;
                 case 203: /* HF wideband ACK */                      decoded = true; break;
                 case 205: /* HF data response — no struct decoder, falls through to raw_hex */ break;
-                case  32: /* Start Follow-on Jam ACK */             decoded = true; break;
-                case  34: /* Stop Follow-on Jam ACK */              decoded = true; break;
-                case  64: /* Auto/Manual Tracking ACK */            decoded = true; break;
-                case  74: /* Start List Jam ACK */                  decoded = true; break;
-                case  76: /* Stop List Jam ACK */                   decoded = true; break;
-                case  80: /* Send ECM Reports ACK */                decoded = true; break;
-                case  93: /* Start Responsive Sweep Jam ACK */      decoded = true; break;
-                case 101: /* Set Flatness Mode ACK */               decoded = true; break;
-                case 103: /* Set Integration Time ACK */            decoded = true; break;
-                case 105: /* Set Multi-Band FH Mode ACK */          decoded = true; break;
-                case 107: /* Set Narrow Band FH ACK */              decoded = true; break;
                 default:  break;
             }
         } else if (hdr.group_id == 109) {
             switch (hdr.unit_id) {
-                case 12: /* Set Date Time ACK */                                decoded = true; break;
-                case 16: decode_auto_threshold_value(payload, plen, w);        decoded = true; break;
-                case 18: decode_hopper_channelization(payload, plen, w);       decoded = true; break;
+                case 12: /* Set Date Time ACK */ decoded = true; break;
                 default: break;
             }
         } else if (hdr.group_id == 111) {
             switch (hdr.unit_id) {
-                case   4: decode_signal_bite_resp(payload, plen, w);    decoded = true; break;
-                case   6: /* Reference Input ACK */                      decoded = true; break;
-                case  10: /* Send Protected Scan List ACK */             decoded = true; break;
-                case  14: /* Protected Scan Enable ACK */                decoded = true; break;
-                case  16: decode_pdw_channelization(payload, plen, w);  decoded = true; break;
-                case  18: /* FH Splitband Enable ACK */                  decoded = true; break;
-                case  20: /* FH Splitband Freq ACK */                    decoded = true; break;
-                case  22: decode_bite_observed_rsp(payload, plen, w);   decoded = true; break;
-                case  26: decode_storage_details(payload, plen, w);     decoded = true; break;
+                case   4: decode_signal_bite_resp(payload, plen, w);  decoded = true; break;
+                case   6: /* Reference Input ACK */                    decoded = true; break;
+                case  10: /* Send Protected Scan List ACK */           decoded = true; break;
+                case  14: /* Protected Scan Enable ACK */              decoded = true; break;
+                case  16: decode_pdw_channelization(payload, plen, w);decoded = true; break;
+                case  18: /* FH Splitband Enable ACK */                decoded = true; break;
+                case  20: /* FH Splitband Freq ACK */                  decoded = true; break;
+                case  26: decode_storage_details(payload, plen, w);   decoded = true; break;
                 case 211: /* cross-group rsp to 101/210 — no struct decoder, falls through to raw_hex */ break;
-                case   8: decode_module_health(payload, plen, w);            decoded = true; break;
-                case  24: /* Spectrum Protected Band ACK */                   decoded = true; break;
-                case  28: decode_read_protected_band_list(payload, plen, w); decoded = true; break;
-                case  30: /* Auto Threshold Enable ACK */                     decoded = true; break;
-                case  32: /* Hopper Channelization ACK */                     decoded = true; break;
                 default:  break;
             }
         } else if (hdr.group_id == 112) {
             switch (hdr.unit_id) {
-                case  2: decode_asu_sdu_config_rsp(payload, plen, w);    decoded = true; break;
-                case  4: decode_trsdu_receiver_status(payload, plen, w); decoded = true; break;
-                case  6: decode_pa_receiver_status(payload, plen, w);    decoded = true; break;
+                case  2: decode_fast_scan_response(payload, plen, w); decoded = true; break;
+                case  6: /* Auto Scan Band Config ACK */               decoded = true; break;
                 case 14: /* Simulation Mode Config ACK */              decoded = true; break;
                 case 38: /* HF fast scan ACK */                        decoded = true; break;
                 default: break;
@@ -2406,21 +1948,8 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 57: /* PA Soft Reboot ACK */                           decoded = true; break;
                 default: break;
             }
-        } else if (hdr.group_id == 106) {
-            switch (hdr.unit_id) {
-                case  2: /* Start Immediate Jam ACK */                           decoded = true; break;
-                case  4: /* TDM Jam ACK */                                       decoded = true; break;
-                case  6: /* FDM Jam ACK */                                       decoded = true; break;
-                case 10: decode_stop_immediate_jam_rsp(payload, plen, w);        decoded = true; break;
-                case 22: /* Enable PA ACK */                                     decoded = true; break;
-                case 40: decode_ext_modulation_response(payload, plen, w);      decoded = true; break;
-                case 42: /* Sweep Jam ACK */                                     decoded = true; break;
-                case 46: /* Enable PA+SDU ACK */                                 decoded = true; break;
-                case 50: /* Configure Prog Exciter ACK */                        decoded = true; break;
-                case 54: decode_immediate_jam_ack(payload, plen, w);            decoded = true; break;
-                case 56: /* Comb Noise ACK */                                    decoded = true; break;
-                default: break;
-            }
+        } else if (hdr.group_id == 106 && hdr.unit_id == 54) {
+            decode_immediate_jam_ack(payload, plen, w); decoded = true;
         // MRx Group 1 responses
         } else if (hdr.group_id == 1) {
             switch (hdr.unit_id) {
@@ -2439,11 +1968,10 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
         } else if (hdr.group_id == 3) {
             switch (hdr.unit_id) {
                 case  2: decode_mrx_board_count_rsp(payload, plen, w);      decoded = true; break;
-                case 18: decode_mrx_all_channels_rsp(payload, plen, w);       decoded = true; break;
-                case 20: /* Write Channel ACK */                               decoded = true; break;
-                case 22: decode_mrx_channel_init_status(payload, plen, w);    decoded = true; break;
+                case 18: decode_mrx_channel_16b_rsp(payload, plen, w);      decoded = true; break;
+                case 20: /* Write Channel ACK */                             decoded = true; break;
+                case 22: decode_mrx_channel_16b_rsp(payload, plen, w);      decoded = true; break;
                 case 24: decode_mrx_tuning_details_rsp(payload, plen, w);   decoded = true; break;
-                case 26: decode_mrx_cbit_status(payload, plen, w);         decoded = true; break;
                 default: break;
             }
         // MRx Group 4 responses
@@ -2468,10 +1996,6 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case 60: /* Smart Memory Scan Config ACK */                  decoded = true; break;
                 case 62: decode_mrx_smart_scan_read_rsp(payload, plen, w);  decoded = true; break;
                 case 64: /* Stop Smart Memory Scan ACK */                    decoded = true; break;
-                case 66: /* Start Optical IQ ACK */                          decoded = true; break;
-                case 68: /* Stop Optical IQ ACK */                           decoded = true; break;
-                case 70: decode_mrx_optical_port_status_rsp(payload, plen, w); decoded = true; break;
-                case 72: decode_mrx_optical_ip_rsp(payload, plen, w);       decoded = true; break;
                 default: break;
             }
         // MRx Group 5 responses
@@ -2489,7 +2013,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
                 case  8: /* FH Monitoring Config ACK */                      decoded = true; break;
                 case 10: /* GO2Monitor Connect ACK */                        decoded = true; break;
                 case 12: /* GO2Monitor Disconnect ACK */                     decoded = true; break;
-                case 14: /* Start GO2Monitor Transmission ACK */              decoded = true; break;
+                case 14: decode_mrx_iq_start_rsp(payload, plen, w);         decoded = true; break;
                 case 16: /* Stop GO2Monitor ACK */                           decoded = true; break;
                 default: break;
             }
@@ -2519,11 +2043,9 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 
     std::string json = w.str();
     char* result = static_cast<char*>(std::malloc(json.size() + 1));
-    if (!result) return -1;
+    if (!result) return nullptr;
     std::memcpy(result, json.c_str(), json.size() + 1);
-    *out_json = result;
-    *out_len = json.size();
-    return 0;
+    return result;
 }
 
 // =============================================================================
@@ -2544,19 +2066,6 @@ static bool json_find_int(const char* json, const char* key, long long& out) {
     return true;
 }
 
-static bool json_find_double(const char* json, const char* key, double& out) {
-    std::string pat = std::string("\"") + key + "\"";
-    const char* k = std::strstr(json, pat.c_str());
-    if (!k) return false;
-    const char* c = std::strchr(k + pat.size(), ':');
-    if (!c) return false;
-    ++c;
-    while (*c == ' ' || *c == '\t') ++c;
-    char* end = nullptr;
-    out = std::strtod(c, &end);
-    return end != c;
-}
-
 static int hex_nibble(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
@@ -2564,135 +2073,48 @@ static int hex_nibble(char c) {
     return -1;
 }
 
-// Serialize FH Detection response payload for Group 101 / Unit 40.
-// Mirrors decode_fh_detection: [hopper_count u16][reserved u16][S_HOPPER_DATA × N (40B each)]
-// S_HOPPER_DATA (40B): @0 hopper_number(u32) @4 min_freq_mhz(f32) @8 max_freq_mhz(f32)
-//   @12 pulse_len_ms(f32) @16 inter_hop_ms(f32) @20 detected_count(u32)
-//   @24 toa_h(u8) @25 toa_m(u8) @26 toa_s(u8) @27 rsv(u8)
-//   @28 power_dbm(f32) @32 freq_active(u16) @34 rsv(u16) @36 snr_db(f32)
-static int encode_fh_detection(const char* json, uint8_t* buf, int max_len) {
-    long long hopper_count_ll = 0;
-    if (!json_find_int(json, "hopper_count", hopper_count_ll) || hopper_count_ll <= 0)
-        return -1;
-    int hc = static_cast<int>(hopper_count_ll);
-    if (4 + hc * 40 > max_len) return -1;
-
-    store_u16le(buf + 0, static_cast<uint16_t>(hc));
-    store_u16le(buf + 2, 0);
-
-    const char* det = std::strstr(json, "\"detections\"");
-    if (!det) return -1;
-    const char* arr = std::strchr(det, '[');
-    if (!arr) return -1;
-
-    const char* p = arr + 1;
-    int written = 0;
-    while (written < hc) {
-        while (*p && *p != '{' && *p != ']') ++p;
-        if (!*p || *p == ']') break;
-
-        const char* obj_start = p;
-        int depth = 1; ++p;
-        while (*p && depth > 0) {
-            if (*p == '{') ++depth;
-            else if (*p == '}') --depth;
-            ++p;
-        }
-        std::string entry(obj_start, p);
-        const char* e = entry.c_str();
-
-        long long hopper_number = 0, detected_count = 0, toa_h = 0, toa_m = 0, toa_s = 0, freq_active = 0;
-        double min_freq_hz = 0, max_freq_hz = 0, pulse_length_s = 0, inter_hop_period_s = 0, power_dbm = 0, snr_db = 0;
-
-        json_find_int(e,    "hopper_number",      hopper_number);
-        json_find_int(e,    "detected_count",     detected_count);
-        json_find_int(e,    "toa_h",              toa_h);
-        json_find_int(e,    "toa_m",              toa_m);
-        json_find_int(e,    "toa_s",              toa_s);
-        json_find_int(e,    "freq_active",        freq_active);
-        json_find_double(e, "min_freq_hz",        min_freq_hz);
-        json_find_double(e, "max_freq_hz",        max_freq_hz);
-        json_find_double(e, "pulse_length_s",     pulse_length_s);
-        json_find_double(e, "inter_hop_period_s", inter_hop_period_s);
-        json_find_double(e, "power_dbm",          power_dbm);
-        json_find_double(e, "snr_db",             snr_db);
-
-        uint8_t* slot = buf + 4 + written * 40;
-        store_u32le(slot +  0, static_cast<uint32_t>(hopper_number));
-        store_f32le(slot +  4, static_cast<float>(min_freq_hz / 1e6));
-        store_f32le(slot +  8, static_cast<float>(max_freq_hz / 1e6));
-        store_f32le(slot + 12, static_cast<float>(pulse_length_s * 1e3));
-        store_f32le(slot + 16, static_cast<float>(inter_hop_period_s * 1e3));
-        store_u32le(slot + 20, static_cast<uint32_t>(detected_count));
-        slot[24] = static_cast<uint8_t>(toa_h);
-        slot[25] = static_cast<uint8_t>(toa_m);
-        slot[26] = static_cast<uint8_t>(toa_s);
-        slot[27] = 0;
-        store_f32le(slot + 28, static_cast<float>(power_dbm));
-        store_u16le(slot + 32, static_cast<uint16_t>(freq_active));
-        store_u16le(slot + 34, 0);
-        store_f32le(slot + 36, static_cast<float>(snr_db));
-        ++written;
-    }
-
-    return 4 + written * 40;
-}
-
-extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_json,
-                                           uint8_t** out_buf, size_t* out_len) {
-    if (!kwargs_json || !out_buf || !out_len) return -1;
+extern "C" SDFC_EXPORT int format_response(const char* json_response, uint8_t* out_frame) {
+    if (!json_response || !out_frame) return -1;
     long long group = 0, unit = 0, status = 0;
-    if (!json_find_int(kwargs_json, "group_id", group)) return -1;
-    if (!json_find_int(kwargs_json, "unit_id",  unit))  return -1;
-    if (!json_find_int(kwargs_json, "status",   status)) return -1;
+    if (!json_find_int(json_response, "group_id", group)) return -1;
+    if (!json_find_int(json_response, "unit_id",  unit))  return -1;
+    if (!json_find_int(json_response, "status",   status)) return -1;
 
     uint8_t payload[MAX_PAYLOAD];
     int plen = 0;
-
-    // Structured encoders: dispatch before payload_hex path
-    if (group == 101 && unit == 40) {
-        plen = encode_fh_detection(kwargs_json, payload, MAX_PAYLOAD);
-        if (plen < 0) return -1;
-    }
-
-    if (plen == 0) {
-        const char* ph = std::strstr(kwargs_json, "\"payload_hex\"");
-        if (ph) {
-            const char* q = std::strchr(ph, ':');
-            if (q) { q = std::strchr(q, '"'); }
-            if (q) {
-                ++q;
-                while (*q && *q != '"') {
-                    int hi = hex_nibble(*q++);
-                    if (*q == '"' || !*q) break;
-                    int lo = hex_nibble(*q++);
-                    if (hi < 0 || lo < 0) return -1;
-                    if (plen >= MAX_PAYLOAD) return -1;
-                    payload[plen++] = static_cast<uint8_t>((hi << 4) | lo);
-                }
+    const char* ph = std::strstr(json_response, "\"payload_hex\"");
+    if (ph) {
+        const char* q = std::strchr(ph, ':');
+        if (q) { q = std::strchr(q, '"'); }
+        if (q) {
+            ++q;
+            while (*q && *q != '"') {
+                int hi = hex_nibble(*q++);
+                if (*q == '"' || !*q) break;
+                int lo = hex_nibble(*q++);
+                if (hi < 0 || lo < 0) return -1;
+                if (plen >= MAX_PAYLOAD) return -1;
+                payload[plen++] = static_cast<uint8_t>((hi << 4) | lo);
             }
         }
     }
 
     int total = RESP_OVERHEAD + plen;
-    uint8_t* buf = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(total)));
-    if (!buf) return -1;
+    if (total > MAX_FRAME_BUFFER_BYTES) return -1;
 
-    std::memcpy(buf, RESP_HEADER, MAGIC_LEN);
-    store_i16le(buf + RESP_OFF_STATUS, static_cast<int16_t>(status));
-    store_u32le(buf + RESP_OFF_SIZE,   static_cast<uint32_t>(plen));
-    store_u16le(buf + RESP_OFF_GROUP,  static_cast<uint16_t>(group));
-    store_u16le(buf + RESP_OFF_UNIT,   static_cast<uint16_t>(unit));
-    if (plen > 0) std::memcpy(buf + RESP_OFF_PAYLOAD, payload, static_cast<size_t>(plen));
-    std::memcpy(buf + RESP_OFF_PAYLOAD + plen, RESP_FOOTER, MAGIC_LEN);
-    *out_buf = buf;
-    *out_len = static_cast<size_t>(total);
-    return 0;
+    std::memcpy(out_frame, RESP_HEADER, MAGIC_LEN);
+    store_i16le(out_frame + RESP_OFF_STATUS, static_cast<int16_t>(status));
+    store_u32le(out_frame + RESP_OFF_SIZE,   static_cast<uint32_t>(plen));
+    store_u16le(out_frame + RESP_OFF_GROUP,  static_cast<uint16_t>(group));
+    store_u16le(out_frame + RESP_OFF_UNIT,   static_cast<uint16_t>(unit));
+    if (plen > 0) std::memcpy(out_frame + RESP_OFF_PAYLOAD, payload, static_cast<size_t>(plen));
+    std::memcpy(out_frame + RESP_OFF_PAYLOAD + plen, RESP_FOOTER, MAGIC_LEN);
+    return total;
 }
 
 // =============================================================================
 // ABI: free_result
 // =============================================================================
-extern "C" SDFC_EXPORT void free_result(void* ptr) {
-    std::free(ptr);
+extern "C" SDFC_EXPORT void free_result(const char* result) {
+    std::free(const_cast<char*>(result));
 }

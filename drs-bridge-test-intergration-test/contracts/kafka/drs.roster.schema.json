@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "drs-bridge/contracts/kafka/drs.roster.schema.json",
+  "title": "drs.roster",
+  "description": "drs-server -> drs-bridge active-roster snapshot. Published to the COMPACTED topic 'drs.roster' under the single key 'active'; the latest retained message is the live roster. drs-bridge reconciles its per-instance servers against each snapshot. One snapshot fully describes the desired state (no deltas).",
+  "type": "object",
+  "required": ["roster_id", "version", "entries"],
+  "properties": {
+    "roster_id": { "type": "string", "description": "Stable id of this roster, e.g. 'lab-full'." },
+    "version":   { "type": "integer", "minimum": 1, "description": "Monotonic version; bumped on every committed change." },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["instance_id", "variant", "host", "command", "response", "port_source", "enabled"],
+        "properties": {
+          "instance_id": { "type": "string", "description": "Logical id, '<variant>#<n>', e.g. 'dp_ecm_hf#1'." },
+          "variant":     { "type": "string", "description": "Variant name, e.g. 'dp_ecm_hf'." },
+          "host":        { "type": "string", "description": "Bind host for this instance's servers." },
+          "command":     { "$ref": "#/$defs/endpoint" },
+          "response":    { "$ref": "#/$defs/endpoint" },
+          "port_source": { "type": "string", "enum": ["irs_fixed", "allocated"] },
+          "enabled":     { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "endpoint": {
+      "type": "object",
+      "required": ["port", "protocol"],
+      "properties": {
+        "port":     { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "protocol": { "type": "string", "enum": ["tcp", "udp"] }
+      }
+    }
+  }
+}

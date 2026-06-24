@@ -75,5 +75,6 @@
     "openpyxl",
     "uvicorn",
     "WindowsFormsHost"
-  ]
+  ],
+  "cmake.sourceDirectory": "C:/Users/Admin/Downloads/ewtss-v2-design-main/start_cpp"
 }

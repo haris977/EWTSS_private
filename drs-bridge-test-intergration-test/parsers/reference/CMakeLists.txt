@@ -1,0 +1,34 @@
+# drs-bridge/parsers/reference/CMakeLists.txt
+#
+# Builds the reference variant parser as a shared library:
+#   • reference_parser.dll      on Windows (MSBuild / Ninja-Multi-Config)
+#   • reference_parser.so       on Linux (Make / Ninja) — see PREFIX rule below
+#
+# Variant developers copy this file alongside the source, change the
+# project name + target name, and otherwise leave it untouched.
+
+cmake_minimum_required(VERSION 3.20)
+project(reference_parser LANGUAGES CXX VERSION 0.1.0)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS OFF)  # only PARSER_EXPORT-tagged symbols
+
+add_library(reference_parser SHARED
+    src/reference_parser.cpp
+)
+
+target_include_directories(reference_parser PUBLIC include)
+
+if(MSVC)
+    target_compile_options(reference_parser PRIVATE /W4 /WX)
+else()
+    target_compile_options(reference_parser PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Drop the "lib" prefix on all platforms so ctypes loads with the same name
+# everywhere: reference_parser.dll / reference_parser.so.
+# MinGW on Windows adds "lib" by default; MSVC does not — remove it either way.
+set_target_properties(reference_parser PROPERTIES PREFIX "")

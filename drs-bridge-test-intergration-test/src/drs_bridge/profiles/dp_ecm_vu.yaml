@@ -1,0 +1,8 @@
+variant: dp_ecm_vu
+parser_lib: parsers/dp_ecm/build/Release/dp_ecm_vu.dll
+time_signal:
+  embedded_in_messages: true
+  periodic_distribution:
+    enabled: false
+    interval_ms: null
+  precision_required_ms: 1.0

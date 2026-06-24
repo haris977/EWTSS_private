@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "drs-bridge/contracts/kafka/drs.control.schema.json",
+  "title": "drs.control",
+  "description": "drs-bridge -> drs-server control events. Consumer ignores unrecognised event types (open schema). Every message MUST carry a string `event` discriminator.",
+  "type": "object",
+  "required": ["event"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "description": "Event discriminator, e.g. 'variant.registered'."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "event": { "const": "variant.registered" } },
+        "required": ["event"]
+      },
+      "then": {
+        "required": ["variant", "precision_required_ms"],
+        "properties": {
+          "variant": {
+            "type": "string",
+            "description": "Variant name, e.g. 'dp_ecm_hf'."
+          },
+          "precision_required_ms": {
+            "type": "number",
+            "description": "Per-variant time-sync precision threshold in milliseconds."
+          }
+        }
+      }
+    }
+  ]
+}

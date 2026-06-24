@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "drs-bridge/contracts/kafka/system.timesync.schema.json",
+  "title": "system.timesync",
+  "description": "SyncStateEngine transition events published by drs-server, consumed by Sg.App + drs-webapp. One message per state transition.",
+  "type": "object",
+  "required": ["scope", "from", "to", "offset_ms", "at"],
+  "additionalProperties": false,
+  "properties": {
+    "scope":     { "type": "string", "description": "'global' for WS1<->WS2 link, or a variant name for per-variant feed." },
+    "from":      { "$ref": "#/$defs/syncStatus", "description": "Previous status." },
+    "to":        { "$ref": "#/$defs/syncStatus", "description": "New status." },
+    "offset_ms": { "type": "number", "description": "NTP offset (ms) at time of transition." },
+    "at":        { "type": "string", "format": "date-time", "description": "ISO-8601 UTC timestamp with trailing 'Z'." }
+  },
+  "$defs": {
+    "syncStatus": {
+      "type": "string",
+      "enum": ["healthy", "warming", "drift_warn", "drift_alert", "sync_lost"]
+    }
+  }
+}

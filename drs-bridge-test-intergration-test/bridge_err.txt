@@ -1,0 +1,318 @@
+2026-06-19 02:20:16,533 INFO    drs_bridge.main: drs-bridge starting (profiles_dir=C:\Users\Admin\drs-bridge-test\src\drs_bridge\profiles, kafka=localhost:9092)
+2026-06-19 02:20:16,533 INFO    drs_bridge.runtime: Runtime starting; profiles_dir=C:\Users\Admin\drs-bridge-test\src\drs_bridge\profiles kafka=localhost:9092
+2026-06-19 02:20:16,582 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'drs.roster'})
+2026-06-19 02:20:16,582 INFO    aiokafka.consumer.group_coordinator: Metadata for topic has changed from {} to {'drs.roster': 1}. 
+2026-06-19 02:20:16,582 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'drs.commands'})
+2026-06-19 02:20:16,596 INFO    drs_bridge.runtime: bound instance=dp_ecm_hf#1 variant=dp_ecm_hf 127.0.0.1:19001
+2026-06-19 02:20:16,596 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 02:20:16,596 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions set() for group drs-bridge-commands
+2026-06-19 02:20:16,596 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 02:20:16,596 INFO    drs_bridge.runtime: bound instance=dp_ecm_vu#1 variant=dp_ecm_vu 127.0.0.1:19011
+2026-06-19 02:20:16,596 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,596 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 02:20:16,596 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: tore down instance=dp_ecm_vu#1
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (1 entries)
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: bound instance=dp_ecm_vu#1 variant=dp_ecm_vu 127.0.0.1:19011
+2026-06-19 02:20:16,612 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 02:20:16,612 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 02:20:23,680 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 76) with member_id aiokafka-0.14.0-512e4b70-cf6d-4acc-8fca-3d31779562af
+2026-06-19 02:20:23,680 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 02:20:23,680 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 76
+2026-06-19 02:20:23,680 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='drs.commands', partition=0)} for group drs-bridge-commands
+2026-06-19 02:20:23,680 INFO    drs_bridge.kafka.command_consumer: command consumer started  topic=drs.commands
+2026-06-19 02:46:00,385 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 02:46:00,392 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 02:46:00,396 WARNING aiokafka: Unable to request metadata from node with id 1: KafkaConnectionError('Connection at localhost:9092 closed')
+2026-06-19 02:46:00,396 ERROR   aiokafka: Unable to update metadata from [1]
+2026-06-19 02:46:00,399 WARNING aiokafka: Unable to request metadata from node with id 1: KafkaConnectionError('Connection at localhost:9092 closed')
+2026-06-19 02:46:00,401 ERROR   aiokafka: Unable to update metadata from [1]
+2026-06-19 02:46:01,042 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 02:46:01,042 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 02:46:01,042 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 02:46:01,359 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 02:46:02,044 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 02:46:03,276 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 02:46:04,061 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 02:46:04,663 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 02:47:02,326 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 02:47:02,402 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 02:47:02,408 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 7] RequestTimedOutError
+2026-06-19 02:47:05,056 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 02:47:06,486 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 02:47:07,221 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 06:28:09,346 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 06:28:09,668 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 06:28:09,709 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 7] RequestTimedOutError
+2026-06-19 06:28:17,764 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 06:28:18,920 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 06:28:20,973 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 06:28:23,091 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 06:28:24,179 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 06:28:27,814 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 06:28:27,908 ERROR   aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to group error ([Error 25] UnknownMemberIdError: drs-bridge-commands), will rejoin
+2026-06-19 06:28:27,908 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 25] UnknownMemberIdError: drs-bridge-commands
+2026-06-19 06:28:28,420 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed: local member_id was not recognized; resetting and re-joining group
+2026-06-19 06:28:28,420 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 06:28:28,420 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 06:28:28,420 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions frozenset({TopicPartition(topic='drs.commands', partition=0)}) for group drs-bridge-commands
+2026-06-19 06:28:28,420 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 06:28:29,065 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 06:28:29,065 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 06:28:34,413 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 78) with member_id aiokafka-0.14.0-3ac83224-0ebf-48fe-84f2-eea22a8a327e
+2026-06-19 06:28:34,427 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 10:22:05,550 ERROR   aiokafka.consumer.group_coordinator: Error sending SyncGroupRequest to node 1 [[Error 7] RequestTimedOutError] -- marking coordinator dead
+2026-06-19 10:22:06,456 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:06,470 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 10:22:06,478 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 10:22:06,932 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:06,932 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 10:22:11,584 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 10:22:20,280 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 80) with member_id aiokafka-0.14.0-0ef8971a-92b4-4a53-8ffd-d3cc7a93c937
+2026-06-19 10:22:20,280 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 10:22:23,990 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 80
+2026-06-19 10:22:24,000 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='drs.commands', partition=0)} for group drs-bridge-commands
+2026-06-19 10:22:27,047 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node 1) is either not started or not valid
+2026-06-19 10:22:27,047 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:27,957 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:28,117 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node 1) is either not started or not valid
+2026-06-19 10:22:28,121 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:29,088 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:29,088 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:29,088 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:29,088 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:29,088 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:30,091 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:30,678 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:30,694 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:30,694 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:30,694 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:31,206 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:31,634 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:31,640 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:31,645 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:31,650 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:32,353 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:32,353 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:32,353 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:32,364 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:32,364 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:33,900 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:33,912 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:33,912 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:33,912 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:33,928 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:34,377 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:34,553 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:34,553 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:34,555 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:34,555 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:34,555 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:34,905 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:34,936 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:34,936 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:34,936 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:34,936 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:34,936 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:35,500 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:35,722 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:35,722 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:35,722 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:35,722 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:35,722 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:36,056 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:36,056 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:36,056 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:36,056 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:36,056 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:36,056 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:36,596 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:36,708 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:36,708 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:36,708 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:36,708 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:36,708 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:37,122 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:37,186 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:37,186 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:37,202 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:37,202 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:37,202 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:37,629 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:37,645 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:37,645 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:37,645 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:37,645 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:37,645 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:38,170 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:38,170 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:38,170 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:38,170 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:38,170 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:38,170 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:38,677 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:38,677 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:38,677 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:38,677 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:38,677 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:38,677 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:39,204 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:39,205 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:39,206 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:39,207 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:39,207 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:39,208 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:39,722 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 10:22:40,773 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:40,803 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:40,803 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:40,803 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:40,803 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:40,803 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:41,326 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:41,333 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:41,333 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:41,336 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:41,339 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:41,339 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:41,870 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:41,874 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:41,876 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:41,878 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:41,879 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:41,881 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:42,434 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:42,438 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:42,438 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:42,441 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:42,442 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:42,442 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:42,955 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:42,957 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:42,958 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:42,959 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:42,959 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:42,959 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:43,464 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:43,465 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:43,466 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:43,467 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:43,468 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:43,469 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:43,979 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 10:22:44,501 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 10:22:45,009 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:45,011 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:45,011 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:45,011 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:45,012 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands: coordinator (node None) is either not started or not valid
+2026-06-19 10:22:45,012 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 10:22:45,587 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 10:22:46,125 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 10:22:46,819 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:52,954 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:52,956 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:52,957 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:53,344 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:53,356 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:53,356 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:53,356 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:53,869 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:53,870 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to a coordinator error (NotCoordinatorForGroupError), will find new coordinator and retry
+2026-06-19 10:22:53,871 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 10:22:53,872 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 16] NotCoordinatorForGroupError
+2026-06-19 10:22:54,392 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 10:22:54,393 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:54,394 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:54,500 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:54,500 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:54,622 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:54,623 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:54,739 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:54,740 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:54,855 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:54,856 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:54,956 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:54,957 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:55,079 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:55,080 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:55,189 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:55,191 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:55,296 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:55,305 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:22:55,435 INFO    aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands because group is initializing (GroupLoadInProgressError), will retry
+2026-06-19 10:22:55,438 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 14] GroupLoadInProgressError
+2026-06-19 10:26:15,504 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands because it is rebalancing
+2026-06-19 10:26:15,504 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions frozenset({TopicPartition(topic='drs.commands', partition=0)}) for group drs-bridge-commands
+2026-06-19 10:26:15,504 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 10:26:15,504 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 81) with member_id aiokafka-0.14.0-0ef8971a-92b4-4a53-8ffd-d3cc7a93c937
+2026-06-19 10:26:15,504 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 10:26:15,512 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 81
+2026-06-19 10:26:15,512 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='drs.commands', partition=0)} for group drs-bridge-commands
+2026-06-19 10:48:16,927 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 10:48:16,983 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 11:02:01,843 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 11:02:01,847 ERROR   aiokafka.consumer.fetcher: Failed fetch messages from 1: [Error 7] RequestTimedOutError
+2026-06-19 11:02:03,103 ERROR   aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to group error ([Error 25] UnknownMemberIdError: drs-bridge-commands), will rejoin
+2026-06-19 11:02:03,178 WARNING aiokafka.consumer.group_coordinator: Auto offset commit failed: [Error 25] UnknownMemberIdError: drs-bridge-commands
+2026-06-19 11:02:03,178 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed: local member_id was not recognized; resetting and re-joining group
+2026-06-19 11:02:03,178 ERROR   aiokafka.consumer.group_coordinator: Heartbeat session expired - marking coordinator dead
+2026-06-19 11:02:03,178 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 11:02:04,480 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 11:02:06,034 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 11:02:08,002 ERROR   aiokafka.consumer.group_coordinator: Group Coordinator Request failed: [Error 15] GroupCoordinatorNotAvailableError
+2026-06-19 11:02:09,621 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 11:02:10,106 ERROR   aiokafka.consumer.group_coordinator: OffsetCommit failed for group drs-bridge-commands due to group error ([Error 25] UnknownMemberIdError: drs-bridge-commands), will rejoin
+2026-06-19 11:02:10,111 ERROR   aiokafka.consumer.group_coordinator: OffsetCommit failed before join, ignoring: CommitFailedError: ('Commit cannot be completed since the group has already\n            rebalanced and assigned the partitions to another member.\n            This means that the time between subsequent calls to poll()\n            was longer than the configured max_poll_interval_ms, which\n            typically implies that the poll loop is spending too much\n            time message processing. You can address this either by\n            increasing the rebalance timeout with max_poll_interval_ms,\n            or by reducing the maximum size of batches returned in poll()\n            with max_poll_records.\n            ', 'Commit cannot be completed since the group has already rebalanced and may have assigned the partitions to another member')
+2026-06-19 11:02:10,111 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions frozenset({TopicPartition(topic='drs.commands', partition=0)}) for group drs-bridge-commands
+2026-06-19 11:02:10,111 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:02:11,408 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 84) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:02:12,297 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:02:12,675 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 85) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:02:13,881 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:02:14,179 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 86) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:02:14,588 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:02:14,707 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 87) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:02:15,122 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:02:15,257 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 88) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:02:15,363 WARNING aiokafka.consumer.group_coordinator: Marking the coordinator dead (node 1)for group drs-bridge-commands.
+2026-06-19 11:02:15,886 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 11:02:15,886 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:02:15,896 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 89) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:02:15,962 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 89
+2026-06-19 11:02:15,967 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions set() for group drs-bridge-commands
+2026-06-19 11:10:36,978 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands because it is rebalancing
+2026-06-19 11:10:36,978 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions frozenset() for group drs-bridge-commands
+2026-06-19 11:10:36,978 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:10:36,978 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 90) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:10:36,978 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 90
+2026-06-19 11:10:36,978 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions set() for group drs-bridge-commands
+2026-06-19 11:10:39,969 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands because it is rebalancing
+2026-06-19 11:10:39,971 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions frozenset() for group drs-bridge-commands
+2026-06-19 11:10:39,971 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:10:39,975 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 91) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:10:39,979 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 91
+2026-06-19 11:10:39,979 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions set() for group drs-bridge-commands
+2026-06-19 11:11:33,975 WARNING aiokafka.consumer.group_coordinator: Heartbeat failed for group drs-bridge-commands because it is rebalancing
+2026-06-19 11:11:33,975 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions frozenset() for group drs-bridge-commands
+2026-06-19 11:11:33,975 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 11:11:33,975 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 92) with member_id aiokafka-0.14.0-cf4914e4-0f8c-4a57-a4ca-eea195725f2c
+2026-06-19 11:11:33,975 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 11:11:33,975 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 92
+2026-06-19 11:11:33,975 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='drs.commands', partition=0)} for group drs-bridge-commands

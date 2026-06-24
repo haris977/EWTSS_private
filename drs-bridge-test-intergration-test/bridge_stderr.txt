@@ -1,0 +1,36 @@
+2026-06-19 01:35:56,521 INFO    drs_bridge.main: drs-bridge starting (profiles_dir=C:\Users\Admin\drs-bridge-test\src\drs_bridge\profiles, kafka=localhost:9092)
+2026-06-19 01:35:56,535 INFO    drs_bridge.runtime: Runtime starting; profiles_dir=C:\Users\Admin\drs-bridge-test\src\drs_bridge\profiles kafka=localhost:9092
+2026-06-19 01:35:56,606 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'drs.roster'})
+2026-06-19 01:35:56,622 INFO    aiokafka.consumer.group_coordinator: Metadata for topic has changed from {} to {'drs.roster': 1}. 
+2026-06-19 01:35:56,622 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'drs.commands'})
+2026-06-19 01:35:56,635 INFO    drs_bridge.runtime: bound instance=dp_ecm_hf#1 variant=dp_ecm_hf 127.0.0.1:19001
+2026-06-19 01:35:56,638 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-bridge-commands
+2026-06-19 01:35:56,638 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions set() for group drs-bridge-commands
+2026-06-19 01:35:56,638 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-bridge-commands
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: bound instance=dp_ecm_vu#1 variant=dp_ecm_vu 127.0.0.1:19011
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1', 'dp_ecm_vu#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (2 entries)
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: tore down instance=dp_ecm_vu#1
+2026-06-19 01:35:56,638 INFO    drs_bridge.runtime: roster dev-roster@1 applied; bound=['dp_ecm_hf#1']
+2026-06-19 01:35:56,638 INFO    drs_bridge.kafka.roster_consumer: applied roster snapshot dev-roster@1 (1 entries)
+2026-06-19 01:35:59,655 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-bridge-commands' (generation 66) with member_id aiokafka-0.14.0-b1a20680-b35a-4f50-a354-9f59e6f9681f
+2026-06-19 01:35:59,655 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 01:35:59,655 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-bridge-commands with generation 66
+2026-06-19 01:35:59,655 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='drs.commands', partition=0)} for group drs-bridge-commands
+2026-06-19 01:35:59,655 INFO    drs_bridge.kafka.command_consumer: command consumer started  topic=drs.commands

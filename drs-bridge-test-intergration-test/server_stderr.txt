@@ -1,0 +1,40 @@
+INFO:     Started server process [37112]
+INFO:     Waiting for application startup.
+2026-06-19 01:35:57,104 INFO    drs_server.lifespan: drs-server lifespan starting (ntpq=C:\Program Files (x86)\NTP\bin\ntpq.exe kafka=localhost:9092 poll=3600s)
+2026-06-19 01:35:57,113 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'drs.control'})
+2026-06-19 01:35:57,113 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-server
+2026-06-19 01:35:57,113 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions set() for group drs-server
+2026-06-19 01:35:57,113 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-server
+2026-06-19 01:36:00,127 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-server' (generation 25) with member_id aiokafka-0.14.0-098d39e3-8e38-4f46-8542-1cc612503231
+2026-06-19 01:36:00,127 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 01:36:00,127 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-server with generation 25
+2026-06-19 01:36:00,127 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='drs.control', partition=0)} for group drs-server
+2026-06-19 01:36:00,127 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'system.health'})
+2026-06-19 01:36:00,143 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-server-presence
+2026-06-19 01:36:00,143 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions set() for group drs-server-presence
+2026-06-19 01:36:00,143 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-server-presence
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-server-presence' (generation 19) with member_id aiokafka-0.14.0-553586cf-29bd-4dca-a409-98fae98073f7
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-server-presence with generation 19
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='system.health', partition=0)} for group drs-server-presence
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'hw.dp_ecm_hf.telemetry'})
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-server-hf
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions set() for group drs-server-hf
+2026-06-19 01:36:03,159 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-server-hf
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-server-hf' (generation 19) with member_id aiokafka-0.14.0-468fb37d-cf18-4505-be30-0ecc3a0f8fe5
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-server-hf with generation 19
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='hw.dp_ecm_hf.telemetry', partition=0)} for group drs-server-hf
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.subscription_state: Updating subscribed topics to: frozenset({'hw.dp_ecm_vu.telemetry'})
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.group_coordinator: Discovered coordinator 1 for group drs-server-vu
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.group_coordinator: Revoking previously assigned partitions set() for group drs-server-vu
+2026-06-19 01:36:06,185 INFO    aiokafka.consumer.group_coordinator: (Re-)joining group drs-server-vu
+2026-06-19 01:36:09,203 INFO    aiokafka.consumer.group_coordinator: Joined group 'drs-server-vu' (generation 19) with member_id aiokafka-0.14.0-67505cd2-b8e2-4bb3-9456-f2629b34477e
+2026-06-19 01:36:09,205 INFO    aiokafka.consumer.group_coordinator: Elected group leader -- performing partition assignments using roundrobin
+2026-06-19 01:36:09,205 INFO    aiokafka.consumer.group_coordinator: Successfully synced group drs-server-vu with generation 19
+2026-06-19 01:36:09,208 INFO    aiokafka.consumer.group_coordinator: Setting newly assigned partitions {TopicPartition(topic='hw.dp_ecm_vu.telemetry', partition=0)} for group drs-server-vu
+2026-06-19 01:36:09,208 INFO    drs_server.consumers.control: registered variant dp_ecm_hf with precision 1.0 ms
+2026-06-19 01:36:09,208 INFO    drs_server.consumers.control: registered variant dp_ecm_vu with precision 1.0 ms
+INFO:     Application startup complete.
+2026-06-19 01:36:09,208 WARNING drs_server.infrastructure.ntp_poller: poll iteration failed; continuing: ntpq not found at 'C:\\Program Files (x86)\\NTP\\bin\\ntpq.exe' — install NTP or set DRS_SERVER__NTPQ_PATH
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)

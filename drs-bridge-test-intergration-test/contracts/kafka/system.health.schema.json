@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "drs-bridge/contracts/kafka/system.health.schema.json",
+  "title": "system.health",
+  "description": "Per-instance / system health events published by drs-bridge. Envelope is { event, ...payload }: every message carries a string `event`; remaining fields vary by event type (open schema).",
+  "type": "object",
+  "required": ["event"],
+  "additionalProperties": true,
+  "properties": {
+    "event": {
+      "type": "string",
+      "description": "Health event type. Known values: 'instance.connected', 'instance.disconnected', 'instance.framing_mismatch', 'instance.failed_bind', 'tick_lag_warn', 'tick_lag_alert'."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "event": { "const": "instance.connected" } },
+        "required": ["event"]
+      },
+      "then": {
+        "required": ["instance_id"],
+        "properties": { "instance_id": { "type": "string" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "event": { "const": "instance.disconnected" } },
+        "required": ["event"]
+      },
+      "then": {
+        "required": ["instance_id"],
+        "properties": { "instance_id": { "type": "string" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "event": { "enum": ["instance.framing_mismatch", "instance.failed_bind"] } },
+        "required": ["event"]
+      },
+      "then": {
+        "required": ["instance_id", "reason"],
+        "properties": {
+          "instance_id": { "type": "string" },
+          "reason":      { "type": "string" }
+        }
+      }
+    }
+  ]
+}

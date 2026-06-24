@@ -1,0 +1,9 @@
+; drs-bridge/parsers/dp_ecm/dp_ecm_vu.def
+; Explicit DLL export list — only these 4 ABI symbols are visible outside the DLL.
+; Everything else (frame core, decoders, helpers) stays hidden.
+LIBRARY dp_ecm_vu
+EXPORTS
+    extract_frame
+    parse_message
+    format_response
+    free_result

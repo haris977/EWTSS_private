@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "drs-bridge/contracts/kafka/hw.dp_ecm.telemetry.schema.json",
+  "title": "hw.dp_ecm.telemetry",
+  "description": "Decoded DP-ECM frame published by drs-bridge to hw.<variant>.telemetry topics. The `frame` object contains the output of parse_message() — fixed envelope fields (frame_type, group_id, unit_id, status) plus open per-unit payload fields decoded to SI units (Hz, dBm, seconds). All multi-byte integers in the wire format are little-endian; the JSON values are already host-converted. Applies to both hw.dp_ecm_hf.telemetry (DP-ECM-1071 HF) and hw.dp_ecm_vu.telemetry (DP-ECM-1074 VU).",
+  "type": "object",
+  "required": ["instance_id", "variant", "timestamp_ns", "frame"],
+  "additionalProperties": false,
+  "properties": {
+    "instance_id": {
+      "type": "string",
+      "description": "Logical DRS instance id, e.g. 'dp_ecm_hf#1'. Matches drs.roster entry."
+    },
+    "variant": {
+      "type": "string",
+      "enum": ["dp_ecm_hf", "dp_ecm_vu"],
+      "description": "Parser variant that decoded this frame."
+    },
+    "timestamp_ns": {
+      "type": "integer",
+      "description": "Wall-clock time (nanoseconds since Unix epoch) when the frame was received by drs-bridge."
+    },
+    "frame": {
+      "type": "object",
+      "description": "parse_message() output. Fixed envelope fields are always present; payload fields are open and vary per (group_id, unit_id).",
+      "required": ["frame_type", "group_id", "unit_id"],
+      "additionalProperties": true,
+      "properties": {
+        "frame_type": {
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "description": "1=command (SDFC->DRS), 2=response (DRS->SDFC), 3=stream."
+        },
+        "group_id": {
+          "type": "integer",
+          "description": "ICD group number. Known groups: 100 diagnostics, 101 detection, 106/200 jamming, 109 date-time, 111 signal/scan, 112 fast-scan."
+        },
+        "unit_id": {
+          "type": "integer",
+          "description": "ICD unit number within the group."
+        },
+        "status": {
+          "type": "integer",
+          "description": "Signed int16 status field, present on response frames (frame_type=2). ICD convention: 0=OK."
+        }
+      }
+    }
+  }
+}
