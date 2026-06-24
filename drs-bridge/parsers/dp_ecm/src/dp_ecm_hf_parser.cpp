@@ -334,7 +334,7 @@ static void decode_wideband_fft(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 6408) { w.key_str("warning", "wideband_fft payload < 6408 bytes"); return; }
     w.key_uint("fft_bin_count", load_u32le(p + 0));
     std::string arr = "[";
-    for (int i = 0; i < 1600; i+=4) {
+    for (int i = 0; i < 1600; ++i) {
         if (i) arr += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.2f",
@@ -2083,6 +2083,11 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
     if (frame_type == FRAME_COMMAND) {
         if (hdr.group_id == 100) {
             switch (hdr.unit_id) {
+                case  1: /* Get System Version — 0 bytes */            decoded = true; break;
+                case  3: /* Get SRX Checksum — 0 bytes */              decoded = true; break;
+                case  5: /* Get PBIT Status — 0 bytes */               decoded = true; break;
+                case  7: /* Get IBIT Status — 0 bytes */               decoded = true; break;
+                case  9: /* Get Temperature — 0 bytes */               decoded = true; break;
                 case 11: decode_cmd_set_fan_speed(payload, plen, w);  decoded = true; break;
                 case 13: /* Fan Speed Status cmd — 0 bytes */           decoded = true; break;
                 case 15: /* Ethernet Test — 0 bytes */                  decoded = true; break;
@@ -2570,6 +2575,8 @@ static int hex_nibble(char c) {
 //   @12 pulse_len_ms(f32) @16 inter_hop_ms(f32) @20 detected_count(u32)
 //   @24 toa_h(u8) @25 toa_m(u8) @26 toa_s(u8) @27 rsv(u8)
 //   @28 power_dbm(f32) @32 freq_active(u16) @34 rsv(u16) @36 snr_db(f32)
+// format_response input contract: array key is "detections" for all detection types.
+// Scalar TOA fields are integers: toa_h, toa_m, toa_s (not "HH:MM:SS" string).
 static int encode_fh_detection(const char* json, uint8_t* buf, int max_len) {
     long long hopper_count_ll = 0;
     if (!json_find_int(json, "hopper_count", hopper_count_ll) || hopper_count_ll <= 0)
@@ -2638,6 +2645,961 @@ static int encode_fh_detection(const char* json, uint8_t* buf, int max_len) {
     return 4 + written * 40;
 }
 
+// Serialize FF Detection response payload for Group 101 / Unit 70.
+// Wire: S_RES_WIDEBAND_FFT_DATA (6408B, zeroed) + ff_count (u32) + S_DETECTED_FIXED_FREQUENCY × N (36B each).
+// S_DETECTED_FIXED_FREQUENCY (36B):
+//   @0  freq (f32,MHz)  @4  current_power_dbm (f32)  @8  active_count (u32)
+//   @12 min_power_dbm (f32)  @16 max_power_dbm (f32)
+//   @20 toa H:M:S:0 (4B)  @24 dur H:M:S:0 (4B)
+//   @28 freq_active (u16)+rsv (u16)  @32 snr_db (f32)
+static int encode_ff_detection(const char* json, uint8_t* buf, int max_len) {
+    const int FFT_BLOCK = 4 + 1600 * 4 + 4;
+    const int FF_ELEM   = 36;
+
+    long long ff_count_ll = 0;
+    if (!json_find_int(json, "ff_count", ff_count_ll) || ff_count_ll < 0)
+        return -1;
+    int fc = static_cast<int>(ff_count_ll);
+    if (FFT_BLOCK + 4 + fc * FF_ELEM > max_len) return -1;
+
+    std::memset(buf, 0, static_cast<size_t>(FFT_BLOCK));
+    store_u32le(buf + FFT_BLOCK, static_cast<uint32_t>(fc));
+
+    if (fc == 0) return FFT_BLOCK + 4;
+
+    const char* det = std::strstr(json, "\"detections\"");
+    if (!det) return FFT_BLOCK + 4;
+    const char* arr = std::strchr(det, '[');
+    if (!arr) return FFT_BLOCK + 4;
+
+    const char* p = arr + 1;
+    int written = 0;
+    while (written < fc) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* obj_start = p;
+        int depth = 1; ++p;
+        while (*p && depth > 0) {
+            if (*p == '{') ++depth; else if (*p == '}') --depth; ++p;
+        }
+        std::string entry(obj_start, p);
+        const char* e = entry.c_str();
+
+        long long active_count = 0, toa_h = 0, toa_m = 0, toa_s = 0;
+        long long dur_h = 0, dur_m = 0, dur_s = 0, freq_active = 0;
+        double freq_hz = 0, current_power_dbm = 0, min_power_dbm = 0;
+        double max_power_dbm = 0, snr_db = 0;
+
+        json_find_double(e, "freq_hz",           freq_hz);
+        json_find_double(e, "current_power_dbm", current_power_dbm);
+        json_find_int(e,    "active_count",      active_count);
+        json_find_double(e, "min_power_dbm",     min_power_dbm);
+        json_find_double(e, "max_power_dbm",     max_power_dbm);
+        json_find_int(e,    "toa_h",             toa_h);
+        json_find_int(e,    "toa_m",             toa_m);
+        json_find_int(e,    "toa_s",             toa_s);
+        json_find_int(e,    "duration_h",        dur_h);
+        json_find_int(e,    "duration_m",        dur_m);
+        json_find_int(e,    "duration_s",        dur_s);
+        json_find_int(e,    "freq_active",       freq_active);
+        json_find_double(e, "snr_db",            snr_db);
+
+        uint8_t* slot = buf + FFT_BLOCK + 4 + written * FF_ELEM;
+        store_f32le(slot +  0, static_cast<float>(freq_hz / 1e6));
+        store_f32le(slot +  4, static_cast<float>(current_power_dbm));
+        store_u32le(slot +  8, static_cast<uint32_t>(active_count));
+        store_f32le(slot + 12, static_cast<float>(min_power_dbm));
+        store_f32le(slot + 16, static_cast<float>(max_power_dbm));
+        slot[20] = static_cast<uint8_t>(toa_h);
+        slot[21] = static_cast<uint8_t>(toa_m);
+        slot[22] = static_cast<uint8_t>(toa_s);
+        slot[23] = 0;
+        slot[24] = static_cast<uint8_t>(dur_h);
+        slot[25] = static_cast<uint8_t>(dur_m);
+        slot[26] = static_cast<uint8_t>(dur_s);
+        slot[27] = 0;
+        store_u16le(slot + 28, static_cast<uint16_t>(freq_active));
+        store_u16le(slot + 30, 0);
+        store_f32le(slot + 32, static_cast<float>(snr_db));
+        ++written;
+    }
+    return FFT_BLOCK + 4 + written * FF_ELEM;
+}
+
+// Serialize Burst Detection response payload for Group 101 / Unit 84.
+// Wire: burst_count (u32) + S_DETECTED_BURST_FREQUENCY × N (24B each).
+// S_DETECTED_BURST_FREQUENCY (24B):
+//   @0  freq (f32,MHz)  @4  current_power_dbm (f32)  @8  pulse_length_ms (f32)
+//   @12 active_count (u32)  @16 toa H:M:S:0 (4B)  @20 snr_db (f32)
+static int encode_burst_detection(const char* json, uint8_t* buf, int max_len) {
+    const int ELEM = 24;
+
+    long long burst_count_ll = 0;
+    if (!json_find_int(json, "burst_count", burst_count_ll) || burst_count_ll < 0)
+        return -1;
+    int bc = static_cast<int>(burst_count_ll);
+    if (4 + bc * ELEM > max_len) return -1;
+
+    store_u32le(buf, static_cast<uint32_t>(bc));
+
+    if (bc == 0) return 4;
+
+    const char* det = std::strstr(json, "\"detections\"");
+    if (!det) return 4;
+    const char* arr = std::strchr(det, '[');
+    if (!arr) return 4;
+
+    const char* p = arr + 1;
+    int written = 0;
+    while (written < bc) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* obj_start = p;
+        int depth = 1; ++p;
+        while (*p && depth > 0) {
+            if (*p == '{') ++depth; else if (*p == '}') --depth; ++p;
+        }
+        std::string entry(obj_start, p);
+        const char* e = entry.c_str();
+
+        long long active_count = 0, toa_h = 0, toa_m = 0, toa_s = 0;
+        double freq_hz = 0, current_power_dbm = 0, pulse_length_ms = 0, snr_db = 0;
+
+        json_find_double(e, "freq_hz",           freq_hz);
+        json_find_double(e, "current_power_dbm", current_power_dbm);
+        json_find_double(e, "pulse_length_ms",   pulse_length_ms);
+        json_find_int(e,    "active_count",      active_count);
+        json_find_int(e,    "toa_h",             toa_h);
+        json_find_int(e,    "toa_m",             toa_m);
+        json_find_int(e,    "toa_s",             toa_s);
+        json_find_double(e, "snr_db",            snr_db);
+
+        uint8_t* slot = buf + 4 + written * ELEM;
+        store_f32le(slot +  0, static_cast<float>(freq_hz / 1e6));
+        store_f32le(slot +  4, static_cast<float>(current_power_dbm));
+        store_f32le(slot +  8, static_cast<float>(pulse_length_ms));
+        store_u32le(slot + 12, static_cast<uint32_t>(active_count));
+        slot[16] = static_cast<uint8_t>(toa_h);
+        slot[17] = static_cast<uint8_t>(toa_m);
+        slot[18] = static_cast<uint8_t>(toa_s);
+        slot[19] = 0;
+        store_f32le(slot + 20, static_cast<float>(snr_db));
+        ++written;
+    }
+    return 4 + written * ELEM;
+}
+
+// Helper: parse "HH:MM:SS" toa string OR individual _h/_m/_s integer fields.
+static void parse_toa_hms(const char* j, const char* key,
+                           uint8_t& h_out, uint8_t& m_out, uint8_t& s_out) {
+    h_out = 0; m_out = 0; s_out = 0;
+    char sub[64];
+    long long v;
+    std::snprintf(sub, sizeof(sub), "%s_h", key); if (json_find_int(j, sub, v)) h_out = (uint8_t)v;
+    std::snprintf(sub, sizeof(sub), "%s_m", key); if (json_find_int(j, sub, v)) m_out = (uint8_t)v;
+    std::snprintf(sub, sizeof(sub), "%s_s", key); if (json_find_int(j, sub, v)) s_out = (uint8_t)v;
+    if (h_out || m_out || s_out) return;
+    std::string pat = std::string("\"") + key + "\"";
+    const char* k = std::strstr(j, pat.c_str());
+    if (!k) return;
+    const char* c = std::strchr(k + pat.size(), ':');
+    if (!c) return; ++c;
+    while (*c == ' ' || *c == '\t') ++c;
+    if (*c != '"') return; ++c;
+    unsigned hh = 0, mm = 0, ss = 0;
+    if (std::sscanf(c, "%u:%u:%u", &hh, &mm, &ss) == 3) {
+        h_out = (uint8_t)hh; m_out = (uint8_t)mm; s_out = (uint8_t)ss;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Group 100 encoders
+// ---------------------------------------------------------------------------
+static int encode_system_version(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 20) return -1;
+    std::memset(buf, 0, 20);
+    double sjc_fw = 0, driver = 0, fpga = 0;
+    long long proc_id = 0, tuner_id = 0, fpga_type = 0;
+    json_find_double(j, "sjc_fw_version",  sjc_fw);
+    json_find_double(j, "driver_version",  driver);
+    json_find_double(j, "fpga_version",    fpga);
+    json_find_int(j,    "processor_id",    proc_id);
+    json_find_int(j,    "sjc_rf_tuner_id", tuner_id);
+    json_find_int(j,    "fpga_type_id",    fpga_type);
+    store_f32le(buf +  0, (float)sjc_fw);
+    store_f32le(buf +  4, (float)driver);
+    store_f32le(buf +  8, (float)fpga);
+    store_u16le(buf + 12, (uint16_t)proc_id);
+    store_u16le(buf + 14, (uint16_t)tuner_id);
+    store_u16le(buf + 16, (uint16_t)fpga_type);
+    return 20;
+}
+
+static int encode_srx_checksum(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 1024) return -1;
+    std::memset(buf, 0, 1024);
+    const char* key = std::strstr(j, "\"sjc_fw_checksum\"");
+    if (!key) return 1024;
+    const char* c = std::strchr(key, ':');
+    if (!c) return 1024;
+    while (*c && *c != '"') ++c;
+    if (*c != '"') return 1024;
+    ++c;
+    size_t idx = 0;
+    while (*c && *c != '"' && idx < 1023) buf[idx++] = (uint8_t)*c++;
+    return 1024;
+}
+
+static int encode_pbit_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 24) return -1;
+    std::memset(buf, 0, 24);
+    long long v = 0;
+    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
+    gi("combined_drx_status",         0);  gi("combined_temperature_status", 1);
+    gi("combined_voltage_status",     2);  gi("combined_exciter_status",     3);
+    gi("fpga_scratch_pad_test",       4);  gi("fpga_board_id",               5);
+    gi("fpga_init_test",              6);  gi("fpga_temperature_status",     7);
+    gi("rf_psu_temp_sensor",          8);  gi("rf_psu_5v_monitor_status",    9);
+    gi("rf_psu_8v5_monitor_status",  10);  gi("fan_voltage_monitor_status", 11);
+    gi("digital_5v_monitor_status",  12);  gi("digital_3v5_monitor_status", 13);
+    gi("digital_psu_temp_status",    14);  gi("msata_detection_status",     15);
+    gi("storage_avail_check_status", 16);  gi("fan_speed_ctrl_sensor_test", 17);
+    gi("rf_tuner_health_status",     18);  gi("drx_pll_health_status",      19);
+    gi("fan_temperature_status",     20);
+    return 24;
+}
+
+static int encode_ibit_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 8) return -1;
+    std::memset(buf, 0, 8);
+    long long v = 0;
+    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
+    gi("combined_drx_status",   0);  gi("storage_health_status", 1);
+    gi("drx_pll_health_test",   2);  gi("rf_tuner_health_test",  3);
+    gi("drx_adc_health_test",   4);  gi("msata_rw_test",         5);
+    gi("storage_avail_check",   6);
+    return 8;
+}
+
+static int encode_temperature(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 24) return -1;
+    double v = 0;
+    auto gd = [&](const char* k, int i) { v = 0; json_find_double(j, k, v); store_f32le(buf + i, (float)v); };
+    gd("processor_temp_c",  0); gd("psu_temp_c",      4); gd("fan_temp_c",    8);
+    gd("rf_psu_temp_c",    12); gd("digital_temp_c", 16); gd("fpga_temp_c",  20);
+    return 24;
+}
+
+static int encode_fan_speed_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    long long rpm = 0; json_find_int(j, "fan_speed_rpm", rpm);
+    store_u32le(buf, (uint32_t)rpm); return 4;
+}
+
+static int encode_ethernet_test(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 12) return -1;
+    long long tx = 0, rx = 0, result = 0;
+    json_find_int(j, "tx_data", tx); json_find_int(j, "rx_data", rx); json_find_int(j, "result", result);
+    store_u32le(buf + 0, (uint32_t)tx); store_u32le(buf + 4, (uint32_t)rx); store_u32le(buf + 8, (uint32_t)result);
+    return 12;
+}
+
+static int encode_uart_test(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0;
+    if (json_find_int(j, "expected_data", v)) buf[0] = (uint8_t)v;
+    if (json_find_int(j, "observed_data", v)) buf[1] = (uint8_t)v;
+    if (json_find_int(j, "result",        v)) buf[2] = (uint8_t)v;
+    return 4;
+}
+
+static int encode_fan_voltage_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 24) return -1;
+    double v = 0;
+    auto gd = [&](const char* k, int i) { v = 0; json_find_double(j, k, v); store_f32le(buf + i, (float)v); };
+    gd("fan_adc_voltage_v", 0); gd("rf1_voltage_v",  4); gd("rf2_voltage_v",  8);
+    gd("rf3_voltage_v",    12); gd("digital_5v_v",  16); gd("digital_3v3_v", 20);
+    return 24;
+}
+
+static int encode_pps_test(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 16) return -1;
+    std::memset(buf, 0, 16);
+    long long on = 0, off = 0, status = 0, result = 0;
+    json_find_int(j, "on_period_us", on); json_find_int(j, "off_period_us", off);
+    json_find_int(j, "pps_status", status); json_find_int(j, "result", result);
+    store_u32le(buf + 0, (uint32_t)on); store_u32le(buf + 4, (uint32_t)off);
+    store_u32le(buf + 8, (uint32_t)status); buf[12] = (uint8_t)result;
+    return 16;
+}
+
+static int encode_fpga_temperature_details(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    double temp = 0; json_find_double(j, "fpga_temperature", temp);
+    store_f32le(buf, (float)temp); return 4;
+}
+
+static int encode_cbit_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0;
+    if (json_find_int(j, "tuner_board_id_status", v)) buf[0] = (uint8_t)v;
+    if (json_find_int(j, "voltage_status",         v)) buf[1] = (uint8_t)v;
+    if (json_find_int(j, "temperature_status",     v)) buf[2] = (uint8_t)v;
+    if (json_find_int(j, "memory_status",          v)) buf[3] = (uint8_t)v;
+    return 4;
+}
+
+// ---------------------------------------------------------------------------
+// Group 101 additional encoders
+// ---------------------------------------------------------------------------
+static int encode_wideband_fft(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 6408) return -1;
+    std::memset(buf, 0, 6408);
+    long long bin_count = 0, scan_speed = 0;
+    json_find_int(j, "fft_bin_count", bin_count); json_find_int(j, "scan_speed", scan_speed);
+    store_u32le(buf + 0, (uint32_t)bin_count); store_u32le(buf + 6404, (uint32_t)scan_speed);
+    return 6408;
+}
+
+static int encode_stop_scan_speed(const char* j, uint8_t* buf, int max_len) {
+    const int TOTAL = 4 + 1600 * 36;
+    if (max_len < TOTAL) return -1;
+    std::memset(buf, 0, (size_t)TOTAL);
+    long long ff_count = 0;
+    json_find_int(j, "ff_count", ff_count);
+    if (ff_count > 1600) ff_count = 1600;
+    store_u32le(buf, (uint32_t)ff_count);
+    if (ff_count == 0) return TOTAL;
+    const char* det = std::strstr(j, "\"detections\"");
+    if (!det) return TOTAL;
+    const char* arr = std::strchr(det, '[');
+    if (!arr) return TOTAL;
+    const char* p = arr + 1; int written = 0;
+    while (written < (int)ff_count) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* os = p; int depth = 1; ++p;
+        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
+        std::string entry(os, p); const char* e = entry.c_str();
+        long long ac = 0, fa = 0;
+        double fhz = 0, cp = 0, mnp = 0, mxp = 0, snr = 0;
+        json_find_double(e, "freq_hz",           fhz); json_find_double(e, "current_power_dbm", cp);
+        json_find_int(e,    "active_count",      ac);  json_find_double(e, "min_power_dbm",     mnp);
+        json_find_double(e, "max_power_dbm",     mxp); json_find_int(e,    "freq_active",       fa);
+        json_find_double(e, "snr_db",            snr);
+        uint8_t th = 0, tm = 0, ts = 0, dh = 0, dm = 0, ds = 0;
+        parse_toa_hms(e, "toa",      th, tm, ts);
+        parse_toa_hms(e, "duration", dh, dm, ds);
+        uint8_t* slot = buf + 4 + written * 36;
+        store_f32le(slot +  0, (float)(fhz / 1e6)); store_f32le(slot +  4, (float)cp);
+        store_u32le(slot +  8, (uint32_t)ac);        store_f32le(slot + 12, (float)mnp);
+        store_f32le(slot + 16, (float)mxp);
+        slot[20] = th; slot[21] = tm; slot[22] = ts; slot[23] = 0;
+        slot[24] = dh; slot[25] = dm; slot[26] = ds; slot[27] = 0;
+        store_u16le(slot + 28, (uint16_t)fa); store_u16le(slot + 30, 0);
+        store_f32le(slot + 32, (float)snr);
+        ++written;
+    }
+    return TOTAL;
+}
+
+static int encode_zoom_fft(const char* j, uint8_t* buf, int max_len) {
+    long long sc = 0; json_find_int(j, "sample_count", sc);
+    if (sc < 0 || sc > 1600) sc = 0;
+    int total = 4 + (int)sc * 4;
+    if (total > max_len) return -1;
+    std::memset(buf, 0, (size_t)total);
+    store_u32le(buf, (uint32_t)sc);
+    if (sc == 0) return 4;
+    const char* pd = std::strstr(j, "\"power_dbm\"");
+    if (!pd) return total;
+    const char* arr = std::strchr(pd, '['); if (!arr) return total; ++arr;
+    int written = 0;
+    while (written < (int)sc) {
+        while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
+        if (*arr == ']' || !*arr) break;
+        char* end; float v = (float)std::strtod(arr, &end);
+        if (end == arr) break;
+        store_f32le(buf + 4 + written * 4, v); arr = end; ++written;
+    }
+    return total;
+}
+
+// ---------------------------------------------------------------------------
+// Group 109 encoders
+// ---------------------------------------------------------------------------
+static int encode_auto_threshold_value(const char* j, uint8_t* buf, int max_len) {
+    const int TOTAL = 4 + 1600 * 4;
+    if (max_len < TOTAL) return -1;
+    std::memset(buf, 0, (size_t)TOTAL);
+    long long bc = 0; json_find_int(j, "auto_threshold_bin_count", bc);
+    if (bc > 1600) bc = 1600;
+    store_u32le(buf, (uint32_t)bc);
+    if (bc == 0) return TOTAL;
+    const char* pd = std::strstr(j, "\"auto_threshold_bin_data\"");
+    if (!pd) return TOTAL;
+    const char* arr = std::strchr(pd, '['); if (!arr) return TOTAL; ++arr;
+    int written = 0;
+    while (written < (int)bc) {
+        while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
+        if (*arr == ']' || !*arr) break;
+        char* end; float v = (float)std::strtod(arr, &end);
+        if (end == arr) break;
+        store_f32le(buf + 4 + written * 4, v); arr = end; ++written;
+    }
+    return TOTAL;
+}
+
+// Shared encoder: hopper_channelization (109/18) and pdw_channelization (111/16).
+// Wire: count(u32)@0 + toa[H,M,S,0]@4 + count×28B entries.
+static int encode_channelization(const char* j, const char* arr_key, uint8_t* buf, int max_len) {
+    long long count = 0; json_find_int(j, "channelization_count", count);
+    if (count < 0) count = 0;
+    int total = 8 + (int)count * 28;
+    if (total > max_len) return -1;
+    std::memset(buf, 0, (size_t)total);
+    store_u32le(buf, (uint32_t)count);
+    uint8_t th = 0, tm = 0, ts = 0;
+    parse_toa_hms(j, "toa", th, tm, ts);
+    buf[4] = th; buf[5] = tm; buf[6] = ts;
+    if (count == 0) return 8;
+    const char* ks = std::strstr(j, arr_key);
+    if (!ks) return 8;
+    const char* arr = std::strchr(ks, '['); if (!arr) return 8;
+    const char* p = arr + 1; int written = 0;
+    while (written < (int)count) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* os = p; int depth = 1; ++p;
+        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
+        std::string entry(os, p); const char* e = entry.c_str();
+        double toi = 0, fihz = 0, pl = 0, pwr = 0;
+        long long bw = 0, fb = 0;
+        json_find_double(e, "toi",             toi);
+        json_find_double(e, "freq_index_hz",   fihz);
+        json_find_double(e, "pulse_length_ms", pl);
+        json_find_double(e, "power_level_dbm", pwr);
+        json_find_int(e,    "bandwidth",       bw);
+        json_find_int(e,    "freq_band",       fb);
+        uint8_t* slot = buf + 8 + written * 28;
+        store_f64le(slot +  0, toi);
+        store_f32le(slot +  8, (float)(fihz / 1e6));
+        store_f32le(slot + 12, (float)pl);
+        store_f32le(slot + 16, (float)pwr);
+        store_u32le(slot + 20, (uint32_t)bw);
+        store_u32le(slot + 24, (uint32_t)fb);
+        ++written;
+    }
+    return 8 + written * 28;
+}
+
+static int encode_hopper_channelization(const char* j, uint8_t* buf, int max_len) {
+    return encode_channelization(j, "\"hopper_channelizations\"", buf, max_len);
+}
+
+// ---------------------------------------------------------------------------
+// Group 111 encoders
+// ---------------------------------------------------------------------------
+static int encode_signal_bite_resp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 12) return -1;
+    std::memset(buf, 0, 12);
+    double freq = 0, power = 0; long long result = 0;
+    json_find_double(j, "bite_freq_hz",   freq);
+    json_find_double(j, "bite_power_dbm", power);
+    json_find_int(j,    "bite_result",    result);
+    store_f32le(buf + 0, (float)(freq / 1e6));
+    store_f32le(buf + 4, (float)power);
+    store_u16le(buf + 8, (uint16_t)result);
+    return 12;
+}
+
+static int encode_module_health(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long drx = 0, tuner = 0;
+    json_find_int(j, "drx_health",      drx);
+    json_find_int(j, "rf_tuner_health", tuner);
+    buf[0] = (uint8_t)drx; buf[1] = (uint8_t)tuner;
+    return 4;
+}
+
+static int encode_pdw_channelization(const char* j, uint8_t* buf, int max_len) {
+    return encode_channelization(j, "\"channelization_data\"", buf, max_len);
+}
+
+static int encode_bite_observed_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 16) return -1;
+    std::memset(buf, 0, 16);
+    double freq = 0, power = 0; long long result = 0;
+    json_find_double(j, "observed_bite_freq_mhz",  freq);
+    json_find_double(j, "observed_bite_power_dbm", power);
+    json_find_int(j,    "bite_result",             result);
+    store_f64le(buf + 0, freq);
+    store_f32le(buf + 8, (float)power);
+    store_u16le(buf + 12, (uint16_t)result);
+    return 16;
+}
+
+static int encode_storage_details(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 20) return -1;
+    std::memset(buf, 0, 20);
+    long long ds1 = 0, ds2 = 0, ds3 = 0; double avail = 0, total = 0;
+    json_find_int(j,    "disk_space_1",         ds1);
+    json_find_int(j,    "disk_space_2",         ds2);
+    json_find_int(j,    "disk_space_3",         ds3);
+    json_find_double(j, "available_disk_space", avail);
+    json_find_double(j, "total_disk_space",     total);
+    buf[0] = (uint8_t)ds1; buf[1] = (uint8_t)ds2; buf[2] = (uint8_t)ds3;
+    store_f64le(buf +  4, avail); store_f64le(buf + 12, total);
+    return 20;
+}
+
+static int encode_read_protected_band_list(const char* j, uint8_t* buf, int max_len) {
+    long long count = 0; json_find_int(j, "protected_band_count", count);
+    if (count < 0) count = 0;
+    int total = 4 + (int)count * 8;
+    if (total > max_len) return -1;
+    std::memset(buf, 0, (size_t)total);
+    store_u16le(buf, (uint16_t)count);
+    if (count == 0) return 4;
+    const char* pd = std::strstr(j, "\"protected_bands\"");
+    if (!pd) return 4;
+    const char* arr = std::strchr(pd, '['); if (!arr) return 4;
+    const char* p = arr + 1; int written = 0;
+    while (written < (int)count) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* os = p; int depth = 1; ++p;
+        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
+        std::string entry(os, p); const char* e = entry.c_str();
+        double start = 0, stop = 0;
+        json_find_double(e, "start_freq_hz", start); json_find_double(e, "stop_freq_hz", stop);
+        uint8_t* slot = buf + 4 + written * 8;
+        store_f32le(slot + 0, (float)(start / 1e6)); store_f32le(slot + 4, (float)(stop / 1e6));
+        ++written;
+    }
+    return 4 + written * 8;
+}
+
+// ---------------------------------------------------------------------------
+// Group 112 encoders
+// ---------------------------------------------------------------------------
+static int encode_asu_sdu_config_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long err = 0; json_find_int(j, "error_value", err);
+    store_i16le(buf, (int16_t)err); return 4;
+}
+
+static int encode_trsdu_receiver_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0; json_find_int(j, "tr_sdu_health_status", v); buf[0] = (uint8_t)v; return 4;
+}
+
+static int encode_pa_receiver_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0; json_find_int(j, "power_amplifier_status", v); buf[0] = (uint8_t)v; return 4;
+}
+
+// ---------------------------------------------------------------------------
+// Group 200 encoders
+// ---------------------------------------------------------------------------
+static int encode_list_jam_report(const char* j, uint8_t* buf, int max_len) {
+    long long count = 0; json_find_int(j, "list_jam_freq_count", count);
+    if (count < 0) count = 0;
+    int total = 4 + (int)count * 8;
+    if (total > max_len) return -1;
+    std::memset(buf, 0, (size_t)total);
+    store_u32le(buf, (uint32_t)count);
+    if (count == 0) return 4;
+    const char* pd = std::strstr(j, "\"frequencies\"");
+    if (!pd) return 4;
+    const char* arr = std::strchr(pd, '['); if (!arr) return 4;
+    const char* p = arr + 1; int written = 0;
+    while (written < (int)count) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* os = p; int depth = 1; ++p;
+        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
+        std::string entry(os, p); const char* e = entry.c_str();
+        long long freq = 0, status = 0;
+        json_find_int(e, "freq_hz", freq); json_find_int(e, "status", status);
+        uint8_t* slot = buf + 4 + written * 8;
+        store_u32le(slot + 0, (uint32_t)freq); store_u16le(slot + 4, (uint16_t)status);
+        ++written;
+    }
+    return 4 + written * 8;
+}
+
+static int encode_hpasu_health_status_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0; json_find_int(j, "health_status", v); buf[0] = (uint8_t)v; return 4;
+}
+
+static int encode_pa_sdu_health_status_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 8) return -1;
+    std::memset(buf, 0, 8);
+    long long v = 0; char key[16];
+    for (int i = 0; i < 4; ++i) {
+        std::snprintf(key, sizeof(key), "pa%d_health", i + 1);
+        v = 0; json_find_int(j, key, v); buf[i] = (uint8_t)v;
+    }
+    v = 0; json_find_int(j, "sdu_health", v); buf[4] = (uint8_t)v;
+    return 8;
+}
+
+// ---------------------------------------------------------------------------
+// Group 106 encoders
+// ---------------------------------------------------------------------------
+static int encode_stop_immediate_jam_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0; json_find_int(j, "exciter_retry_count", v); buf[0] = (uint8_t)v; return 4;
+}
+
+static int encode_ext_modulation_response(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    long long v = 0; json_find_int(j, "software_buffer_size", v);
+    store_u32le(buf, (uint32_t)v); return 4;
+}
+
+static int encode_immediate_jam_ack(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 8) return -1;
+    std::memset(buf, 0, 8);
+    long long jam_id = 0, jam_active = 0;
+    json_find_int(j, "jam_id", jam_id); json_find_int(j, "jam_active", jam_active);
+    store_u16le(buf + 0, (uint16_t)jam_id); store_u16le(buf + 4, (uint16_t)jam_active);
+    return 8;
+}
+
+// ---------------------------------------------------------------------------
+// MRx Group 1 encoders
+// ---------------------------------------------------------------------------
+static int encode_mrx_system_version(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 16) return -1;
+    std::memset(buf, 0, 16);
+    double fw = 0, drv = 0, fpga = 0; long long tuner_id = 0;
+    json_find_double(j, "fw_version",     fw);   json_find_double(j, "driver_version", drv);
+    json_find_double(j, "fpga_version",   fpga); json_find_int(j,    "rf_tuner_id",    tuner_id);
+    store_f32le(buf + 0, (float)fw); store_f32le(buf + 4, (float)drv); store_f32le(buf + 8, (float)fpga);
+    store_u16le(buf + 12, (uint16_t)tuner_id);
+    return 16;
+}
+
+static int encode_mrx_checksum(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 1024) return -1;
+    std::memset(buf, 0, 1024);
+    const char* key = std::strstr(j, "\"sjc_fw_checksum\"");
+    if (!key) return 1024;
+    const char* c = std::strchr(key, ':'); if (!c) return 1024;
+    while (*c && *c != '"') ++c;
+    if (*c != '"') return 1024; ++c;
+    size_t idx = 0;
+    while (*c && *c != '"' && idx < 1023) buf[idx++] = (uint8_t)*c++;
+    return 1024;
+}
+
+static int encode_mrx_pbit_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 120) return -1;
+    std::memset(buf, 0, 120);
+    long long v = 0;
+    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
+    gi("fpga_scratch_pad_test",    0); gi("fpga_board_id_read",      1);
+    gi("processor_temp_status",    2); gi("fan_temp_status",          3);
+    gi("fpga_temp_status",         4); gi("rfpsu_temp_status",        6);
+    gi("fan_speed_ctrl_sensor",    7); gi("fan_voltage_status",       8);
+    gi("rfsu_5v_status",           9); gi("rfsu_8v5_status",         10);
+    gi("msata_detection_status",  11); gi("lo1_pll_lock_status",     12);
+    gi("lo2_pll_lock_status",     13); gi("bite_pll_lock_status",    14);
+    gi("tuner_detection_status",  15); gi("tuner_scratchpad_test",   18);
+    gi("pll_lock_status",         21); gi("adc_bonding_status",      22);
+    gi("storage_availability",    23); gi("digital_5v_status",       24);
+    gi("digital_3v5_status",      25); gi("digital_psu_temp_status", 26);
+    return 120;
+}
+
+static int encode_mrx_ibit_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 112) return -1;
+    std::memset(buf, 0, 112);
+    long long v = 0;
+    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
+    gi("pll_lock_status",         0); gi("adc_bonding_status",      1);
+    gi("msata_detection_status",  2); gi("storage_availability",    3);
+    gi("tuner_lo1_pll_lock",      4); gi("tuner_lo2_pll_lock",      5);
+    gi("tuner_bite_pll_lock",     6); gi("adc1_link_status",        7);
+    gi("tuner_detection_status", 10); gi("tuner_scratchpad_test",  13);
+    return 112;
+}
+
+static int encode_mrx_temperature(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 36) return -1;
+    static const char* NAMES[] = {
+        "bpt_temp_c", "psu_8156_temp_c", "tuner_temp_c", "psu_7255_temp_c",
+        "processor_temp_c", "power_supply_temp_c", "control_board_temp_c",
+        "rf_psu_temp_c", "fpga_temp_c"
+    };
+    for (int i = 0; i < 9; ++i) {
+        double v = 0; json_find_double(j, NAMES[i], v); store_f32le(buf + i * 4, (float)v);
+    }
+    return 36;
+}
+
+static int encode_mrx_fan_speed(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    long long rpm = 0; json_find_int(j, "fan_speed_rpm", rpm);
+    store_u32le(buf, (uint32_t)rpm); return 4;
+}
+
+static int encode_mrx_uart_test_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0;
+    if (json_find_int(j, "expected_data", v)) buf[0] = (uint8_t)v;
+    if (json_find_int(j, "observed_data", v)) buf[1] = (uint8_t)v;
+    if (json_find_int(j, "result",        v)) buf[2] = (uint8_t)v;
+    return 4;
+}
+
+static int encode_mrx_cbit_status(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 8) return -1;
+    std::memset(buf, 0, 8);
+    long long v = 0;
+    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
+    gi("drx_status",             0); gi("voltage_status",        1);
+    gi("temperature_status",     2); gi("tuner_detection_status",4);
+    gi("memory_status",          7);
+    return 8;
+}
+
+// ---------------------------------------------------------------------------
+// MRx Group 3 encoders
+// ---------------------------------------------------------------------------
+static int encode_mrx_board_count_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long count = 0, tuner_id = 0;
+    json_find_int(j, "board_count",        count);
+    json_find_int(j, "available_tuner_id", tuner_id);
+    store_u16le(buf + 0, (uint16_t)count); store_u16le(buf + 2, (uint16_t)tuner_id);
+    return 4;
+}
+
+static int encode_mrx_channels_16b(const char* j, const char* arr_key,
+                                    const char* status_key, uint8_t* buf, int max_len) {
+    if (max_len < 16) return -1;
+    std::memset(buf, 0, 16);
+    const char* pd = std::strstr(j, arr_key); if (!pd) return 16;
+    const char* arr = std::strchr(pd, '['); if (!arr) return 16;
+    const char* p = arr + 1; int written = 0;
+    while (written < 8) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* os = p; int depth = 1; ++p;
+        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
+        std::string entry(os, p);
+        long long status = 0; json_find_int(entry.c_str(), status_key, status);
+        store_u16le(buf + written * 2, (uint16_t)status); ++written;
+    }
+    return 16;
+}
+
+static int encode_mrx_tuning_details_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 8) return -1;
+    std::memset(buf, 0, 8);
+    long long v = 0;
+    auto gi  = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
+    auto gu  = [&](const char* k, int i) { if (json_find_int(j, k, v)) store_u16le(buf + i, (uint16_t)v); };
+    gi("srx_tuned_status", 0); gi("mrx_tuned_status", 1);
+    gu("srx_scan_mode_status",   2); gu("tuned_center_freq_mhz", 4);
+    gi("memory_scan_tuned", 6); gi("bite_selection", 7);
+    return 8;
+}
+
+// ---------------------------------------------------------------------------
+// MRx Group 4 encoders
+// ---------------------------------------------------------------------------
+static int encode_mrx_audio_data_rsp(const char* j, uint8_t* buf, int max_len) {
+    long long audio_size = 0; json_find_int(j, "audio_data_size", audio_size);
+    if (audio_size < 0) audio_size = 0;
+    if (audio_size > 262144) audio_size = 262144;
+    int total = 4 + (int)audio_size * 2;
+    if (total > max_len) return -1;
+    std::memset(buf, 0, (size_t)total);
+    store_u32le(buf, (uint32_t)audio_size);
+    if (audio_size == 0) return 4;
+    const char* pd = std::strstr(j, "\"audio_data\""); if (!pd) return total;
+    const char* arr = std::strchr(pd, '['); if (!arr) return total; ++arr;
+    int written = 0;
+    while (written < (int)audio_size) {
+        while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
+        if (*arr == ']' || !*arr) break;
+        char* end; long long v = std::strtoll(arr, &end, 10);
+        if (end == arr) break;
+        store_u16le(buf + 4 + written * 2, (uint16_t)v); arr = end; ++written;
+    }
+    return total;
+}
+
+static int encode_mrx_iq_start_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long v = 0;
+    if (json_find_int(j, "mrx_channel",          v)) buf[0] = (uint8_t)v;
+    if (json_find_int(j, "narrowband_iq_status",  v)) buf[1] = (uint8_t)v;
+    if (json_find_int(j, "wideband_iq_status",    v)) buf[2] = (uint8_t)v;
+    return 4;
+}
+
+static int encode_mrx_iq_logging_stop_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 132) return -1;
+    std::memset(buf, 0, 132);
+    long long ch = 0; json_find_int(j, "mrx_channel", ch); store_u16le(buf, (uint16_t)ch);
+    const char* key = std::strstr(j, "\"file_path\""); if (!key) return 132;
+    const char* c = std::strchr(key, ':'); if (!c) return 132;
+    while (*c && *c != '"') ++c; if (*c != '"') return 132; ++c;
+    size_t idx = 0;
+    while (*c && *c != '"' && idx < 127) buf[4 + idx++] = (uint8_t)*c++;
+    return 132;
+}
+
+static int encode_mrx_memory_scan_data_rsp(const char* j, uint8_t* buf, int max_len) {
+    long long count = 0, scan_speed = 0;
+    json_find_int(j, "total_available_count",       count);
+    json_find_int(j, "scan_speed_channels_per_sec", scan_speed);
+    if (count < 0) count = 0; if (count > 10000) count = 10000;
+    int total = 8 + (int)count * 20;
+    if (total > max_len) return -1;
+    std::memset(buf, 0, (size_t)total);
+    store_u32le(buf + 0, (uint32_t)count); store_u16le(buf + 4, (uint16_t)scan_speed);
+    if (count == 0) return 8;
+    const char* pd = std::strstr(j, "\"scan_data\""); if (!pd) return 8;
+    const char* arr = std::strchr(pd, '['); if (!arr) return 8;
+    const char* p = arr + 1; int written = 0;
+    while (written < (int)count) {
+        while (*p && *p != '{' && *p != ']') ++p;
+        if (!*p || *p == ']') break;
+        const char* os = p; int depth = 1; ++p;
+        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
+        std::string entry(os, p); const char* e = entry.c_str();
+        double power = 0, freq = 0; long long bw = 0;
+        json_find_double(e, "power_dbm", power); json_find_double(e, "freq_hz", freq);
+        json_find_int(e, "bandwidth_list", bw);
+        uint8_t* slot = buf + 8 + written * 20;
+        store_f32le(slot +  0, (float)power);
+        store_f64le(slot +  4, freq / 1e6);
+        store_u16le(slot + 18, (uint16_t)bw);
+        ++written;
+    }
+    return 8 + written * 20;
+}
+
+static int encode_mrx_ddc_fft_rsp(const char* j, uint8_t* buf, int max_len) {
+    long long bc = 0; json_find_int(j, "bin_count", bc);
+    if (bc < 0) bc = 0; if (bc > 4096) bc = 4096;
+    int total = 4 + (int)bc * 4;
+    if (total > max_len) return -1;
+    std::memset(buf, 0, (size_t)total);
+    store_u16le(buf, (uint16_t)bc);
+    if (bc == 0) return total;
+    const char* pd = std::strstr(j, "\"ddc_fft_power_dbm\""); if (!pd) return total;
+    const char* arr = std::strchr(pd, '['); if (!arr) return total; ++arr;
+    int written = 0;
+    while (written < (int)bc) {
+        while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
+        if (*arr == ']' || !*arr) break;
+        char* end; float v = (float)std::strtod(arr, &end);
+        if (end == arr) break;
+        store_f32le(buf + 4 + written * 4, v); arr = end; ++written;
+    }
+    return total;
+}
+
+static int encode_mrx_smart_scan_read_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 16) return -1;
+    std::memset(buf, 0, 16);
+    double freq = 0, amplitude = 0; long long ch = 0;
+    json_find_double(j, "freq_hz",    freq);
+    json_find_int(j,    "mrx_channel", ch);
+    json_find_double(j, "amplitude",   amplitude);
+    store_f64le(buf + 0, freq / 1e6);
+    store_u16le(buf + 8, (uint16_t)ch);
+    store_f32le(buf + 12, (float)amplitude);
+    return 16;
+}
+
+static int encode_mrx_optical_port_status_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 12) return -1;
+    std::memset(buf, 0, 12);
+    long long v = 0;
+    auto gu = [&](const char* k, int i) { if (json_find_int(j, k, v)) store_u16le(buf + i, (uint16_t)v); };
+    gu("port_number", 0); gu("port_id", 2); gu("port_alive_status", 4);
+    gu("already_transmitting", 6); gu("can_start_transfer", 8);
+    return 12;
+}
+
+static int encode_mrx_optical_ip_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 24) return -1;
+    std::memset(buf, 0, 24);
+    const char* ip_key = std::strstr(j, "\"ip_address\"");
+    if (ip_key) {
+        const char* c = std::strchr(ip_key, ':'); if (c) { while (*c && *c != '"') ++c; }
+        if (c && *c == '"') { ++c;
+            unsigned a = 0, b = 0, cc = 0, d = 0;
+            if (std::sscanf(c, "%u.%u.%u.%u", &a, &b, &cc, &d) == 4) {
+                buf[0] = (uint8_t)a; buf[1] = (uint8_t)b; buf[2] = (uint8_t)cc; buf[3] = (uint8_t)d;
+            }
+        }
+    }
+    const char* pd = std::strstr(j, "\"port_ids\"");
+    if (pd) {
+        const char* arr = std::strchr(pd, '['); if (arr) { ++arr;
+            for (int i = 0; i < 9; ++i) {
+                while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
+                if (*arr == ']' || !*arr) break;
+                char* end; long long v = std::strtoll(arr, &end, 10);
+                if (end == arr) break;
+                store_u16le(buf + 4 + i * 2, (uint16_t)v); arr = end;
+            }
+        }
+    }
+    return 24;
+}
+
+// ---------------------------------------------------------------------------
+// MRx Group 5 encoders
+// ---------------------------------------------------------------------------
+static int encode_mrx_agc_status_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 4) return -1;
+    std::memset(buf, 0, 4);
+    long long rf = 0, ifatt = 0, agc = 0;
+    json_find_int(j, "rf_attenuation_db", rf);
+    json_find_int(j, "if_attenuation_db", ifatt);
+    json_find_int(j, "agc_running",       agc);
+    buf[0] = (uint8_t)rf; buf[1] = (uint8_t)ifatt; store_u16le(buf + 2, (uint16_t)agc);
+    return 4;
+}
+
+// ---------------------------------------------------------------------------
+// MRx Group 7 encoders
+// ---------------------------------------------------------------------------
+static int encode_mrx_signal_bite_rsp(const char* j, uint8_t* buf, int max_len) {
+    if (max_len < 16) return -1;
+    std::memset(buf, 0, 16);
+    double freq = 0, power = 0; long long result = 0;
+    json_find_double(j, "observed_freq_hz",   freq);
+    json_find_double(j, "observed_power_dbm", power);
+    json_find_int(j,    "result",             result);
+    store_f64le(buf + 0, freq / 1e6);
+    store_f32le(buf + 8, (float)power);
+    store_u16le(buf + 12, (uint16_t)result);
+    return 16;
+}
+
 extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_json,
                                            uint8_t** out_buf, size_t* out_len) {
     if (!kwargs_json || !out_buf || !out_len) return -1;
@@ -2646,16 +3608,240 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
     if (!json_find_int(kwargs_json, "unit_id",  unit))  return -1;
     if (!json_find_int(kwargs_json, "status",   status)) return -1;
 
-    uint8_t payload[MAX_PAYLOAD];
+    uint8_t* payload = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(MAX_PAYLOAD)));
+    if (!payload) return -1;
     int plen = 0;
+    // is_ack: this unit_id is a known zero-payload ACK — skip payload_hex fallback.
+    bool is_ack = false;
 
-    // Structured encoders: dispatch before payload_hex path
-    if (group == 101 && unit == 40) {
-        plen = encode_fh_detection(kwargs_json, payload, MAX_PAYLOAD);
-        if (plen < 0) return -1;
+    typedef int (*EncFn)(const char*, uint8_t*, int);
+    EncFn fn = nullptr;
+
+    if (group == 100) {
+        switch (unit) {
+            case  2: fn = encode_system_version;           break;
+            case  4: fn = encode_srx_checksum;             break;
+            case  6: fn = encode_pbit_status;              break;
+            case  8: fn = encode_ibit_status;              break;
+            case 10: fn = encode_temperature;              break;
+            case 12: is_ack = true;                        break; // Set Fan Speed ACK
+            case 14: fn = encode_fan_speed_status;         break;
+            case 16: fn = encode_ethernet_test;            break;
+            case 18: fn = encode_uart_test;                break;
+            case 22: fn = encode_fan_voltage_status;       break;
+            case 24: fn = encode_pps_test;                 break;
+            case 26: is_ack = true;                        break; // RS422 Test ACK
+            case 28: fn = encode_fpga_temperature_details; break;
+            case 30: fn = encode_cbit_status;              break;
+            default: break;
+        }
+    } else if (group == 101) {
+        switch (unit) {
+            case  26: is_ack = true; break; // Set Threshold ACK
+            case  28: is_ack = true; break; // Set Resolution ACK
+            case  32: is_ack = true; break; // Start Follow-on Jam ACK
+            case  34: is_ack = true; break; // Stop Follow-on Jam ACK
+            case  38: is_ack = true; break; // Configure Detection ACK
+            case  40: fn = encode_fh_detection;   break;
+            case  44: fn = encode_wideband_fft;   break;
+            case  48: is_ack = true; break; // Set Pulse Range ACK
+            case  56: is_ack = true; break; // Set Min Hops ACK
+            case  64: is_ack = true; break; // Tracking Config ACK
+            case  70: fn = encode_ff_detection;   break;
+            case  74: is_ack = true; break; // Start List Jam ACK
+            case  76: is_ack = true; break; // Stop List Jam ACK
+            case  80: is_ack = true; break; // Send ECM Reports ACK
+            case  84: fn = encode_burst_detection; break;
+            case  86: is_ack = true; break; // Start Scan Speed ACK
+            case  88: fn = encode_stop_scan_speed; break;
+            case  93: is_ack = true; break; // Start Responsive Sweep Jam ACK
+            case  95: fn = encode_zoom_fft;        break;
+            case 101: is_ack = true; break; // Set Flatness Mode ACK
+            case 103: is_ack = true; break; // Set Integration Time ACK
+            case 105: is_ack = true; break; // Set Multi-Band FH ACK
+            case 107: is_ack = true; break; // Set Narrow-Band FH ACK
+            case 141: is_ack = true; break; // HF-specific ACK
+            case 159: is_ack = true; break; // Terminate FFT ACK
+            case 161: is_ack = true; break; // HF slow scan ACK
+            case 163: is_ack = true; break;
+            case 165: is_ack = true; break;
+            case 175: is_ack = true; break;
+            case 177: is_ack = true; break;
+            case 179: is_ack = true; break;
+            case 183: is_ack = true; break; // HF fast scan ACK
+            case 185: is_ack = true; break;
+            case 187: is_ack = true; break;
+            case 201: is_ack = true; break; // HF wideband ACK
+            case 203: is_ack = true; break;
+            // 205: HF data stream — no encoder; caller supplies payload_hex
+            // 211: cross-group (grp111) — no encoder; caller supplies payload_hex
+            default: break;
+        }
+    } else if (group == 109) {
+        switch (unit) {
+            case 12: is_ack = true;                     break; // Set Date/Time ACK
+            case 16: fn = encode_auto_threshold_value;  break;
+            case 18: fn = encode_hopper_channelization; break;
+            default: break;
+        }
+    } else if (group == 111) {
+        switch (unit) {
+            case  4: fn = encode_signal_bite_resp;          break;
+            case  6: is_ack = true;                         break; // Reference Input ACK
+            case  8: fn = encode_module_health;             break;
+            case 10: is_ack = true;                         break; // Send Protected Scan List ACK
+            case 14: is_ack = true;                         break; // Protected Scan Enable ACK
+            case 16: fn = encode_pdw_channelization;        break;
+            case 18: is_ack = true;                         break; // FH Splitband Enable ACK
+            case 20: is_ack = true;                         break; // FH Splitband Freq ACK
+            case 22: fn = encode_bite_observed_rsp;         break;
+            case 24: is_ack = true;                         break; // Spectrum Protected Band ACK
+            case 26: fn = encode_storage_details;           break;
+            case 28: fn = encode_read_protected_band_list;  break;
+            case 30: is_ack = true;                         break; // Auto Threshold Enable ACK
+            case 32: is_ack = true;                         break; // Hopper Channelization ACK
+            // 211: cross-group stream rsp — no encoder; caller supplies payload_hex
+            default: break;
+        }
+    } else if (group == 112) {
+        switch (unit) {
+            case  2: fn = encode_asu_sdu_config_rsp;    break;
+            case  4: fn = encode_trsdu_receiver_status; break;
+            case  6: fn = encode_pa_receiver_status;    break;
+            case 14: is_ack = true;                     break; // Simulation Mode Config ACK
+            case 38: is_ack = true;                     break; // HF fast scan ACK
+            default: break;
+        }
+    } else if (group == 200) {
+        switch (unit) {
+            case 10: is_ack = true;                           break; // Send ECM Reports ACK
+            case 12: is_ack = true;                           break; // Start List Jam ACK
+            case 14: is_ack = true;                           break; // Stop List Jam ACK
+            case 16: fn = encode_list_jam_report;             break;
+            case 18: is_ack = true;                           break; // Start Follow-on Jam ACK
+            case 20: is_ack = true;                           break; // Stop Follow-on Jam ACK
+            case 22: is_ack = true;                           break; // Start Responsive Sweep Jam ACK
+            case 24: is_ack = true;                           break; // Stop Responsive Sweep Jam ACK
+            case 42: fn = encode_hpasu_health_status_rsp;    break;
+            case 55: fn = encode_pa_sdu_health_status_rsp;   break;
+            case 57: is_ack = true;                           break; // PA Soft Reboot ACK
+            default: break;
+        }
+    } else if (group == 106) {
+        switch (unit) {
+            case  2: is_ack = true;                        break; // Start Immediate Jam ACK
+            case  4: is_ack = true;                        break; // TDM Jam ACK
+            case  6: is_ack = true;                        break; // FDM Jam ACK
+            case 10: fn = encode_stop_immediate_jam_rsp;   break;
+            case 22: is_ack = true;                        break; // Enable PA ACK
+            case 40: fn = encode_ext_modulation_response;  break;
+            case 42: is_ack = true;                        break; // Sweep Jam ACK
+            case 46: is_ack = true;                        break; // Enable PA+SDU ACK
+            case 50: is_ack = true;                        break; // Configure Prog Exciter ACK
+            case 54: fn = encode_immediate_jam_ack;        break;
+            case 56: is_ack = true;                        break; // Comb Noise ACK
+            default: break;
+        }
+    } else if (group == 1) {   // MRx diagnostics
+        switch (unit) {
+            case  2: fn = encode_mrx_system_version; break;
+            case  4: fn = encode_mrx_checksum;        break;
+            case  6: fn = encode_mrx_pbit_status;     break;
+            case  8: fn = encode_mrx_ibit_status;     break;
+            case 10: fn = encode_mrx_temperature;     break;
+            case 14: fn = encode_mrx_fan_speed;       break;
+            case 18: fn = encode_mrx_uart_test_rsp;   break;
+            case 26: fn = encode_mrx_cbit_status;     break;
+            case 34: is_ack = true;                   break; // Close All Channels ACK
+            default: break;
+        }
+    } else if (group == 3) {   // MRx RF board
+        switch (unit) {
+            case  2: fn = encode_mrx_board_count_rsp;  break;
+            case 18: {
+                plen = encode_mrx_channels_16b(kwargs_json, "\"channels\"", "status", payload, MAX_PAYLOAD);
+                if (plen < 0) { std::free(payload); return -1; }
+                break;
+            }
+            case 20: is_ack = true; break; // Write Channel ACK
+            case 22: {
+                plen = encode_mrx_channels_16b(kwargs_json, "\"channel_init_statuses\"", "init_status", payload, MAX_PAYLOAD);
+                if (plen < 0) { std::free(payload); return -1; }
+                break;
+            }
+            case 24: fn = encode_mrx_tuning_details_rsp; break;
+            case 26: fn = encode_mrx_cbit_status;         break;
+            default: break;
+        }
+    } else if (group == 4) {   // MRx data acquisition
+        switch (unit) {
+            case  6: is_ack = true;                        break; // Set Threshold ACK
+            case  8: fn = encode_mrx_audio_data_rsp;       break;
+            case 10: is_ack = true;                        break; // Audio Start Play ACK
+            case 12: is_ack = true;                        break; // Audio Stop Play ACK
+            case 16: is_ack = true;                        break; // Audio FIFO Reset ACK
+            case 18: is_ack = true;                        break; // Demod/BW Select ACK
+            case 24: fn = encode_mrx_iq_start_rsp;         break;
+            case 26: fn = encode_mrx_iq_logging_stop_rsp;  break;
+            case 34: fn = encode_mrx_iq_start_rsp;         break;
+            case 36: is_ack = true;                        break; // Stop IQ Streaming ACK
+            case 40: is_ack = true;                        break; // Configure Memory Scan ACK
+            case 42: fn = encode_mrx_memory_scan_data_rsp; break;
+            case 44: fn = encode_mrx_ddc_fft_rsp;          break;
+            case 54: is_ack = true;                        break; // Engage Channel ACK
+            case 56: is_ack = true;                        break; // Disengage Channel ACK
+            case 58: is_ack = true;                        break; // Stop Memory Scan ACK
+            case 60: is_ack = true;                        break; // Smart Memory Scan Config ACK
+            case 62: fn = encode_mrx_smart_scan_read_rsp;  break;
+            case 64: is_ack = true;                        break; // Stop Smart Memory Scan ACK
+            case 66: is_ack = true;                        break; // Start Optical IQ ACK
+            case 68: is_ack = true;                        break; // Stop Optical IQ ACK
+            case 70: fn = encode_mrx_optical_port_status_rsp; break;
+            case 72: fn = encode_mrx_optical_ip_rsp;          break;
+            default: break;
+        }
+    } else if (group == 5) {   // MRx tuner
+        switch (unit) {
+            case  2: is_ack = true;                  break; // Set Center Freq ACK
+            case  4: is_ack = true;                  break; // Attenuation Select ACK
+            case 10: is_ack = true;                  break; // Clear Center Freq ACK
+            case 14: fn = encode_mrx_agc_status_rsp; break;
+            default: break;
+        }
+    } else if (group == 6) {   // MRx FH monitoring / GO2Monitor
+        switch (unit) {
+            case  8: is_ack = true; break; // FH Monitoring Config ACK
+            case 10: is_ack = true; break; // GO2Monitor Connect ACK
+            case 12: is_ack = true; break; // GO2Monitor Disconnect ACK
+            case 14: is_ack = true; break; // Start GO2Monitor ACK
+            case 16: is_ack = true; break; // Stop GO2Monitor ACK
+            default: break;
+        }
+    } else if (group == 7) {   // MRx Signal BITE / misc
+        switch (unit) {
+            case  2: fn = encode_mrx_signal_bite_rsp; break;
+            case  4: is_ack = true; break; // BITE/Antenna Select ACK
+            case  6: is_ack = true; break; // Ref Source Select ACK
+            case 10: is_ack = true; break; // AFC ACK
+            case 12: is_ack = true; break; // RF Squelch ACK
+            case 14: is_ack = true; break; // IQ Socket Open ACK
+            case 16: is_ack = true; break; // IQ Socket Close ACK
+            case 18: is_ack = true; break; // Spectrum Avg Count ACK
+            case 20: is_ack = true; break; // Smart RF AGC ACK
+            case 22: is_ack = true; break; // Audio Squelch ACK
+            case 24: is_ack = true; break; // Set Date/Time ACK
+            default: break;
+        }
     }
 
-    if (plen == 0) {
+    if (fn) {
+        plen = fn(kwargs_json, payload, MAX_PAYLOAD);
+        if (plen < 0) { std::free(payload); return -1; }
+    }
+
+    // Only fall through to payload_hex for truly unknown group/unit combinations
+    // (e.g. raw stream responses). Known ACK responses skip this path.
+    if (!is_ack && plen == 0) {
         const char* ph = std::strstr(kwargs_json, "\"payload_hex\"");
         if (ph) {
             const char* q = std::strchr(ph, ':');
@@ -2666,8 +3852,8 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
                     int hi = hex_nibble(*q++);
                     if (*q == '"' || !*q) break;
                     int lo = hex_nibble(*q++);
-                    if (hi < 0 || lo < 0) return -1;
-                    if (plen >= MAX_PAYLOAD) return -1;
+                    if (hi < 0 || lo < 0) { std::free(payload); return -1; }
+                    if (plen >= MAX_PAYLOAD) { std::free(payload); return -1; }
                     payload[plen++] = static_cast<uint8_t>((hi << 4) | lo);
                 }
             }
@@ -2676,7 +3862,7 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
 
     int total = RESP_OVERHEAD + plen;
     uint8_t* buf = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(total)));
-    if (!buf) return -1;
+    if (!buf) { std::free(payload); return -1; }
 
     std::memcpy(buf, RESP_HEADER, MAGIC_LEN);
     store_i16le(buf + RESP_OFF_STATUS, static_cast<int16_t>(status));
@@ -2685,6 +3871,7 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
     store_u16le(buf + RESP_OFF_UNIT,   static_cast<uint16_t>(unit));
     if (plen > 0) std::memcpy(buf + RESP_OFF_PAYLOAD, payload, static_cast<size_t>(plen));
     std::memcpy(buf + RESP_OFF_PAYLOAD + plen, RESP_FOOTER, MAGIC_LEN);
+    std::free(payload);
     *out_buf = buf;
     *out_len = static_cast<size_t>(total);
     return 0;

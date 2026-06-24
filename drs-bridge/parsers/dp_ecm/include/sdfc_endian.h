@@ -72,10 +72,21 @@ inline void store_u32le(uint8_t* p, uint32_t v) {
     p[3] = static_cast<uint8_t>((v >> 24) & 0xFF);
 }
 
+inline void store_u64le(uint8_t* p, uint64_t v) {
+    store_u32le(p,     static_cast<uint32_t>(v & 0xFFFFFFFFu));
+    store_u32le(p + 4, static_cast<uint32_t>(v >> 32));
+}
+
 inline void store_f32le(uint8_t* p, float v) {
     uint32_t bits;
     std::memcpy(&bits, &v, sizeof(bits));
     store_u32le(p, bits);
+}
+
+inline void store_f64le(uint8_t* p, double v) {
+    uint64_t bits;
+    std::memcpy(&bits, &v, sizeof(bits));
+    store_u64le(p, bits);
 }
 
 } // namespace sdfc
