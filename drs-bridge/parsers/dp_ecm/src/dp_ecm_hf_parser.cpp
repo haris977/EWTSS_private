@@ -39,6 +39,15 @@
 
 using namespace sdfc;
 
+// store_u64le / store_f64le — not in sdfc_endian.h (header stays minimal)
+static inline void store_u64le(uint8_t* p, uint64_t v) {
+    store_u32le(p,     static_cast<uint32_t>(v & 0xFFFFFFFFu));
+    store_u32le(p + 4, static_cast<uint32_t>(v >> 32));
+}
+static inline void store_f64le(uint8_t* p, double v) {
+    uint64_t bits; std::memcpy(&bits, &v, sizeof(bits)); store_u64le(p, bits);
+}
+
 static constexpr const char* HW_NAME = "dp_ecm_hf";
 
 // =============================================================================
