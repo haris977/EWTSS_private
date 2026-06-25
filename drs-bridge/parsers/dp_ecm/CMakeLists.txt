@@ -9,11 +9,20 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)   # only .def / SDFC_EXPORT symbols are 
 set(SDFC_CORE_SRC src/sdfc_frame.cpp)
 
 # ---- DP-ECM-1071 HF parser DLL (1–30 MHz) ----
+# Collect group sources (empty at scaffolding stage; grows as Tasks 2–12 land)
+file(GLOB HF_PARSER_SRCS src/hf/parser/*.cpp)
+file(GLOB HF_FORMAT_SRCS src/hf/format/*.cpp)
+
 add_library(dp_ecm_hf SHARED
     ${SDFC_CORE_SRC}
     src/dp_ecm_hf_parser.cpp
+    ${HF_PARSER_SRCS}
+    ${HF_FORMAT_SRCS}
 )
-target_include_directories(dp_ecm_hf PRIVATE include)
+target_include_directories(dp_ecm_hf PRIVATE
+    include
+    src/hf
+)
 
 if(MSVC)
     target_compile_options(dp_ecm_hf PRIVATE /W4 /permissive-)
@@ -45,8 +54,13 @@ add_executable(test_dp_ecm
     tests/test_frames.cpp
     ${SDFC_CORE_SRC}
     src/dp_ecm_hf_parser.cpp
+    ${HF_PARSER_SRCS}
+    ${HF_FORMAT_SRCS}
 )
-target_include_directories(test_dp_ecm PRIVATE include)
+target_include_directories(test_dp_ecm PRIVATE
+    include
+    src/hf
+)
 if(NOT MSVC)
     target_compile_options(test_dp_ecm PRIVATE -Wall -Wextra)
 endif()
