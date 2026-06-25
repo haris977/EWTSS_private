@@ -11,3 +11,9 @@ bool g100_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
 bool g100_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
 int  g100_format   (long long unit_id, const char* json,
                     uint8_t* buf, int max_len, bool& is_ack);
+
+// Group 101 — SJC Detection + Jamming
+bool g101_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+bool g101_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+int  g101_format   (long long unit_id, const char* json,
+                    uint8_t* buf, int max_len, bool& is_ack);
