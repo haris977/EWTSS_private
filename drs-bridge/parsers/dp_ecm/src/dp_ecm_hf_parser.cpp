@@ -3066,7 +3066,10 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
     typedef int (*EncFn)(const char*, uint8_t*, int);
     EncFn fn = nullptr;
 
-    if (group == 100) plen = g100_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+    if (group == 100) {
+        plen = g100_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+        if (plen < 0) { std::free(payload); return -1; }
+    }
     else if (group == 101) {
         switch (unit) {
             case  26: is_ack = true; break; // Set Threshold ACK
