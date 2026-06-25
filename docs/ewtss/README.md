@@ -54,6 +54,7 @@ The v1 codebase itself (the live `drs_bridge/`, `drs_server/`, and `ewtss-backen
 
 The audience-targeted docs above distil the load-bearing decisions; the underlying design specs sit alongside in [`specs/`](specs/) for the reader who needs the detail behind a decision. These are the active design records the v2 doc set draws from:
 
+- [HF parser per-group restructure](specs/hf-parser-restructure-design.md) — splits `dp_ecm_hf_parser.cpp` (~3,900 lines) into 26 per-group files under `src/hf/`, one `_parse.cpp` + one `_format.cpp` per protocol group. Preserves ABI; VU parser untouched.
 - [v2 tech-stack archive](specs/v2-tech-stack-archive.md) — the original exhaustive analysis (~5,000 lines). Source of the AP-N citations, §17 Mode B technical design, §21 per-service layered models, §25 MVP findings.
 - [Hybrid design spec](specs/hybrid-frontend-design.md) — full proposal for the chosen frontend architecture (Mode A primary, Mode B opt-in future).
 - [MVP4 STK-native embedded design](specs/mvp4-stk-native-embedded-design.md) — the C# WPF + STK ActiveX design (Option D2) that the Hybrid's desktop deliverable builds on.
