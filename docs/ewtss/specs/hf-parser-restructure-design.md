@@ -18,9 +18,12 @@ hard; a developer looking for Group 101 detection code must scroll past Group
 
 ## Goal
 
-Split the file into self-contained per-group pairs that are easy to explain
-to a client or new contributor: *"every protocol group has exactly two files —
-one for parsing, one for formatting."*
+Split the file into self-contained per-group files organised by concern:
+all parsing (decode) logic lives under `hf/parser/`, all formatting (encode)
+logic lives under `hf/format/`. One file per protocol group in each folder.
+
+Easy to explain to a client: *"open `parser/` to find decode logic, open
+`format/` to find encode logic — every group has a file in each."*
 
 ---
 
@@ -30,57 +33,61 @@ one for parsing, one for formatting."*
 
 ```
 drs-bridge/parsers/dp_ecm/
-├── include/                    ← unchanged
+├── include/                       ← unchanged
 │   ├── sdfc_abi.h
 │   ├── sdfc_frame.h
 │   ├── sdfc_endian.h
 │   └── json_writer.h
 └── src/
-    ├── sdfc_frame.cpp           ← unchanged
-    ├── dp_ecm_hf_parser.cpp     ← shrinks to ~150 lines: 3 ABI exports + dispatch
-    └── hf/                      ← NEW: all group implementation files
-        ├── hf_groups.h          ← dispatcher signatures (included only by main)
-        ├── hf_json_utils.h      ← json_find_int/double, hex_nibble, parse_toa_hms,
-        │                           MAX_PAYLOAD — shared by all format files
-        ├── hf_shared.h          ← 4 decode functions shared between groups 101 & 200
+    ├── sdfc_frame.cpp              ← unchanged
+    ├── dp_ecm_hf_parser.cpp        ← shrinks to ~150 lines: 3 ABI exports + dispatch
+    └── hf/                         ← NEW
+        ├── hf_groups.h             ← dispatcher signatures (included only by main)
+        ├── hf_json_utils.h         ← json_find_int/double, hex_nibble, parse_toa_hms,
+        │                              MAX_PAYLOAD — shared by all format files
+        ├── hf_shared.h             ← 4 decode functions shared between groups 101 & 200
         │
-        ├── g100_parse.cpp       ← SJC Diagnostics: decode_* functions + cmd/rsp dispatch
-        ├── g100_format.cpp      ← SJC Diagnostics: encode_* functions + format dispatch
-        ├── g101_parse.cpp       ← SJC Detection+Jamming: decode
-        ├── g101_format.cpp      ← SJC Detection+Jamming: encode
-        ├── g106_parse.cpp       ← Immediate Jamming: decode
-        ├── g106_format.cpp      ← Immediate Jamming: encode
-        ├── g109_parse.cpp       ← Date/Time: decode
-        ├── g109_format.cpp      ← Date/Time: encode
-        ├── g111_parse.cpp       ← Signal/Scan: decode
-        ├── g111_format.cpp      ← Signal/Scan: encode
-        ├── g112_parse.cpp       ← Fast Scan/Simulation: decode
-        ├── g112_format.cpp      ← Fast Scan/Simulation: encode
-        ├── g200_parse.cpp       ← HF ECM Jamming: decode
-        ├── g200_format.cpp      ← HF ECM Jamming: encode
-        ├── mrx_g1_parse.cpp     ← MRx Diagnostics: decode
-        ├── mrx_g1_format.cpp
-        ├── mrx_g3_parse.cpp     ← MRx RF Board/Channel: decode
-        ├── mrx_g3_format.cpp
-        ├── mrx_g4_parse.cpp     ← MRx Data Acquisition: decode
-        ├── mrx_g4_format.cpp
-        ├── mrx_g5_parse.cpp     ← MRx Tuner: decode
-        ├── mrx_g5_format.cpp
-        ├── mrx_g6_parse.cpp     ← MRx FH Monitoring/GO2Monitor: decode
-        ├── mrx_g6_format.cpp
-        ├── mrx_g7_parse.cpp     ← MRx Signal BITE/misc: decode
-        └── mrx_g7_format.cpp
+        ├── parser/                 ← all decode (parse_message) logic
+        │   ├── g100_parser.cpp     ← SJC Diagnostics
+        │   ├── g101_parser.cpp     ← SJC Detection + Jamming
+        │   ├── g106_parser.cpp     ← Immediate Jamming
+        │   ├── g109_parser.cpp     ← Date/Time
+        │   ├── g111_parser.cpp     ← Signal/Scan
+        │   ├── g112_parser.cpp     ← Fast Scan/Simulation
+        │   ├── g200_parser.cpp     ← HF ECM Jamming
+        │   ├── mrx_g1_parser.cpp   ← MRx Diagnostics
+        │   ├── mrx_g3_parser.cpp   ← MRx RF Board/Channel
+        │   ├── mrx_g4_parser.cpp   ← MRx Data Acquisition
+        │   ├── mrx_g5_parser.cpp   ← MRx Tuner
+        │   ├── mrx_g6_parser.cpp   ← MRx FH Monitoring/GO2Monitor
+        │   └── mrx_g7_parser.cpp   ← MRx Signal BITE/misc
+        │
+        └── format/                 ← all encode (format_response) logic
+            ├── g100_format.cpp
+            ├── g101_format.cpp
+            ├── g106_format.cpp
+            ├── g109_format.cpp
+            ├── g111_format.cpp
+            ├── g112_format.cpp
+            ├── g200_format.cpp
+            ├── mrx_g1_format.cpp
+            ├── mrx_g3_format.cpp
+            ├── mrx_g4_format.cpp
+            ├── mrx_g5_format.cpp
+            ├── mrx_g6_format.cpp
+            └── mrx_g7_format.cpp
 ```
 
-**26 group `.cpp` files + 3 internal headers.** The `include/` directory and
-`sdfc_frame.cpp` are untouched.
+**13 parser files + 13 format files + 3 shared headers.** The `include/`
+directory and `sdfc_frame.cpp` are untouched.
 
 ---
 
 ### Group interface (`hf_groups.h`)
 
-Every group pair exposes exactly three functions. Example for Group 100;
-all other groups follow the identical signature pattern:
+Every group exposes exactly three functions, declared in `hf_groups.h` and
+included only by `dp_ecm_hf_parser.cpp`. Example for Group 100; all other
+groups follow the identical signature pattern:
 
 ```cpp
 // hf/hf_groups.h
@@ -107,8 +114,8 @@ int  g101_format   (long long unit_id, const char* json,
 **Return-value contracts:**
 - `parse_cmd` / `parse_rsp`: return `true` if `unit_id` was recognised, `false`
   to fall through to the `raw_hex` envelope in the main dispatcher.
-- `format`: returns the number of payload bytes written; `-1` on error; sets
-  `is_ack = true` for zero-payload ACKs (caller skips payload encoding).
+- `format`: returns payload bytes written; `-1` on error; sets `is_ack = true`
+  for zero-payload ACKs (caller skips payload encoding).
 
 All internal `decode_*` and `encode_*` helpers remain `static` inside their
 `.cpp` — nothing beyond these three functions is visible outside the file.
@@ -119,8 +126,8 @@ All internal `decode_*` and `encode_*` helpers remain `static` inside their
 
 | File | Contents |
 |---|---|
-| `g{N}_parse.cpp` | All `decode_*` statics for that group + `g{N}_parse_cmd()` + `g{N}_parse_rsp()` implementations (switch statements on `unit_id`) |
-| `g{N}_format.cpp` | All `encode_*` statics for that group + `g{N}_format()` implementation (switch + `EncFn fn` pattern matching the existing code) |
+| `parser/g{N}_parser.cpp` | All `decode_*` statics for that group + `g{N}_parse_cmd()` + `g{N}_parse_rsp()` (switch on `unit_id`) |
+| `format/g{N}_format.cpp` | All `encode_*` statics for that group + `g{N}_format()` (switch + `EncFn fn` pattern matching existing code) |
 | `hf_json_utils.h` | `inline` helpers currently at lines 2537–2793 of the original: `json_find_int`, `json_find_double`, `hex_nibble`, `parse_toa_hms`, `MAX_PAYLOAD` constant |
 | `hf_shared.h` | `inline` decode functions called by both groups 101 and 200: `decode_cmd_send_ecm_reports`, `decode_cmd_start_list_jam`, `decode_cmd_start_follow_on_jam`, `decode_cmd_start_responsive_sweep_jam` |
 
@@ -155,16 +162,16 @@ else if (group == 101) plen = g101_format(unit, kwargs_json, payload, MAX_PAYLOA
 
 Four command decoders are called from both Group 101 and Group 200 in the
 current `parse_message`. They move to `hf_shared.h` as `inline` functions.
-Both `g101_parse.cpp` and `g200_parse.cpp` include this header.
+Both `parser/g101_parser.cpp` and `parser/g200_parser.cpp` include this header.
 
 ```cpp
 // hf/hf_shared.h
 #pragma once
 // Decode functions shared between groups 101 and 200.
-inline void decode_cmd_send_ecm_reports(...)       { … }
-inline void decode_cmd_start_list_jam(...)          { … }
-inline void decode_cmd_start_follow_on_jam(...)     { … }
-inline void decode_cmd_start_responsive_sweep_jam(…){ … }
+inline void decode_cmd_send_ecm_reports(...)        { … }
+inline void decode_cmd_start_list_jam(...)           { … }
+inline void decode_cmd_start_follow_on_jam(...)      { … }
+inline void decode_cmd_start_responsive_sweep_jam(…) { … }
 ```
 
 No duplication, no additional linkage.
@@ -174,17 +181,19 @@ No duplication, no additional linkage.
 ### CMakeLists.txt changes
 
 ```cmake
-# Collect all new group sources
-file(GLOB HF_GROUP_SRCS src/hf/*.cpp)
+# Collect group sources from both subfolders
+file(GLOB HF_PARSER_SRCS src/hf/parser/*.cpp)
+file(GLOB HF_FORMAT_SRCS src/hf/format/*.cpp)
 
 add_library(dp_ecm_hf SHARED
     ${SDFC_CORE_SRC}
     src/dp_ecm_hf_parser.cpp
-    ${HF_GROUP_SRCS}           # ← added
+    ${HF_PARSER_SRCS}           # ← added
+    ${HF_FORMAT_SRCS}           # ← added
 )
 target_include_directories(dp_ecm_hf PRIVATE
     include
-    src/hf                     # ← added so group files reach hf_*.h headers
+    src/hf                      # ← added so group files reach hf_*.h headers
 )
 
 # Test executable gets the same additions
@@ -192,11 +201,12 @@ add_executable(test_dp_ecm
     tests/test_frames.cpp
     ${SDFC_CORE_SRC}
     src/dp_ecm_hf_parser.cpp
-    ${HF_GROUP_SRCS}           # ← added
+    ${HF_PARSER_SRCS}           # ← added
+    ${HF_FORMAT_SRCS}           # ← added
 )
 target_include_directories(test_dp_ecm PRIVATE
     include
-    src/hf                     # ← added
+    src/hf                      # ← added
 )
 ```
 
@@ -216,7 +226,7 @@ target_include_directories(test_dp_ecm PRIVATE
 
 ## Approximate file sizes after split
 
-| Group | `_parse.cpp` | `_format.cpp` |
+| Group | `parser/` | `format/` |
 |---|---|---|
 | g100 | ~200 lines | ~200 lines |
 | g101 | ~350 lines | ~350 lines |
@@ -232,5 +242,4 @@ target_include_directories(test_dp_ecm PRIVATE
 | mrx_g6 | ~80 lines  | ~50 lines  |
 | mrx_g7 | ~120 lines | ~50 lines  |
 
-All files land well under 400 lines — the threshold where a single-purpose file
-becomes uncomfortable to navigate.
+All files land well under 400 lines.
