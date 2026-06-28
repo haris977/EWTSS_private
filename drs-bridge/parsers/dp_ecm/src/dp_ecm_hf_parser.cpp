@@ -50,75 +50,9 @@ static constexpr const char* HW_NAME = "dp_ecm_hf";
 // =============================================================================
 
 // =============================================================================
-// Group 112 command/response decoders — ASU/SDU + Auto Scan + Simulation Mode
+// Group 112 decode functions moved to src/hf/parser/g112_parser.cpp
+// Group 112 encode functions moved to src/hf/format/g112_format.cpp
 // =============================================================================
-
-// 112/1 — ASU/SDU Configuration command (8 bytes, per ICD Table 192).
-// @0 ASU SDU Signal Name (uint32, 4B)  @4 ASU SDU Signal Value (uint32, 4B)
-static void decode_cmd_asu_sdu_config(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "asu_sdu_config cmd < 8 bytes"); return; }
-    w.key_uint("asu_sdu_signal_name",  load_u32le(p + 0));
-    w.key_uint("asu_sdu_signal_value", load_u32le(p + 4));
-}
-
-// 112/5 — Auto Scan Band Configuration command.
-// @0 BandCount (uint8) + 3 reserved + BandCount × S_SCAN_BAND (12B each).
-// S_SCAN_BAND: StartFreqMHz (float) + StopFreqMHz (float) + DwellTimeMs (float).
-static void decode_cmd_auto_scan_band_config(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "auto_scan_band_config cmd < 4 bytes"); return; }
-    uint8_t band_count = p[0];
-    w.key_uint("band_count", band_count);
-    const int ELEM = 12;
-    int off = 4;
-    std::string arr = "[";
-    uint8_t emitted = 0;
-    for (uint8_t i = 0; i < band_count; ++i) {
-        if (off + ELEM > n) break;
-        const uint8_t* e = p + off;
-        JsonWriter b;
-        b.key_double("start_freq_hz",  static_cast<double>(load_f32le(e + 0)) * 1e6);
-        b.key_double("stop_freq_hz",   static_cast<double>(load_f32le(e + 4)) * 1e6);
-        b.key_double("dwell_time_ms",  static_cast<double>(load_f32le(e + 8)));
-        if (emitted++) arr += ',';
-        arr += b.str();
-        off += ELEM;
-    }
-    arr += "]";
-    w.key_raw("scan_bands", arr);
-}
-
-// 112/13 — Simulation Mode Configuration command.
-// @0 SimMode (uint8): 0=Disable, 1=Enable + 3 reserved.
-// Remaining payload contains simulation parameters; emitted as raw_hex.
-static void decode_cmd_simulation_mode_config(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "simulation_mode_config cmd < 4 bytes"); return; }
-    w.key_str("sim_mode", p[0] == 0 ? "disable" : "enable");
-    if (n > 4) w.key_str("sim_params_hex", to_hex(p + 4, n - 4));
-}
-
-// 112/2 — ASU/SDU Enable/Disable response (4 bytes, per ICD Table 193).
-// @0 Error Value (int16_t, 2B)  @2 Reserved (int16_t, 2B)
-static void decode_asu_sdu_config_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "asu_sdu_config_rsp payload < 4 bytes"); return; }
-    w.key_int("error_value", static_cast<int16_t>(load_u16le(p + 0)));
-    // p[2-3] reserved
-}
-
-// 112/4 — TRSDU Receiver Line Status response (4 bytes, per ICD Table 195).
-// @0 TR SDU Health Status (uint8, 1B)  @1-3 Reserved (3 bytes)
-static void decode_trsdu_receiver_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "trsdu_receiver_status payload < 4 bytes"); return; }
-    w.key_uint("tr_sdu_health_status", p[0]);
-    // p[1-3] reserved
-}
-
-// 112/6 — Power Amplifier Receiver Line Status response (4 bytes, per ICD Table 197).
-// @0 Power Amplifier Status (uint8, 1B)  @1-3 Reserved (3 bytes)
-static void decode_pa_receiver_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "pa_receiver_status payload < 4 bytes"); return; }
-    w.key_uint("power_amplifier_status", p[0]);
-    // p[1-3] reserved
-}
 
 // =============================================================================
 // Group 200 HF jamming command/response decoders
@@ -883,14 +817,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
         else if (hdr.group_id == 111) {
             decoded = g111_parse_cmd(hdr.unit_id, payload, plen, w);
         } else if (hdr.group_id == 112) {
-            switch (hdr.unit_id) {
-                case  1: decode_cmd_asu_sdu_config(payload, plen, w);            decoded = true; break;
-                case  3: /* TRSDU Receiver Line Status — 0 bytes */           decoded = true; break;
-                case  5: /* PA Receiver Line Status — 0 bytes */              decoded = true; break;
-                case 13: decode_cmd_simulation_mode_config(payload, plen, w);    decoded = true; break;
-                case 37: /* HF-specific fast scan cmd — 0 bytes */               decoded = true; break;
-                default: break;
-            }
+            decoded = g112_parse_cmd(hdr.unit_id, payload, plen, w);
         } else if (hdr.group_id == 200) {
             // NOTE: unit IDs confirmed from ICD §5.1.10-5.1.13.
             // Immediate Jam, Ext Modulation, Prog Exciter unit IDs not yet assigned
@@ -1013,14 +940,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             // unit 211 is a cross-group stream rsp to 101/210 — no struct decoder, falls through to raw_hex
             if (hdr.unit_id != 211) decoded = g111_parse_rsp(hdr.unit_id, payload, plen, w);
         } else if (hdr.group_id == 112) {
-            switch (hdr.unit_id) {
-                case  2: decode_asu_sdu_config_rsp(payload, plen, w);    decoded = true; break;
-                case  4: decode_trsdu_receiver_status(payload, plen, w); decoded = true; break;
-                case  6: decode_pa_receiver_status(payload, plen, w);    decoded = true; break;
-                case 14: /* Simulation Mode Config ACK */              decoded = true; break;
-                case 38: /* HF fast scan ACK */                        decoded = true; break;
-                default: break;
-            }
+            decoded = g112_parse_rsp(hdr.unit_id, payload, plen, w);
         } else if (hdr.group_id == 200) {
             switch (hdr.unit_id) {
                 case 10: /* Send ECM Reports ACK */                         decoded = true; break;
@@ -1150,26 +1070,8 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 // encode_channelization static helper also removed (lives in g109_format.cpp and g111_format.cpp)
 
 // ---------------------------------------------------------------------------
-// Group 112 encoders
+// Group 112 encoders moved to src/hf/format/g112_format.cpp
 // ---------------------------------------------------------------------------
-static int encode_asu_sdu_config_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    std::memset(buf, 0, 4);
-    long long err = 0; json_find_int(j, "error_value", err);
-    store_i16le(buf, (int16_t)err); return 4;
-}
-
-static int encode_trsdu_receiver_status(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    std::memset(buf, 0, 4);
-    long long v = 0; json_find_int(j, "tr_sdu_health_status", v); buf[0] = (uint8_t)v; return 4;
-}
-
-static int encode_pa_receiver_status(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    std::memset(buf, 0, 4);
-    long long v = 0; json_find_int(j, "power_amplifier_status", v); buf[0] = (uint8_t)v; return 4;
-}
 
 // ---------------------------------------------------------------------------
 // Group 200 encoders
@@ -1577,14 +1479,8 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         plen = g111_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
         if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 112) {
-        switch (unit) {
-            case  2: fn = encode_asu_sdu_config_rsp;    break;
-            case  4: fn = encode_trsdu_receiver_status; break;
-            case  6: fn = encode_pa_receiver_status;    break;
-            case 14: is_ack = true;                     break; // Simulation Mode Config ACK
-            case 38: is_ack = true;                     break; // HF fast scan ACK
-            default: break;
-        }
+        plen = g112_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+        if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 200) {
         switch (unit) {
             case 10: is_ack = true;                           break; // Send ECM Reports ACK
