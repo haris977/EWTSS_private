@@ -46,79 +46,6 @@ using namespace sdfc;
 static constexpr const char* HW_NAME = "dp_ecm_hf";
 
 // =============================================================================
-// Group 109 command decoder
-// =============================================================================
-
-// 109/11 — Set Date and Time (8 bytes). Same as VU.
-static void decode_cmd_set_date_time(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "set_date_time cmd < 8 bytes"); return; }
-    w.key_uint("day",     p[0]);
-    w.key_uint("month",   p[1]);
-    w.key_uint("year",    load_u16le(p + 2));
-    w.key_uint("hour",    p[4]);
-    w.key_uint("minute",  p[5]);
-    w.key_uint("seconds", p[6]);
-}
-
-// 109/18 — Hopper Channelization Data response (per ICD Table 183).
-// Message size: 4 + 4 + (28 × up to 16384) entries.
-// Header: Channelization Data Count (uint32) + S_HOPPER_CHANNELIZATION_TOA (4B: H,M,S,rsv)
-// S_HOPPER_CHANNELIZATION layout (28 bytes per entry):
-//   @0  TOI (double,8B)  @8  Frequency Index (float→Hz)  @12 Pulse Length (float)
-//   @16 Power Level (dBm) (float)  @20 Bandwidth (uint32)  @24 Frequency Band (uint32)
-static void decode_hopper_channelization(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "hopper_channelization payload < 8 bytes"); return; }
-    uint32_t count = load_u32le(p + 0);
-    w.key_uint("channelization_count", count);
-    char toa[16];
-    std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", p[4], p[5], p[6]);
-    w.key_str("toa", toa);
-
-    const int      ELEM      = 28;
-    const uint32_t MAX_SLOTS = 16384;
-    uint32_t valid = count < MAX_SLOTS ? count : MAX_SLOTS;
-
-    std::string arr = "[";
-    uint32_t emitted = 0;
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 8 + static_cast<int>(i) * ELEM;
-        if (off + ELEM > n) break;
-        const uint8_t* e = p + off;
-        JsonWriter c;
-        c.key_double("toi",             load_f64le(e +  0));
-        c.key_double("freq_index_hz",   static_cast<double>(load_f32le(e +  8)) * 1e6);
-        c.key_double("pulse_length_ms", static_cast<double>(load_f32le(e + 12)));
-        c.key_double("power_level_dbm", static_cast<double>(load_f32le(e + 16)));
-        c.key_uint("bandwidth",          load_u32le(e + 20));
-        c.key_uint("freq_band",          load_u32le(e + 24));
-        if (emitted++) arr += ',';
-        arr += c.str();
-    }
-    arr += "]";
-    w.key_raw("hopper_channelizations", arr);
-}
-
-// 109/16 — Auto Threshold Value response (6404 bytes, per ICD Table 180/181).
-// @0 Auto Threshold Bin Count (uint32, 4B)
-// @4 Auto Threshold Bin Data  (float[1600], 6400B)
-static void decode_auto_threshold_value(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 6404) { w.key_str("warning", "auto_threshold_value payload < 6404 bytes"); return; }
-    uint32_t bin_count = load_u32le(p + 0);
-    w.key_uint("auto_threshold_bin_count", bin_count);
-    uint32_t emit = bin_count < 1600 ? bin_count : 1600;
-    std::string arr = "[";
-    for (uint32_t i = 0; i < emit; ++i) {
-        if (i) arr += ',';
-        char tmp[32];
-        std::snprintf(tmp, sizeof(tmp), "%.4f",
-            static_cast<double>(load_f32le(p + 4 + i * 4)));
-        arr += tmp;
-    }
-    arr += "]";
-    w.key_raw("auto_threshold_bin_data", arr);
-}
-
-// =============================================================================
 // Group 111 command decoders — HF-specific where noted
 // =============================================================================
 
@@ -1156,14 +1083,8 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
     if (frame_type == FRAME_COMMAND) {
         if (hdr.group_id == 100) decoded = g100_parse_cmd(hdr.unit_id, payload, plen, w);
         else if (hdr.group_id == 101) decoded = g101_parse_cmd(hdr.unit_id, payload, plen, w);
-        else if (hdr.group_id == 109) {
-            switch (hdr.unit_id) {
-                case 11: decode_cmd_set_date_time(payload, plen, w); decoded = true; break;
-                case 15: /* Send Auto Threshold Value — 0 bytes */  decoded = true; break;
-                case 17: /* Acquire Hopper Channelization — 0 bytes */ decoded = true; break;
-                default: break;
-            }
-        } else if (hdr.group_id == 111) {
+        else if (hdr.group_id == 109) decoded = g109_parse_cmd(hdr.unit_id, payload, plen, w);
+        else if (hdr.group_id == 111) {
             switch (hdr.unit_id) {
                 case  3: decode_cmd_signal_bite(payload, plen, w);               decoded = true; break;
                 case  5: decode_cmd_reference_input(payload, plen, w);           decoded = true; break;
@@ -1307,14 +1228,8 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
     else if (frame_type == FRAME_RESPONSE) {
         if (hdr.group_id == 100) decoded = g100_parse_rsp(hdr.unit_id, payload, plen, w);
         else if (hdr.group_id == 101) decoded = g101_parse_rsp(hdr.unit_id, payload, plen, w);
-        else if (hdr.group_id == 109) {
-            switch (hdr.unit_id) {
-                case 12: /* Set Date Time ACK */                                decoded = true; break;
-                case 16: decode_auto_threshold_value(payload, plen, w);        decoded = true; break;
-                case 18: decode_hopper_channelization(payload, plen, w);       decoded = true; break;
-                default: break;
-            }
-        } else if (hdr.group_id == 111) {
+        else if (hdr.group_id == 109) decoded = g109_parse_rsp(hdr.unit_id, payload, plen, w);
+        else if (hdr.group_id == 111) {
             switch (hdr.unit_id) {
                 case   4: decode_signal_bite_resp(payload, plen, w);    decoded = true; break;
                 case   6: /* Reference Input ACK */                      decoded = true; break;
@@ -1467,31 +1382,6 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 // =============================================================================
 // ABI: format_response
 // =============================================================================
-// ---------------------------------------------------------------------------
-// Group 109 encoders
-// ---------------------------------------------------------------------------
-static int encode_auto_threshold_value(const char* j, uint8_t* buf, int max_len) {
-    const int TOTAL = 4 + 1600 * 4;
-    if (max_len < TOTAL) return -1;
-    std::memset(buf, 0, (size_t)TOTAL);
-    long long bc = 0; json_find_int(j, "auto_threshold_bin_count", bc);
-    if (bc > 1600) bc = 1600;
-    store_u32le(buf, (uint32_t)bc);
-    if (bc == 0) return TOTAL;
-    const char* pd = std::strstr(j, "\"auto_threshold_bin_data\"");
-    if (!pd) return TOTAL;
-    const char* arr = std::strchr(pd, '['); if (!arr) return TOTAL; ++arr;
-    int written = 0;
-    while (written < (int)bc) {
-        while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
-        if (*arr == ']' || !*arr) break;
-        char* end; float v = (float)std::strtod(arr, &end);
-        if (end == arr) break;
-        store_f32le(buf + 4 + written * 4, v); arr = end; ++written;
-    }
-    return TOTAL;
-}
-
 // Shared encoder: hopper_channelization (109/18) and pdw_channelization (111/16).
 // Wire: count(u32)@0 + toa[H,M,S,0]@4 + count×28B entries.
 static int encode_channelization(const char* j, const char* arr_key, uint8_t* buf, int max_len) {
@@ -1533,10 +1423,6 @@ static int encode_channelization(const char* j, const char* arr_key, uint8_t* bu
         ++written;
     }
     return 8 + written * 28;
-}
-
-static int encode_hopper_channelization(const char* j, uint8_t* buf, int max_len) {
-    return encode_channelization(j, "\"hopper_channelizations\"", buf, max_len);
 }
 
 // ---------------------------------------------------------------------------
@@ -2045,12 +1931,8 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         plen = g101_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
         if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 109) {
-        switch (unit) {
-            case 12: is_ack = true;                     break; // Set Date/Time ACK
-            case 16: fn = encode_auto_threshold_value;  break;
-            case 18: fn = encode_hopper_channelization; break;
-            default: break;
-        }
+        plen = g109_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+        if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 111) {
         switch (unit) {
             case  4: fn = encode_signal_bite_resp;          break;
