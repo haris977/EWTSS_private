@@ -65,3 +65,18 @@ bool mrx_g4_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
 bool mrx_g4_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
 int  mrx_g4_format   (long long unit_id, const char* json,
                       uint8_t* buf, int max_len, bool& is_ack);
+
+// MRx Group 5 — Tuner
+bool mrx_g5_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+bool mrx_g5_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+int  mrx_g5_format   (long long unit_id, const char* json, uint8_t* buf, int max_len, bool& is_ack);
+
+// MRx Group 6 — FH Monitoring / GO2Monitor
+bool mrx_g6_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+bool mrx_g6_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+int  mrx_g6_format   (long long unit_id, const char* json, uint8_t* buf, int max_len, bool& is_ack);
+
+// MRx Group 7 — Signal BITE / misc
+bool mrx_g7_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+bool mrx_g7_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+int  mrx_g7_format   (long long unit_id, const char* json, uint8_t* buf, int max_len, bool& is_ack);

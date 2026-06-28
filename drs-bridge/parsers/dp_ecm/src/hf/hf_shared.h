@@ -167,3 +167,15 @@ inline void decode_cmd_send_ecm_reports(const uint8_t* p, int n, JsonWriter& w) 
 inline void decode_mrx_channel_cmd(const uint8_t* p, int n, JsonWriter& w) {
     if (n >= 2) w.key_uint("mrx_channel", load_u16le(p));
 }
+
+// Shared helper: decode 4-byte "selection + mrx_channel" command.
+// sel_key: JSON key for the uint16 selection field.
+// on_name/off_name: string labels for sel==1/sel==0; pass nullptr for both to omit state.
+inline void decode_mrx_sel_channel_cmd(const char* sel_key, const char* on_name, const char* off_name,
+                                        const uint8_t* p, int n, JsonWriter& w) {
+    if (n < 4) return;
+    uint16_t sel = load_u16le(p + 0);
+    w.key_uint(sel_key, sel);
+    if (on_name && off_name) w.key_str("state", sel ? on_name : off_name);
+    w.key_uint("mrx_channel", load_u16le(p + 2));
+}
