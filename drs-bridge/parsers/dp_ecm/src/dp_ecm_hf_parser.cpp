@@ -55,39 +55,9 @@ static constexpr const char* HW_NAME = "dp_ecm_hf";
 // =============================================================================
 
 // =============================================================================
-// Group 200 HF jamming command/response decoders
-// (VU jamming lives on Groups 101/106/108; HF consolidates all jamming on Group 200.)
-// (Group 106 decode functions moved to src/hf/parser/g106_parser.cpp)
+// Group 200 decode functions moved to src/hf/parser/g200_parser.cpp
+// Group 200 encode functions moved to src/hf/format/g200_format.cpp
 // =============================================================================
-
-// 200/14, 200/15 — ECM Report / List Jam Report (variable streaming).
-// count (uint32) + S_LIST_JAM_REPORT_REPLY × count (8B each). Same as VU 108/6.
-static void decode_list_jam_report(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "list_jam_report payload < 4 bytes"); return; }
-    uint32_t count = load_u32le(p + 0);
-    w.key_uint("list_jam_freq_count", count);
-    static const char* STATUS_NAMES[] = {
-        "inactive", "active", "jammed", "within_protected_band"
-    };
-    const int ELEM = 8;
-    std::string arr = "[";
-    int off = 4;
-    uint32_t emitted = 0;
-    for (uint32_t i = 0; i < count; ++i) {
-        if (off + ELEM > n) break;
-        const uint8_t* e = p + off;
-        JsonWriter f;
-        f.key_uint("freq_hz", load_u32le(e + 0));
-        uint16_t status = load_u16le(e + 4);
-        f.key_uint("status", status);
-        f.key_str("status_name", status < 4 ? STATUS_NAMES[status] : "unknown");
-        if (emitted++) arr += ',';
-        arr += f.str();
-        off += ELEM;
-    }
-    arr += "]";
-    w.key_raw("frequencies", arr);
-}
 
 // =============================================================================
 // Group 3 multi-channel status response decoder
@@ -171,54 +141,6 @@ static void decode_mrx_optical_ip_rsp(const uint8_t* p, int n, JsonWriter& w) {
     }
     ports += "]";
     w.key_raw("port_ids", ports);
-}
-
-// =============================================================================
-// Group 200 — new command/response decoders
-// =============================================================================
-
-// 200/41 — HPASU and PA Health Status command (4 bytes).
-// @0 Selection (uint8): 0=HPASU, 1=PA-1, 2=PA-2, 3=PA-3, 4=PA-4. @1-3 Reserved.
-static void decode_hpasu_health_status_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "hpasu_health_cmd < 4 bytes"); return; }
-    static const char* SEL[] = {"hpasu", "pa_1", "pa_2", "pa_3", "pa_4"};
-    uint8_t sel = p[0];
-    w.key_uint("selection", sel);
-    w.key_str("selection_name", sel < 5 ? SEL[sel] : "unknown");
-}
-
-// 200/42 — HPASU and PA Health Status response (4 bytes).
-static void decode_hpasu_health_status_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "hpasu_health_rsp < 4 bytes"); return; }
-    w.key_uint("health_status", p[0]);
-    w.key_str("health_status_name", p[0] == 0 ? "healthy" : "fault");
-}
-
-// 200/55 — PA and SDU Health Status response (8 bytes).
-// PA fault: 0=no_fault, 1=overdrive, 3=vswr, 4=bpm. SDU fault: 0=no_fault, 1=fault.
-static void decode_pa_sdu_health_status_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "pa_sdu_health_rsp < 8 bytes"); return; }
-    static const char* PA_FAULT[] = {"no_fault", "overdrive", "unknown", "vswr", "bpm"};
-    for (int i = 0; i < 4; ++i) {
-        char key[16];
-        std::snprintf(key, sizeof(key), "pa%d_health", i + 1);
-        w.key_uint(key, p[i]);
-        char key2[32];
-        std::snprintf(key2, sizeof(key2), "pa%d_health_name", i + 1);
-        w.key_str(key2, p[i] < 5 ? PA_FAULT[p[i]] : "unknown");
-    }
-    w.key_uint("sdu_health", p[4]);
-    w.key_str("sdu_health_name", p[4] == 0 ? "no_fault" : "fault");
-}
-
-// 200/56 — PA Soft Reboot command (4 bytes).
-// @0 PA Selection (uint8): 0=PA-1, 1=PA-2, 2=PA-3, 3=PA-4. @1-3 Reserved.
-static void decode_cmd_pa_soft_reboot(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "pa_soft_reboot_cmd < 4 bytes"); return; }
-    w.key_uint("pa_selection", p[0]);
-    char name[8];
-    std::snprintf(name, sizeof(name), "pa_%u", p[0] + 1);
-    w.key_str("pa_name", name);
 }
 
 // =============================================================================
@@ -819,23 +741,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
         } else if (hdr.group_id == 112) {
             decoded = g112_parse_cmd(hdr.unit_id, payload, plen, w);
         } else if (hdr.group_id == 200) {
-            // NOTE: unit IDs confirmed from ICD §5.1.10-5.1.13.
-            // Immediate Jam, Ext Modulation, Prog Exciter unit IDs not yet assigned
-            // in this ICD version — raw_hex fallback covers them.
-            switch (hdr.unit_id) {
-                case  9: decode_cmd_send_ecm_reports(payload, plen, w);             decoded = true; break;
-                case 11: decode_cmd_start_list_jam(payload, plen, w);               decoded = true; break;
-                case 13: /* Stop List Jam — 0 bytes */                               decoded = true; break;
-                case 15: /* Get List Jam Report — 0 bytes, periodic cmd */           decoded = true; break;
-                case 17: decode_cmd_start_follow_on_jam(payload, plen, w);          decoded = true; break;
-                case 19: /* Stop Follow-on Jam — 0 bytes */                          decoded = true; break;
-                case 21: decode_cmd_start_responsive_sweep_jam(payload, plen, w);   decoded = true; break;
-                case 23: /* Stop Responsive Sweep Jam — 0 bytes (unit assumed ±1) */ decoded = true; break;
-                case 41: decode_hpasu_health_status_cmd(payload, plen, w);          decoded = true; break;
-                case 54: /* PA/SDU Health Status — 0 bytes */                        decoded = true; break;
-                case 56: decode_cmd_pa_soft_reboot(payload, plen, w);               decoded = true; break;
-                default: break;
-            }
+            decoded = g200_parse_cmd(hdr.unit_id, payload, plen, w);
         // ECM Group 106 — Immediate Jamming commands
         } else if (hdr.group_id == 106) {
             decoded = g106_parse_cmd(hdr.unit_id, payload, plen, w);
@@ -942,20 +848,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
         } else if (hdr.group_id == 112) {
             decoded = g112_parse_rsp(hdr.unit_id, payload, plen, w);
         } else if (hdr.group_id == 200) {
-            switch (hdr.unit_id) {
-                case 10: /* Send ECM Reports ACK */                         decoded = true; break;
-                case 12: /* Start List Jam ACK */                           decoded = true; break;
-                case 14: /* Stop List Jam ACK */                            decoded = true; break;
-                case 16: decode_list_jam_report(payload, plen, w);         decoded = true; break;
-                case 18: /* Start Follow-on Jam ACK */                      decoded = true; break;
-                case 20: /* Stop Follow-on Jam ACK */                       decoded = true; break;
-                case 22: /* Start Responsive Sweep Jam ACK */               decoded = true; break;
-                case 24: /* Stop Responsive Sweep Jam ACK (unit assumed) */ decoded = true; break;
-                case 42: decode_hpasu_health_status_rsp(payload, plen, w); decoded = true; break;
-                case 55: decode_pa_sdu_health_status_rsp(payload, plen, w);decoded = true; break;
-                case 57: /* PA Soft Reboot ACK */                           decoded = true; break;
-                default: break;
-            }
+            decoded = g200_parse_rsp(hdr.unit_id, payload, plen, w);
         } else if (hdr.group_id == 106) {
             decoded = g106_parse_rsp(hdr.unit_id, payload, plen, w);
         // MRx Group 1 responses
@@ -1074,52 +967,8 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Group 200 encoders
+// Group 200 encoders moved to src/hf/format/g200_format.cpp
 // ---------------------------------------------------------------------------
-static int encode_list_jam_report(const char* j, uint8_t* buf, int max_len) {
-    long long count = 0; json_find_int(j, "list_jam_freq_count", count);
-    if (count < 0) count = 0;
-    int total = 4 + (int)count * 8;
-    if (total > max_len) return -1;
-    std::memset(buf, 0, (size_t)total);
-    store_u32le(buf, (uint32_t)count);
-    if (count == 0) return 4;
-    const char* pd = std::strstr(j, "\"frequencies\"");
-    if (!pd) return 4;
-    const char* arr = std::strchr(pd, '['); if (!arr) return 4;
-    const char* p = arr + 1; int written = 0;
-    while (written < (int)count) {
-        while (*p && *p != '{' && *p != ']') ++p;
-        if (!*p || *p == ']') break;
-        const char* os = p; int depth = 1; ++p;
-        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
-        std::string entry(os, p); const char* e = entry.c_str();
-        long long freq = 0, status = 0;
-        json_find_int(e, "freq_hz", freq); json_find_int(e, "status", status);
-        uint8_t* slot = buf + 4 + written * 8;
-        store_u32le(slot + 0, (uint32_t)freq); store_u16le(slot + 4, (uint16_t)status);
-        ++written;
-    }
-    return 4 + written * 8;
-}
-
-static int encode_hpasu_health_status_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    std::memset(buf, 0, 4);
-    long long v = 0; json_find_int(j, "health_status", v); buf[0] = (uint8_t)v; return 4;
-}
-
-static int encode_pa_sdu_health_status_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 8) return -1;
-    std::memset(buf, 0, 8);
-    long long v = 0; char key[16];
-    for (int i = 0; i < 4; ++i) {
-        std::snprintf(key, sizeof(key), "pa%d_health", i + 1);
-        v = 0; json_find_int(j, key, v); buf[i] = (uint8_t)v;
-    }
-    v = 0; json_find_int(j, "sdu_health", v); buf[4] = (uint8_t)v;
-    return 8;
-}
 
 // ---------------------------------------------------------------------------
 // Group 106 encoders moved to src/hf/format/g106_format.cpp
@@ -1482,20 +1331,8 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         plen = g112_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
         if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 200) {
-        switch (unit) {
-            case 10: is_ack = true;                           break; // Send ECM Reports ACK
-            case 12: is_ack = true;                           break; // Start List Jam ACK
-            case 14: is_ack = true;                           break; // Stop List Jam ACK
-            case 16: fn = encode_list_jam_report;             break;
-            case 18: is_ack = true;                           break; // Start Follow-on Jam ACK
-            case 20: is_ack = true;                           break; // Stop Follow-on Jam ACK
-            case 22: is_ack = true;                           break; // Start Responsive Sweep Jam ACK
-            case 24: is_ack = true;                           break; // Stop Responsive Sweep Jam ACK
-            case 42: fn = encode_hpasu_health_status_rsp;    break;
-            case 55: fn = encode_pa_sdu_health_status_rsp;   break;
-            case 57: is_ack = true;                           break; // PA Soft Reboot ACK
-            default: break;
-        }
+        plen = g200_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+        if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 106) {
         plen = g106_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
         if (plen < 0) { std::free(payload); return -1; }
