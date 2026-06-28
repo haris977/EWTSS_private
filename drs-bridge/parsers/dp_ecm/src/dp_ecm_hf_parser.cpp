@@ -60,43 +60,9 @@ static constexpr const char* HW_NAME = "dp_ecm_hf";
 // =============================================================================
 
 // =============================================================================
-// Group 3 multi-channel status response decoder
+// MRx Group 3 decode functions moved to src/hf/parser/mrx_g3_parser.cpp
+// MRx Group 3 encode functions moved to src/hf/format/mrx_g3_format.cpp
 // =============================================================================
-
-// 3/18 — Read Channel Information response (16 bytes): 8× uint16 channel status.
-static void decode_mrx_all_channels_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "mrx_channels_rsp < 16 bytes"); return; }
-    std::string arr = "[";
-    for (int i = 0; i < 8; ++i) {
-        if (i) arr += ',';
-        char tmp[64];
-        uint16_t status = load_u16le(p + i * 2);
-        std::snprintf(tmp, sizeof(tmp),
-            "{\"channel\":%d,\"status\":%u,\"state\":\"%s\"}",
-            i + 1, status, status == 1 ? "open" : "closed");
-        arr += tmp;
-    }
-    arr += "]";
-    w.key_raw("channels", arr);
-}
-
-// 3/22 — MRX Individual Channel Init Status response (16 bytes, per ICD Table 219).
-// 8 channels × uint16: 1 = initialization success, 0 = initialization failure.
-static void decode_mrx_channel_init_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "mrx_channel_init_status < 16 bytes"); return; }
-    std::string arr = "[";
-    for (int i = 0; i < 8; ++i) {
-        if (i) arr += ',';
-        char tmp[64];
-        uint16_t status = load_u16le(p + i * 2);
-        std::snprintf(tmp, sizeof(tmp),
-            "{\"channel\":%d,\"init_status\":%u,\"state\":\"%s\"}",
-            i + 1, status, status == 1 ? "success" : "failure");
-        arr += tmp;
-    }
-    arr += "]";
-    w.key_raw("channel_init_statuses", arr);
-}
 
 // =============================================================================
 // Group 4 optical IQ command/response decoders
@@ -145,65 +111,7 @@ static void decode_mrx_optical_ip_rsp(const uint8_t* p, int n, JsonWriter& w) {
 
 // =============================================================================
 // MRx Group 1 decode functions moved to src/hf/parser/mrx_g1_parser.cpp
-// Note: decode_mrx_cbit_status retained here — also used by Group 3 (3/26).
 // =============================================================================
-
-// 1/26 — CBIT Status response (8 bytes). Also used by Group 3 (3/26).
-static void decode_mrx_cbit_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "mrx_cbit_status < 8 bytes"); return; }
-    w.key_uint("drx_status",            p[0]);
-    w.key_uint("voltage_status",        p[1]);
-    w.key_uint("temperature_status",    p[2]);
-    // p[3] reserved
-    w.key_uint("tuner_detection_status",p[4]);
-    // p[5-6] reserved
-    w.key_uint("memory_status",         p[7]);
-}
-
-// =============================================================================
-// MRx Group 3 — RF board / channel management
-// =============================================================================
-
-// 3/2 — Read Board Count response (4 bytes).
-static void decode_mrx_board_count_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    uint16_t count = load_u16le(p + 0);
-    w.key_uint("board_count", count);
-    w.key_str("note", count == 1 ? "mrx_channels_accessible" : "mrx_channels_not_accessible");
-    w.key_uint("available_tuner_id", load_u16le(p + 2));
-}
-
-// 3/18 and 3/22 — Channel status response (16 bytes).
-// channel1_status + 7× reserved u16. Status 1=open/initialised, 0=closed/failed.
-static void decode_mrx_channel_16b_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) return;
-    w.key_uint("channel1_status", load_u16le(p + 0));
-    w.key_str("channel1_name", load_u16le(p + 0) == 1 ? "open_or_success" : "closed_or_fail");
-}
-
-// 3/19 — Write Channel Information command (4 bytes).
-static void decode_mrx_write_channel_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    w.key_uint("mrx_channel", load_u16le(p + 0));
-    w.key_uint("channel_status", load_u16le(p + 2));
-    w.key_str("channel_action", load_u16le(p + 2) == 1 ? "open" : "close");
-}
-
-// 3/24 — Read MRx and SRx Tuning Details response (8 bytes).
-// @0 SRx Tuned (u8)  @1 MRx Tuned (u8)  @2 SRx Scan Mode (u16)
-// @4 Tuned Center Freq (u16)  @6 Memory Scan Tuned (u8)  @7 BITE Selection (u8)
-static void decode_mrx_tuning_details_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "mrx_tuning_details < 8 bytes"); return; }
-    static const char* SRX_TUNED[] = {"not_tuned", "search_mode", "jam_mode"};
-    w.key_uint("srx_tuned_status",        p[0]);
-    w.key_str("srx_tuned_status_name",    p[0] < 3 ? SRX_TUNED[p[0]] : "unknown");
-    w.key_uint("mrx_tuned_status",        p[1]);
-    w.key_uint("srx_scan_mode_status",    load_u16le(p + 2));
-    w.key_uint("tuned_center_freq_mhz",   load_u16le(p + 4));
-    w.key_uint("memory_scan_tuned",       p[6]);
-    w.key_uint("bite_selection",          p[7]);
-    w.key_str("bite_selection_name",      p[7] == 0 ? "antenna" : "bite");
-}
 
 // =============================================================================
 // MRx Group 5 — Tuner
@@ -651,15 +559,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             decoded = mrx_g1_parse_cmd(hdr.unit_id, payload, plen, w);
         // MRx Group 3 — RF board / channel management
         } else if (hdr.group_id == 3) {
-            switch (hdr.unit_id) {
-                case  1: /* Read Board Count — 0 bytes */      decoded = true; break;
-                case 17: /* Read Channel Info — 0 bytes */     decoded = true; break;
-                case 19: decode_mrx_write_channel_cmd(payload, plen, w); decoded = true; break;
-                case 21: /* VUSHF Channel Status — 0 bytes */  decoded = true; break;
-                case 23: /* Read Tuning Details — 0 bytes */   decoded = true; break;
-                case 25: /* Get CBIT Status — 0 bytes */       decoded = true; break;
-                default: break;
-            }
+            decoded = mrx_g3_parse_cmd(hdr.unit_id, payload, plen, w);
         // MRx Group 4 — data acquisition
         } else if (hdr.group_id == 4) {
             switch (hdr.unit_id) {
@@ -746,15 +646,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             decoded = mrx_g1_parse_rsp(hdr.unit_id, payload, plen, w);
         // MRx Group 3 responses
         } else if (hdr.group_id == 3) {
-            switch (hdr.unit_id) {
-                case  2: decode_mrx_board_count_rsp(payload, plen, w);      decoded = true; break;
-                case 18: decode_mrx_all_channels_rsp(payload, plen, w);       decoded = true; break;
-                case 20: /* Write Channel ACK */                               decoded = true; break;
-                case 22: decode_mrx_channel_init_status(payload, plen, w);    decoded = true; break;
-                case 24: decode_mrx_tuning_details_rsp(payload, plen, w);   decoded = true; break;
-                case 26: decode_mrx_cbit_status(payload, plen, w);         decoded = true; break;
-                default: break;
-            }
+            decoded = mrx_g3_parse_rsp(hdr.unit_id, payload, plen, w);
         // MRx Group 4 responses
         } else if (hdr.group_id == 4) {
             switch (hdr.unit_id) {
@@ -855,63 +747,8 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 
 // ---------------------------------------------------------------------------
 // MRx Group 1 encoders moved to src/hf/format/mrx_g1_format.cpp
-// Note: encode_mrx_cbit_status retained here — also used by Group 3 (3/26).
+// MRx Group 3 encoders moved to src/hf/format/mrx_g3_format.cpp
 // ---------------------------------------------------------------------------
-
-static int encode_mrx_cbit_status(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 8) return -1;
-    std::memset(buf, 0, 8);
-    long long v = 0;
-    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
-    gi("drx_status",             0); gi("voltage_status",        1);
-    gi("temperature_status",     2); gi("tuner_detection_status",4);
-    gi("memory_status",          7);
-    return 8;
-}
-
-// ---------------------------------------------------------------------------
-// MRx Group 3 encoders
-// ---------------------------------------------------------------------------
-static int encode_mrx_board_count_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    std::memset(buf, 0, 4);
-    long long count = 0, tuner_id = 0;
-    json_find_int(j, "board_count",        count);
-    json_find_int(j, "available_tuner_id", tuner_id);
-    store_u16le(buf + 0, (uint16_t)count); store_u16le(buf + 2, (uint16_t)tuner_id);
-    return 4;
-}
-
-static int encode_mrx_channels_16b(const char* j, const char* arr_key,
-                                    const char* status_key, uint8_t* buf, int max_len) {
-    if (max_len < 16) return -1;
-    std::memset(buf, 0, 16);
-    const char* pd = std::strstr(j, arr_key); if (!pd) return 16;
-    const char* arr = std::strchr(pd, '['); if (!arr) return 16;
-    const char* p = arr + 1; int written = 0;
-    while (written < 8) {
-        while (*p && *p != '{' && *p != ']') ++p;
-        if (!*p || *p == ']') break;
-        const char* os = p; int depth = 1; ++p;
-        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
-        std::string entry(os, p);
-        long long status = 0; json_find_int(entry.c_str(), status_key, status);
-        store_u16le(buf + written * 2, (uint16_t)status); ++written;
-    }
-    return 16;
-}
-
-static int encode_mrx_tuning_details_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 8) return -1;
-    std::memset(buf, 0, 8);
-    long long v = 0;
-    auto gi  = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
-    auto gu  = [&](const char* k, int i) { if (json_find_int(j, k, v)) store_u16le(buf + i, (uint16_t)v); };
-    gi("srx_tuned_status", 0); gi("mrx_tuned_status", 1);
-    gu("srx_scan_mode_status",   2); gu("tuned_center_freq_mhz", 4);
-    gi("memory_scan_tuned", 6); gi("bite_selection", 7);
-    return 8;
-}
 
 // ---------------------------------------------------------------------------
 // MRx Group 4 encoders
@@ -1136,23 +973,8 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         plen = mrx_g1_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
         if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 3) {   // MRx RF board
-        switch (unit) {
-            case  2: fn = encode_mrx_board_count_rsp;  break;
-            case 18: {
-                plen = encode_mrx_channels_16b(kwargs_json, "\"channels\"", "status", payload, MAX_PAYLOAD);
-                if (plen < 0) { std::free(payload); return -1; }
-                break;
-            }
-            case 20: is_ack = true; break; // Write Channel ACK
-            case 22: {
-                plen = encode_mrx_channels_16b(kwargs_json, "\"channel_init_statuses\"", "init_status", payload, MAX_PAYLOAD);
-                if (plen < 0) { std::free(payload); return -1; }
-                break;
-            }
-            case 24: fn = encode_mrx_tuning_details_rsp; break;
-            case 26: fn = encode_mrx_cbit_status;         break;
-            default: break;
-        }
+        plen = mrx_g3_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+        if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 4) {   // MRx data acquisition
         switch (unit) {
             case  6: is_ack = true;                        break; // Set Threshold ACK
