@@ -54,6 +54,40 @@ static void decode_cmd_pa_soft_reboot(const uint8_t* p, int n, JsonWriter& w) {
     w.key_str("pa_name", name);
 }
 
+// 200/16 — List Jam Report (variable, streaming report from hardware).
+// Per ICD Table 176: count (uint32) + S_LIST_JAM_REPORT_REPLY × count (8B each, max 100).
+// S_LIST_JAM_REPORT_REPLY:
+//   @0 Frequency (uint32, Hz — ICD explicitly labels field as "Frequency (Hz)")
+//   @4 Frequency Status (uint16): 0=Inactive, 1=Active, 2=Jammed, 3=Within Protected Band
+//   @6 Reserved (uint16)
+static void decode_list_jam_report(const uint8_t* p, int n, JsonWriter& w) {
+    if (n < 4) { w.key_str("warning", "list_jam_report payload < 4 bytes"); return; }
+    uint32_t count = load_u32le(p + 0);
+    w.key_uint("list_jam_freq_count", count);
+
+    static const char* STATUS_NAMES[] = {
+        "inactive", "active", "jammed", "within_protected_band"
+    };
+    const int ELEM = 8;
+    std::string arr = "[";
+    int off = 4;
+    uint32_t emitted = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (off + ELEM > n) break;
+        const uint8_t* e = p + off;
+        JsonWriter f;
+        f.key_uint("freq_hz", load_u32le(e + 0));
+        uint16_t status = load_u16le(e + 4);
+        f.key_uint("status", status);
+        f.key_str("status_name", status < 4 ? STATUS_NAMES[status] : "unknown");
+        if (emitted++) arr += ',';
+        arr += f.str();
+        off += ELEM;
+    }
+    arr += "]";
+    w.key_raw("frequencies", arr);
+}
+
 // =============================================================================
 // Group 200 dispatchers
 // =============================================================================
@@ -80,7 +114,7 @@ bool g200_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w) {
         case 10: return true;                                        // Send ECM Reports ACK
         case 12: return true;                                        // Start List Jam ACK
         case 14: return true;                                        // Stop List Jam ACK
-        case 16: return true;                                        // List Jam Report (decoded via format path)
+        case 16: decode_list_jam_report(p, n, w);                    return true;  // List Jam Report
         case 18: return true;                                        // Start Follow-on Jam ACK
         case 20: return true;                                        // Stop Follow-on Jam ACK
         case 22: return true;                                        // Start Responsive Sweep Jam ACK

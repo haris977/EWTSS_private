@@ -85,7 +85,7 @@ static void decode_mrx_tuning_details_rsp(const uint8_t* p, int n, JsonWriter& w
     w.key_str("bite_selection_name",      p[7] == 0 ? "antenna" : "bite");
 }
 
-// 1/26 — CBIT Status response (8 bytes). Duplicated from mrx_g1_parser.cpp (static helper).
+// 3/26 — CBIT Status response (8 bytes). Duplicated from mrx_g1_parser.cpp (static helper).
 static void decode_mrx_cbit_status(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "mrx_cbit_status < 8 bytes"); return; }
     w.key_uint("drx_status",            p[0]);
