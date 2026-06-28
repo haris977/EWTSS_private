@@ -65,49 +65,9 @@ static constexpr const char* HW_NAME = "dp_ecm_hf";
 // =============================================================================
 
 // =============================================================================
-// Group 4 optical IQ command/response decoders
+// MRx Group 4 decode functions moved to src/hf/parser/mrx_g4_parser.cpp
+// MRx Group 4 encode functions moved to src/hf/format/mrx_g4_format.cpp
 // =============================================================================
-
-// 4/65 — Start IQ Data Streaming to GO2Monitor Optical command (4 bytes).
-// @0 MRX_channel (uint16)  @2 Bandwidth (uint16)
-static void decode_mrx_optical_iq_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    static const char* BW[] = {"10MHz","5MHz","2.5MHz","1MHz","240kHz","120kHz","60kHz",
-                                "30kHz","15kHz","6kHz","3kHz","1.5kHz"};
-    uint16_t bw = load_u16le(p + 2);
-    w.key_uint("mrx_channel",  load_u16le(p + 0));
-    w.key_uint("bw_selection", bw);
-    w.key_str("bandwidth_name", bw < 12 ? BW[bw] : "unknown");
-}
-
-// 4/70 — Read Optical Port Availability Status response (12 bytes).
-static void decode_mrx_optical_port_status_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 12) { w.key_str("warning", "optical_port_status < 12 bytes"); return; }
-    w.key_uint("port_number",          load_u16le(p + 0));
-    w.key_uint("port_id",              load_u16le(p + 2));
-    w.key_uint("port_alive_status",    load_u16le(p + 4));
-    w.key_str("port_alive",            load_u16le(p + 4) == 1 ? "available" : "unavailable");
-    w.key_uint("already_transmitting", load_u16le(p + 6));
-    w.key_uint("can_start_transfer",   load_u16le(p + 8));
-}
-
-// 4/72 — Read Optical Interface IP Address response (24 bytes).
-// @0 IP_Address (4× uint8)  @4 Port_IDs (9× uint16)  @22 Reserved (2B)
-static void decode_mrx_optical_ip_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 24) { w.key_str("warning", "optical_ip_rsp < 24 bytes"); return; }
-    char ip[32];
-    std::snprintf(ip, sizeof(ip), "%u.%u.%u.%u", p[0], p[1], p[2], p[3]);
-    w.key_str("ip_address", ip);
-    std::string ports = "[";
-    for (int i = 0; i < 9; ++i) {
-        if (i) ports += ',';
-        char tmp[8];
-        std::snprintf(tmp, sizeof(tmp), "%u", load_u16le(p + 4 + i * 2));
-        ports += tmp;
-    }
-    ports += "]";
-    w.key_raw("port_ids", ports);
-}
 
 // =============================================================================
 // MRx Group 1 decode functions moved to src/hf/parser/mrx_g1_parser.cpp
@@ -142,208 +102,6 @@ static void decode_mrx_attenuation_cmd(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("mrx_channel",         load_u16le(p + 0));
     w.key_double("rf_attenuation_db", static_cast<double>(load_f32le(p + 4)));
     w.key_double("if_attenuation_db", static_cast<double>(load_f32le(p + 8)));
-}
-
-// =============================================================================
-// MRx Group 4 — Data acquisition
-// =============================================================================
-
-// 4/5 — Set Threshold command (8 bytes).
-static void decode_mrx_set_threshold_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) return;
-    w.key_uint("mrx_channel",   load_u16le(p + 0));
-    w.key_double("threshold_dbm", static_cast<double>(load_f32le(p + 4)));
-}
-
-// 4/8 — Audio Data Acquisition response (per ICD Table 225).
-// Message size: 4 + (audio_data_size × 2). Max 262144 samples. 8000Hz, 16-bit unsigned samples.
-static void decode_mrx_audio_data_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) { w.key_str("warning", "audio_data_rsp payload < 4 bytes"); return; }
-    uint32_t audio_size = load_u32le(p + 0);
-    w.key_uint("audio_data_size", audio_size);
-
-    const uint32_t MAX_SAMPLES = 262144;
-    uint32_t valid = audio_size < MAX_SAMPLES ? audio_size : MAX_SAMPLES;
-
-    std::string arr = "[";
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 4 + static_cast<int>(i) * 2;
-        if (off + 2 > n) break;
-        if (i) arr += ',';
-        arr += std::to_string(load_u16le(p + off));
-    }
-    arr += "]";
-    w.key_raw("audio_data", arr);
-}
-
-// 4/17 — Demodulation and Bandwidth Selection command (8 bytes).
-static void decode_mrx_demod_bw_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) return;
-    static const char* DEMOD[] = {"cw", "am", "fm", "lsb", "usb"};
-    static const char* BW[]    = {"240kHz","120kHz","60kHz","30kHz","15kHz","6kHz","3kHz","1.5kHz"};
-    uint16_t demod  = load_u16le(p + 2);
-    uint16_t bw     = load_u16le(p + 4);
-    uint16_t offset = load_u16le(p + 6);
-    w.key_uint("mrx_channel",     load_u16le(p + 0));
-    w.key_uint("demod_selection", demod);
-    w.key_str("demod_name",       demod < 5 ? DEMOD[demod] : "unknown");
-    w.key_uint("bw_selection",    bw);
-    w.key_str("bandwidth_name",   bw < 8 ? BW[bw] : "unknown");
-    w.key_uint("lsb_usb_offset",  offset);
-}
-
-// 4/39 and 4/41 — Configure/Read Memory Scan command (variable).
-// Header: mrx_channel(2) + reserved(2) + freq_count(4).
-// Per entry (12B): freq_val(double,8) + bw_val(uint16,2) + reserved(uint16,2).
-static void decode_mrx_memory_scan_config_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) return;
-    w.key_uint("mrx_channel",   load_u16le(p + 0));
-    uint32_t count = load_u32le(p + 4);
-    w.key_uint("freq_count", count);
-    const int ELEM  = 12;
-    const uint32_t MAX_ENTRIES = 10000;
-    uint32_t valid = count < MAX_ENTRIES ? count : MAX_ENTRIES;
-    int off = 8;
-    uint32_t emit = 0;
-    std::string arr = "[";
-    for (uint32_t i = 0; i < valid; ++i) {
-        if (off + ELEM > n) break;
-        const uint8_t* e = p + off;
-        JsonWriter f;
-        f.key_double("freq_hz",  load_f64le(e + 0) * 1e6);
-        f.key_uint("bw_sel",     load_u16le(e + 8));
-        if (emit++) arr += ',';
-        arr += f.str();
-        off += ELEM;
-    }
-    arr += "]";
-    w.key_raw("frequencies", arr);
-    if (count > MAX_ENTRIES) {
-        char msg[64];
-        std::snprintf(msg, sizeof(msg), "truncated at %u of %u entries", MAX_ENTRIES, count);
-        w.key_str("truncated", msg);
-    }
-}
-
-// 4/42 — Read Memory Scan Data response (per ICD Table 239/240).
-// Header: Total Available Count(4) + Scan Speed(2) + Reserved(2).
-// S_RES_MEMORY_SCAN_LIST layout (20 bytes per entry, max 10000):
-//   @0  Power Level (dBm) (float)  @4  Frequency Value (double)
-//   @12 H:M:S:reserved (4B)        @16 Millisecond (uint16)  @18 Bandwidth List (uint16)
-static void decode_mrx_memory_scan_data_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 8) { w.key_str("warning", "memory_scan_data_rsp payload < 8 bytes"); return; }
-    uint32_t count      = load_u32le(p + 0);
-    uint16_t scan_speed = load_u16le(p + 4);
-    w.key_uint("total_available_count",       count);
-    w.key_uint("scan_speed_channels_per_sec", scan_speed);
-
-    const int      ELEM      = 20;
-    const uint32_t MAX_SLOTS = 10000;
-    uint32_t valid = count < MAX_SLOTS ? count : MAX_SLOTS;
-
-    std::string arr = "[";
-    uint32_t emit = 0;
-    for (uint32_t i = 0; i < valid; ++i) {
-        int off = 8 + static_cast<int>(i) * ELEM;
-        if (off + ELEM > n) break;
-        const uint8_t* e = p + off;
-        JsonWriter f;
-        f.key_double("power_dbm", static_cast<double>(load_f32le(e +  0)));
-        f.key_double("freq_hz",   load_f64le(e +  4) * 1e6);
-        char toa[24];
-        std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u.%03u",
-                      e[12], e[13], e[14], load_u16le(e + 16));
-        f.key_str("toa", toa);
-        f.key_uint("bandwidth_list", load_u16le(e + 18));
-        if (emit++) arr += ',';
-        arr += f.str();
-    }
-    arr += "]";
-    w.key_raw("scan_data", arr);
-}
-
-// 4/61 — Read Smart Memory Scan Data command (12 bytes).
-static void decode_mrx_smart_scan_read_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 12) return;
-    w.key_double("freq_hz",   load_f64le(p + 0) * 1e6);
-    w.key_uint("mrx_channel", load_u16le(p + 8));
-}
-
-// 4/62 — Read Smart Memory Scan Data response (16 bytes).
-static void decode_mrx_smart_scan_read_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) return;
-    w.key_double("freq_hz",    load_f64le(p +  0) * 1e6);
-    w.key_uint("mrx_channel",  load_u16le(p +  8));
-    w.key_double("amplitude",  static_cast<double>(load_f32le(p + 12)));
-}
-
-// 4/44 — DDC FFT Data response (fixed: 2+2+4096×4 = 16388 bytes).
-static void decode_mrx_ddc_fft_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    uint16_t bin_count = load_u16le(p + 0);
-    w.key_uint("bin_count", bin_count);
-    uint32_t emit = bin_count < 4096 ? bin_count : 4096;
-    const int HDR = 4;
-    if (n < HDR + static_cast<int>(emit) * 4) emit = static_cast<uint32_t>((n - HDR) / 4);
-    std::string arr = "[";
-    for (uint32_t i = 0; i < emit; ++i) {
-        if (i) arr += ',';
-        char tmp[32];
-        std::snprintf(tmp, sizeof(tmp), "%.2f",
-            static_cast<double>(load_f32le(p + HDR + i * 4)));
-        arr += tmp;
-    }
-    arr += "]";
-    w.key_raw("ddc_fft_power_dbm", arr);
-}
-
-// Shared IQ status response (4 bytes): channel + nb_iq_status + wb_iq_status + reserved.
-// Used for 4/34, 4/24, 6/14.
-static void decode_mrx_iq_start_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    w.key_uint("mrx_channel",          p[0]);
-    w.key_uint("narrowband_iq_status", p[1]);
-    w.key_uint("wideband_iq_status",   p[2]);
-    w.key_str("iq_type",               p[2] ? "wideband_10MHz_to_1MHz" : "narrowband_240kHz_and_below");
-    //p[3] reserved
-}
-
-// 4/23 — Start IQ Data Logging command (20 bytes).
-static void decode_mrx_iq_logging_start_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 20) return;
-    static const char* BW[] = {
-        "10MHz","5MHz","2.5MHz","1MHz","240kHz","120kHz","60kHz",
-        "30kHz","15kHz","6kHz","3kHz","1.5kHz"
-    };
-    uint16_t bw = load_u16le(p + 2);
-    w.key_uint("mrx_channel",      load_u16le(p + 0));
-    w.key_uint("bw_selection",     bw);
-    w.key_str("bandwidth_name",    bw < 12 ? BW[bw] : "unknown");
-    w.key_double("center_freq_hz", static_cast<double>(load_f32le(p + 4)) * 1e6);
-    w.key_uint("day",    load_u16le(p +  8));
-    w.key_uint("month",  load_u16le(p + 10));
-    w.key_uint("year",   load_u16le(p + 12));
-    w.key_uint("hour",   load_u16le(p + 14));
-    w.key_uint("minute", load_u16le(p + 16));
-    w.key_uint("second", load_u16le(p + 18));
-}
-
-// 4/26 — Stop IQ Data Logging response (132 bytes).
-// @0 channel(u16) @2 reserved(u16) @4 file_path(char[128])
-static void decode_mrx_iq_logging_stop_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 132) return;
-    w.key_uint("mrx_channel", load_u16le(p + 0));
-    char path[129];
-    std::memcpy(path, p + 4, 128);
-    path[128] = '\0';
-    w.key_str("file_path", path);
-}
-
-// 4/53 — Engage Channel command (12 bytes).
-static void decode_mrx_engage_channel_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 12) return;
-    w.key_uint("mrx_channel",       load_u16le(p + 0));
-    w.key_double("center_freq_hz",  load_f64le(p + 4) * 1e6);
 }
 
 // =============================================================================
@@ -463,28 +221,6 @@ static void decode_mrx_sel_channel_cmd(const char* sel_key, const char* on_name,
     w.key_uint("mrx_channel", load_u16le(p + 2));
 }
 
-// Shared helper: decode DDC FFT command (4 bytes): channel + bw_selection.
-static void decode_mrx_ddc_fft_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    static const char* BW[] = {"240kHz","120kHz","60kHz","30kHz","15kHz","6kHz","3kHz","1.5kHz"};
-    uint16_t bw = load_u16le(p + 2);
-    w.key_uint("mrx_channel",  load_u16le(p + 0));
-    w.key_uint("bw_selection", bw);
-    w.key_str("bandwidth_name", bw < 8 ? BW[bw] : "unknown");
-}
-
-// Shared helper: decode IQ streaming start command (4 bytes): channel + bw_selection.
-static void decode_mrx_iq_start_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    static const char* BW[] = {
-        "1MHz","240kHz","120kHz","60kHz","30kHz","15kHz","6kHz","3kHz","1.5kHz"
-    };
-    uint16_t bw = load_u16le(p + 2);
-    w.key_uint("mrx_channel",  load_u16le(p + 0));
-    w.key_uint("bw_selection", bw);
-    w.key_str("bandwidth_name", bw < 9 ? BW[bw] : "unknown");
-}
-
 // =============================================================================
 // ABI: extract_frame
 // =============================================================================
@@ -562,32 +298,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             decoded = mrx_g3_parse_cmd(hdr.unit_id, payload, plen, w);
         // MRx Group 4 — data acquisition
         } else if (hdr.group_id == 4) {
-            switch (hdr.unit_id) {
-                case  5: decode_mrx_set_threshold_cmd(payload, plen, w);            decoded = true; break;
-                case  7: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case  9: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 11: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 15: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 17: decode_mrx_demod_bw_cmd(payload, plen, w);                 decoded = true; break;
-                case 23: decode_mrx_iq_logging_start_cmd(payload, plen, w);         decoded = true; break;
-                case 25: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 33: decode_mrx_iq_start_cmd(payload, plen, w);                 decoded = true; break;
-                case 35: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 39: decode_mrx_memory_scan_config_cmd(payload, plen, w);       decoded = true; break;
-                case 41: decode_mrx_memory_scan_config_cmd(payload, plen, w);       decoded = true; break;
-                case 43: decode_mrx_ddc_fft_cmd(payload, plen, w);                  decoded = true; break;
-                case 53: decode_mrx_engage_channel_cmd(payload, plen, w);           decoded = true; break;
-                case 55: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 57: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 59: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 61: decode_mrx_smart_scan_read_cmd(payload, plen, w);          decoded = true; break;
-                case 63: decode_mrx_channel_cmd(payload, plen, w);                  decoded = true; break;
-                case 65: decode_mrx_optical_iq_cmd(payload, plen, w);          decoded = true; break;
-                case 67: decode_mrx_channel_cmd(payload, plen, w);              decoded = true; break; // Stop optical IQ
-                case 69: decode_mrx_optical_iq_cmd(payload, plen, w);          decoded = true; break; // Read port status cmd
-                case 71: decode_mrx_optical_iq_cmd(payload, plen, w);          decoded = true; break; // Read IP cmd
-                default: break;
-            }
+            decoded = mrx_g4_parse_cmd(hdr.unit_id, payload, plen, w);
         // MRx Group 5 — tuner
         } else if (hdr.group_id == 5) {
             switch (hdr.unit_id) {
@@ -649,32 +360,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             decoded = mrx_g3_parse_rsp(hdr.unit_id, payload, plen, w);
         // MRx Group 4 responses
         } else if (hdr.group_id == 4) {
-            switch (hdr.unit_id) {
-                case  6: /* Set Threshold ACK */                             decoded = true; break;
-                case  8: decode_mrx_audio_data_rsp(payload, plen, w);       decoded = true; break;
-                case 10: /* Audio Start Play ACK */                          decoded = true; break;
-                case 12: /* Audio Stop Play ACK */                           decoded = true; break;
-                case 16: /* Audio FIFO Reset ACK */                          decoded = true; break;
-                case 18: /* Demod/BW Select ACK */                           decoded = true; break;
-                case 24: decode_mrx_iq_start_rsp(payload, plen, w);         decoded = true; break;
-                case 26: decode_mrx_iq_logging_stop_rsp(payload, plen, w);  decoded = true; break;
-                case 34: decode_mrx_iq_start_rsp(payload, plen, w);         decoded = true; break;
-                case 36: /* Stop IQ Streaming ACK */                         decoded = true; break;
-                case 40: /* Configure Memory Scan ACK */                     decoded = true; break;
-                case 42: decode_mrx_memory_scan_data_rsp(payload, plen, w); decoded = true; break;
-                case 44: decode_mrx_ddc_fft_rsp(payload, plen, w);          decoded = true; break;
-                case 54: /* Engage Channel ACK */                            decoded = true; break;
-                case 56: /* Disengage Channel ACK */                         decoded = true; break;
-                case 58: /* Stop Memory Scan ACK */                          decoded = true; break;
-                case 60: /* Smart Memory Scan Config ACK */                  decoded = true; break;
-                case 62: decode_mrx_smart_scan_read_rsp(payload, plen, w);  decoded = true; break;
-                case 64: /* Stop Smart Memory Scan ACK */                    decoded = true; break;
-                case 66: /* Start Optical IQ ACK */                          decoded = true; break;
-                case 68: /* Stop Optical IQ ACK */                           decoded = true; break;
-                case 70: decode_mrx_optical_port_status_rsp(payload, plen, w); decoded = true; break;
-                case 72: decode_mrx_optical_ip_rsp(payload, plen, w);       decoded = true; break;
-                default: break;
-            }
+            decoded = mrx_g4_parse_rsp(hdr.unit_id, payload, plen, w);
         // MRx Group 5 responses
         } else if (hdr.group_id == 5) {
             switch (hdr.unit_id) {
@@ -751,154 +437,8 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// MRx Group 4 encoders
+// MRx Group 4 encoders moved to src/hf/format/mrx_g4_format.cpp
 // ---------------------------------------------------------------------------
-static int encode_mrx_audio_data_rsp(const char* j, uint8_t* buf, int max_len) {
-    long long audio_size = 0; json_find_int(j, "audio_data_size", audio_size);
-    if (audio_size < 0) audio_size = 0;
-    if (audio_size > 262144) audio_size = 262144;
-    int total = 4 + (int)audio_size * 2;
-    if (total > max_len) return -1;
-    std::memset(buf, 0, (size_t)total);
-    store_u32le(buf, (uint32_t)audio_size);
-    if (audio_size == 0) return 4;
-    const char* pd = std::strstr(j, "\"audio_data\""); if (!pd) return total;
-    const char* arr = std::strchr(pd, '['); if (!arr) return total; ++arr;
-    int written = 0;
-    while (written < (int)audio_size) {
-        while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
-        if (*arr == ']' || !*arr) break;
-        char* end; long long v = std::strtoll(arr, &end, 10);
-        if (end == arr) break;
-        store_u16le(buf + 4 + written * 2, (uint16_t)v); arr = end; ++written;
-    }
-    return total;
-}
-
-static int encode_mrx_iq_start_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    std::memset(buf, 0, 4);
-    long long v = 0;
-    if (json_find_int(j, "mrx_channel",          v)) buf[0] = (uint8_t)v;
-    if (json_find_int(j, "narrowband_iq_status",  v)) buf[1] = (uint8_t)v;
-    if (json_find_int(j, "wideband_iq_status",    v)) buf[2] = (uint8_t)v;
-    return 4;
-}
-
-static int encode_mrx_iq_logging_stop_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 132) return -1;
-    std::memset(buf, 0, 132);
-    long long ch = 0; json_find_int(j, "mrx_channel", ch); store_u16le(buf, (uint16_t)ch);
-    const char* key = std::strstr(j, "\"file_path\""); if (!key) return 132;
-    const char* c = std::strchr(key, ':'); if (!c) return 132;
-    while (*c && *c != '"') ++c; if (*c != '"') return 132; ++c;
-    size_t idx = 0;
-    while (*c && *c != '"' && idx < 127) buf[4 + idx++] = (uint8_t)*c++;
-    return 132;
-}
-
-static int encode_mrx_memory_scan_data_rsp(const char* j, uint8_t* buf, int max_len) {
-    long long count = 0, scan_speed = 0;
-    json_find_int(j, "total_available_count",       count);
-    json_find_int(j, "scan_speed_channels_per_sec", scan_speed);
-    if (count < 0) count = 0; if (count > 10000) count = 10000;
-    int total = 8 + (int)count * 20;
-    if (total > max_len) return -1;
-    std::memset(buf, 0, (size_t)total);
-    store_u32le(buf + 0, (uint32_t)count); store_u16le(buf + 4, (uint16_t)scan_speed);
-    if (count == 0) return 8;
-    const char* pd = std::strstr(j, "\"scan_data\""); if (!pd) return 8;
-    const char* arr = std::strchr(pd, '['); if (!arr) return 8;
-    const char* p = arr + 1; int written = 0;
-    while (written < (int)count) {
-        while (*p && *p != '{' && *p != ']') ++p;
-        if (!*p || *p == ']') break;
-        const char* os = p; int depth = 1; ++p;
-        while (*p && depth > 0) { if (*p == '{') ++depth; else if (*p == '}') --depth; ++p; }
-        std::string entry(os, p); const char* e = entry.c_str();
-        double power = 0, freq = 0; long long bw = 0;
-        json_find_double(e, "power_dbm", power); json_find_double(e, "freq_hz", freq);
-        json_find_int(e, "bandwidth_list", bw);
-        uint8_t* slot = buf + 8 + written * 20;
-        store_f32le(slot +  0, (float)power);
-        store_f64le(slot +  4, freq / 1e6);
-        store_u16le(slot + 18, (uint16_t)bw);
-        ++written;
-    }
-    return 8 + written * 20;
-}
-
-static int encode_mrx_ddc_fft_rsp(const char* j, uint8_t* buf, int max_len) {
-    long long bc = 0; json_find_int(j, "bin_count", bc);
-    if (bc < 0) bc = 0; if (bc > 4096) bc = 4096;
-    int total = 4 + (int)bc * 4;
-    if (total > max_len) return -1;
-    std::memset(buf, 0, (size_t)total);
-    store_u16le(buf, (uint16_t)bc);
-    if (bc == 0) return total;
-    const char* pd = std::strstr(j, "\"ddc_fft_power_dbm\""); if (!pd) return total;
-    const char* arr = std::strchr(pd, '['); if (!arr) return total; ++arr;
-    int written = 0;
-    while (written < (int)bc) {
-        while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
-        if (*arr == ']' || !*arr) break;
-        char* end; float v = (float)std::strtod(arr, &end);
-        if (end == arr) break;
-        store_f32le(buf + 4 + written * 4, v); arr = end; ++written;
-    }
-    return total;
-}
-
-static int encode_mrx_smart_scan_read_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 16) return -1;
-    std::memset(buf, 0, 16);
-    double freq = 0, amplitude = 0; long long ch = 0;
-    json_find_double(j, "freq_hz",    freq);
-    json_find_int(j,    "mrx_channel", ch);
-    json_find_double(j, "amplitude",   amplitude);
-    store_f64le(buf + 0, freq / 1e6);
-    store_u16le(buf + 8, (uint16_t)ch);
-    store_f32le(buf + 12, (float)amplitude);
-    return 16;
-}
-
-static int encode_mrx_optical_port_status_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 12) return -1;
-    std::memset(buf, 0, 12);
-    long long v = 0;
-    auto gu = [&](const char* k, int i) { if (json_find_int(j, k, v)) store_u16le(buf + i, (uint16_t)v); };
-    gu("port_number", 0); gu("port_id", 2); gu("port_alive_status", 4);
-    gu("already_transmitting", 6); gu("can_start_transfer", 8);
-    return 12;
-}
-
-static int encode_mrx_optical_ip_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 24) return -1;
-    std::memset(buf, 0, 24);
-    const char* ip_key = std::strstr(j, "\"ip_address\"");
-    if (ip_key) {
-        const char* c = std::strchr(ip_key, ':'); if (c) { while (*c && *c != '"') ++c; }
-        if (c && *c == '"') { ++c;
-            unsigned a = 0, b = 0, cc = 0, d = 0;
-            if (std::sscanf(c, "%u.%u.%u.%u", &a, &b, &cc, &d) == 4) {
-                buf[0] = (uint8_t)a; buf[1] = (uint8_t)b; buf[2] = (uint8_t)cc; buf[3] = (uint8_t)d;
-            }
-        }
-    }
-    const char* pd = std::strstr(j, "\"port_ids\"");
-    if (pd) {
-        const char* arr = std::strchr(pd, '['); if (arr) { ++arr;
-            for (int i = 0; i < 9; ++i) {
-                while (*arr == ' ' || *arr == '\t' || *arr == '\n' || *arr == ',') ++arr;
-                if (*arr == ']' || !*arr) break;
-                char* end; long long v = std::strtoll(arr, &end, 10);
-                if (end == arr) break;
-                store_u16le(buf + 4 + i * 2, (uint16_t)v); arr = end;
-            }
-        }
-    }
-    return 24;
-}
 
 // ---------------------------------------------------------------------------
 // MRx Group 5 encoders
@@ -976,32 +516,8 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         plen = mrx_g3_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
         if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 4) {   // MRx data acquisition
-        switch (unit) {
-            case  6: is_ack = true;                        break; // Set Threshold ACK
-            case  8: fn = encode_mrx_audio_data_rsp;       break;
-            case 10: is_ack = true;                        break; // Audio Start Play ACK
-            case 12: is_ack = true;                        break; // Audio Stop Play ACK
-            case 16: is_ack = true;                        break; // Audio FIFO Reset ACK
-            case 18: is_ack = true;                        break; // Demod/BW Select ACK
-            case 24: fn = encode_mrx_iq_start_rsp;         break;
-            case 26: fn = encode_mrx_iq_logging_stop_rsp;  break;
-            case 34: fn = encode_mrx_iq_start_rsp;         break;
-            case 36: is_ack = true;                        break; // Stop IQ Streaming ACK
-            case 40: is_ack = true;                        break; // Configure Memory Scan ACK
-            case 42: fn = encode_mrx_memory_scan_data_rsp; break;
-            case 44: fn = encode_mrx_ddc_fft_rsp;          break;
-            case 54: is_ack = true;                        break; // Engage Channel ACK
-            case 56: is_ack = true;                        break; // Disengage Channel ACK
-            case 58: is_ack = true;                        break; // Stop Memory Scan ACK
-            case 60: is_ack = true;                        break; // Smart Memory Scan Config ACK
-            case 62: fn = encode_mrx_smart_scan_read_rsp;  break;
-            case 64: is_ack = true;                        break; // Stop Smart Memory Scan ACK
-            case 66: is_ack = true;                        break; // Start Optical IQ ACK
-            case 68: is_ack = true;                        break; // Stop Optical IQ ACK
-            case 70: fn = encode_mrx_optical_port_status_rsp; break;
-            case 72: fn = encode_mrx_optical_ip_rsp;          break;
-            default: break;
-        }
+        plen = mrx_g4_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+        if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 5) {   // MRx tuner
         switch (unit) {
             case  2: is_ack = true;                  break; // Set Center Freq ACK

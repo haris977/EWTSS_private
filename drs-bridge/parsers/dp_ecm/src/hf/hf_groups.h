@@ -59,3 +59,9 @@ bool mrx_g3_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
 bool mrx_g3_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
 int  mrx_g3_format   (long long unit_id, const char* json,
                       uint8_t* buf, int max_len, bool& is_ack);
+
+// MRx Group 4 — Data Acquisition
+bool mrx_g4_parse_cmd(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+bool mrx_g4_parse_rsp(uint16_t unit_id, const uint8_t* p, int n, JsonWriter& w);
+int  mrx_g4_format   (long long unit_id, const char* json,
+                      uint8_t* buf, int max_len, bool& is_ack);
