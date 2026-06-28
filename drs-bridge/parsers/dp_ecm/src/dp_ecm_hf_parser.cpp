@@ -144,110 +144,11 @@ static void decode_mrx_optical_ip_rsp(const uint8_t* p, int n, JsonWriter& w) {
 }
 
 // =============================================================================
-// MRx Group 1 — diagnostics (shared with VU variant; same device, same messages)
+// MRx Group 1 decode functions moved to src/hf/parser/mrx_g1_parser.cpp
+// Note: decode_mrx_cbit_status retained here — also used by Group 3 (3/26).
 // =============================================================================
 
-// 1/2 — Get System Version Details response (16 bytes).
-// @0 FW Version (float)  @4 Driver Version (float)  @8 FPGA Version (float)
-// @12 RF Tuner ID (uint16)  @14 Reserved (uint16)
-static void decode_mrx_system_version(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 16) { w.key_str("warning", "mrx_system_version < 16 bytes"); return; }
-    w.key_double("fw_version",     static_cast<double>(load_f32le(p + 0)));
-    w.key_double("driver_version", static_cast<double>(load_f32le(p + 4)));
-    w.key_double("fpga_version",   static_cast<double>(load_f32le(p + 8)));
-    w.key_uint("rf_tuner_id",      load_u16le(p + 12));
-}
-
-// 1/4 — Get Checksum Details response (1024 bytes, per ICD Table 201). Payload is a char array.
-static void decode_mrx_checksum(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 1024) { w.key_str("warning", "mrx_checksum payload < 1024 bytes"); return; }
-    const char* cs = reinterpret_cast<const char*>(p);
-    w.key_str("sjc_fw_checksum", std::string(cs, strnlen(cs, 1024)));
-}
-
-// 1/6 — PBIT Status response (120 bytes, per ICD Table 203).
-static void decode_mrx_pbit_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 120) { w.key_str("warning", "mrx_pbit_status < 120 bytes"); return; }
-    w.key_uint("fpga_scratch_pad_test",    p[ 0]);
-    w.key_uint("fpga_board_id_read",       p[ 1]);
-    w.key_uint("processor_temp_status",    p[ 2]);
-    w.key_uint("fan_temp_status",          p[ 3]);
-    w.key_uint("fpga_temp_status",         p[ 4]);
-    // p[5] reserved
-    w.key_uint("rfpsu_temp_status",        p[ 6]);
-    w.key_uint("fan_speed_ctrl_sensor",    p[ 7]);
-    w.key_uint("fan_voltage_status",       p[ 8]);
-    w.key_uint("rfsu_5v_status",           p[ 9]);
-    w.key_uint("rfsu_8v5_status",          p[10]);
-    w.key_uint("msata_detection_status",   p[11]);
-    w.key_uint("lo1_pll_lock_status",      p[12]);
-    w.key_uint("lo2_pll_lock_status",      p[13]);
-    w.key_uint("bite_pll_lock_status",     p[14]);
-    w.key_uint("tuner_detection_status",   p[15]);
-    // p[16-17] reserved
-    w.key_uint("tuner_scratchpad_test",    p[18]);
-    // p[19-20] reserved
-    w.key_uint("pll_lock_status",          p[21]);
-    w.key_uint("adc_bonding_status",       p[22]);
-    w.key_uint("storage_availability",     p[23]);
-    w.key_uint("digital_5v_status",        p[24]);
-    w.key_uint("digital_3v5_status",       p[25]);
-    w.key_uint("digital_psu_temp_status",  p[26]);
-    // p[27-123] reserved blocks
-}
-
-// 1/8 — IBIT Status response (112 bytes).
-static void decode_mrx_ibit_status(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 112) { w.key_str("warning", "mrx_ibit_status < 112 bytes"); return; }
-    w.key_uint("pll_lock_status",          p[ 0]);
-    w.key_uint("adc_bonding_status",       p[ 1]);
-    w.key_uint("msata_detection_status",   p[ 2]);
-    w.key_uint("storage_availability",     p[ 3]);
-    w.key_uint("tuner_lo1_pll_lock",       p[ 4]);
-    w.key_uint("tuner_lo2_pll_lock",       p[ 5]);
-    w.key_uint("tuner_bite_pll_lock",      p[ 6]);
-    w.key_uint("adc1_link_status",         p[ 7]);
-    // p[8-9] reserved
-    w.key_uint("tuner_detection_status",   p[10]);
-    // p[11-12] reserved
-    w.key_uint("tuner_scratchpad_test",    p[13]);
-    // p[14-111] reserved blocks
-}
-
-// 1/10 — Temperature Status response (36 bytes, 9 floats, per ICD Table 212/213).
-static void decode_mrx_temperature(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 36) { w.key_str("warning", "mrx_temperature < 36 bytes"); return; }
-    static const char* NAMES[] = {
-        "bpt_temp_c", "psu_8156_temp_c", "tuner_temp_c", "psu_7255_temp_c",
-        "processor_temp_c", "power_supply_temp_c", "control_board_temp_c",
-        "rf_psu_temp_c", "fpga_temp_c"
-    };
-    for (int i = 0; i < 9; ++i)
-        w.key_double(NAMES[i], static_cast<double>(load_f32le(p + i * 4)));
-}
-
-// 1/14 — Fan Speed Status response (4 bytes). Same layout as ECM 100/14.
-static void decode_mrx_fan_speed(const uint8_t* p, int n, JsonWriter& w) {
-    if (n >= 4) w.key_uint("fan_speed_rpm", load_u32le(p));
-}
-
-// 1/17 — UART Test command (4 bytes).
-static void decode_mrx_uart_test_cmd(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    w.key_uint("uart_number", p[0]);
-    w.key_str("uart_type", p[0] == 0 ? "rs232" : p[0] == 1 ? "rs422" : "unknown");
-}
-
-// 1/18 — UART Test response (4 bytes). Same layout as ECM 100/18.
-static void decode_mrx_uart_test_rsp(const uint8_t* p, int n, JsonWriter& w) {
-    if (n < 4) return;
-    w.key_uint("expected_data", p[0]);
-    w.key_uint("observed_data", p[1]);
-    w.key_uint("result",        p[2]);
-    w.key_str("result_name", p[2] == 1 ? "pass" : "fail");
-}
-
-// 1/26 — CBIT Status response (8 bytes).
+// 1/26 — CBIT Status response (8 bytes). Also used by Group 3 (3/26).
 static void decode_mrx_cbit_status(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "mrx_cbit_status < 8 bytes"); return; }
     w.key_uint("drx_status",            p[0]);
@@ -747,18 +648,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             decoded = g106_parse_cmd(hdr.unit_id, payload, plen, w);
         // MRx Group 1 — diagnostics
         } else if (hdr.group_id == 1) {
-            switch (hdr.unit_id) {
-                case  1: /* Get System Version — 0 bytes */    decoded = true; break;
-                case  3: /* Get Checksum — 0 bytes */          decoded = true; break;
-                case  5: /* PBIT — 0 bytes */                  decoded = true; break;
-                case  7: /* IBIT — 0 bytes */                  decoded = true; break;
-                case  9: /* Temperature — 0 bytes */           decoded = true; break;
-                case 13: /* Fan Speed — 0 bytes */             decoded = true; break;
-                case 17: decode_mrx_uart_test_cmd(payload, plen, w); decoded = true; break;
-                case 25: /* CBIT — 0 bytes */                  decoded = true; break;
-                case 33: /* Close All Channels — 0 bytes */    decoded = true; break;
-                default: break;
-            }
+            decoded = mrx_g1_parse_cmd(hdr.unit_id, payload, plen, w);
         // MRx Group 3 — RF board / channel management
         } else if (hdr.group_id == 3) {
             switch (hdr.unit_id) {
@@ -853,18 +743,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             decoded = g106_parse_rsp(hdr.unit_id, payload, plen, w);
         // MRx Group 1 responses
         } else if (hdr.group_id == 1) {
-            switch (hdr.unit_id) {
-                case  2: decode_mrx_system_version(payload, plen, w); decoded = true; break;
-                case  4: decode_mrx_checksum(payload, plen, w);        decoded = true; break;
-                case  6: decode_mrx_pbit_status(payload, plen, w);     decoded = true; break;
-                case  8: decode_mrx_ibit_status(payload, plen, w);     decoded = true; break;
-                case 10: decode_mrx_temperature(payload, plen, w);     decoded = true; break;
-                case 14: decode_mrx_fan_speed(payload, plen, w);       decoded = true; break;
-                case 18: decode_mrx_uart_test_rsp(payload, plen, w);   decoded = true; break;
-                case 26: decode_mrx_cbit_status(payload, plen, w);     decoded = true; break;
-                case 34: /* Close All Channels ACK */                   decoded = true; break;
-                default: break;
-            }
+            decoded = mrx_g1_parse_rsp(hdr.unit_id, payload, plen, w);
         // MRx Group 3 responses
         } else if (hdr.group_id == 3) {
             switch (hdr.unit_id) {
@@ -975,92 +854,9 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// MRx Group 1 encoders
+// MRx Group 1 encoders moved to src/hf/format/mrx_g1_format.cpp
+// Note: encode_mrx_cbit_status retained here — also used by Group 3 (3/26).
 // ---------------------------------------------------------------------------
-static int encode_mrx_system_version(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 16) return -1;
-    std::memset(buf, 0, 16);
-    double fw = 0, drv = 0, fpga = 0; long long tuner_id = 0;
-    json_find_double(j, "fw_version",     fw);   json_find_double(j, "driver_version", drv);
-    json_find_double(j, "fpga_version",   fpga); json_find_int(j,    "rf_tuner_id",    tuner_id);
-    store_f32le(buf + 0, (float)fw); store_f32le(buf + 4, (float)drv); store_f32le(buf + 8, (float)fpga);
-    store_u16le(buf + 12, (uint16_t)tuner_id);
-    return 16;
-}
-
-static int encode_mrx_checksum(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 1024) return -1;
-    std::memset(buf, 0, 1024);
-    const char* key = std::strstr(j, "\"sjc_fw_checksum\"");
-    if (!key) return 1024;
-    const char* c = std::strchr(key, ':'); if (!c) return 1024;
-    while (*c && *c != '"') ++c;
-    if (*c != '"') return 1024; ++c;
-    size_t idx = 0;
-    while (*c && *c != '"' && idx < 1023) buf[idx++] = (uint8_t)*c++;
-    return 1024;
-}
-
-static int encode_mrx_pbit_status(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 120) return -1;
-    std::memset(buf, 0, 120);
-    long long v = 0;
-    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
-    gi("fpga_scratch_pad_test",    0); gi("fpga_board_id_read",      1);
-    gi("processor_temp_status",    2); gi("fan_temp_status",          3);
-    gi("fpga_temp_status",         4); gi("rfpsu_temp_status",        6);
-    gi("fan_speed_ctrl_sensor",    7); gi("fan_voltage_status",       8);
-    gi("rfsu_5v_status",           9); gi("rfsu_8v5_status",         10);
-    gi("msata_detection_status",  11); gi("lo1_pll_lock_status",     12);
-    gi("lo2_pll_lock_status",     13); gi("bite_pll_lock_status",    14);
-    gi("tuner_detection_status",  15); gi("tuner_scratchpad_test",   18);
-    gi("pll_lock_status",         21); gi("adc_bonding_status",      22);
-    gi("storage_availability",    23); gi("digital_5v_status",       24);
-    gi("digital_3v5_status",      25); gi("digital_psu_temp_status", 26);
-    return 120;
-}
-
-static int encode_mrx_ibit_status(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 112) return -1;
-    std::memset(buf, 0, 112);
-    long long v = 0;
-    auto gi = [&](const char* k, int i) { if (json_find_int(j, k, v)) buf[i] = (uint8_t)v; };
-    gi("pll_lock_status",         0); gi("adc_bonding_status",      1);
-    gi("msata_detection_status",  2); gi("storage_availability",    3);
-    gi("tuner_lo1_pll_lock",      4); gi("tuner_lo2_pll_lock",      5);
-    gi("tuner_bite_pll_lock",     6); gi("adc1_link_status",        7);
-    gi("tuner_detection_status", 10); gi("tuner_scratchpad_test",  13);
-    return 112;
-}
-
-static int encode_mrx_temperature(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 36) return -1;
-    static const char* NAMES[] = {
-        "bpt_temp_c", "psu_8156_temp_c", "tuner_temp_c", "psu_7255_temp_c",
-        "processor_temp_c", "power_supply_temp_c", "control_board_temp_c",
-        "rf_psu_temp_c", "fpga_temp_c"
-    };
-    for (int i = 0; i < 9; ++i) {
-        double v = 0; json_find_double(j, NAMES[i], v); store_f32le(buf + i * 4, (float)v);
-    }
-    return 36;
-}
-
-static int encode_mrx_fan_speed(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    long long rpm = 0; json_find_int(j, "fan_speed_rpm", rpm);
-    store_u32le(buf, (uint32_t)rpm); return 4;
-}
-
-static int encode_mrx_uart_test_rsp(const char* j, uint8_t* buf, int max_len) {
-    if (max_len < 4) return -1;
-    std::memset(buf, 0, 4);
-    long long v = 0;
-    if (json_find_int(j, "expected_data", v)) buf[0] = (uint8_t)v;
-    if (json_find_int(j, "observed_data", v)) buf[1] = (uint8_t)v;
-    if (json_find_int(j, "result",        v)) buf[2] = (uint8_t)v;
-    return 4;
-}
 
 static int encode_mrx_cbit_status(const char* j, uint8_t* buf, int max_len) {
     if (max_len < 8) return -1;
@@ -1337,18 +1133,8 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         plen = g106_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
         if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 1) {   // MRx diagnostics
-        switch (unit) {
-            case  2: fn = encode_mrx_system_version; break;
-            case  4: fn = encode_mrx_checksum;        break;
-            case  6: fn = encode_mrx_pbit_status;     break;
-            case  8: fn = encode_mrx_ibit_status;     break;
-            case 10: fn = encode_mrx_temperature;     break;
-            case 14: fn = encode_mrx_fan_speed;       break;
-            case 18: fn = encode_mrx_uart_test_rsp;   break;
-            case 26: fn = encode_mrx_cbit_status;     break;
-            case 34: is_ack = true;                   break; // Close All Channels ACK
-            default: break;
-        }
+        plen = mrx_g1_format(unit, kwargs_json, payload, MAX_PAYLOAD, is_ack);
+        if (plen < 0) { std::free(payload); return -1; }
     } else if (group == 3) {   // MRx RF board
         switch (unit) {
             case  2: fn = encode_mrx_board_count_rsp;  break;
