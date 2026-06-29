@@ -9,70 +9,91 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)   # only .def / SDFC_EXPORT symbols are 
 set(SDFC_CORE_SRC src/sdfc_frame.cpp)
 
 # ---- DP-ECM-1071 HF parser DLL (1–30 MHz) ----
-# Collect group sources (empty at scaffolding stage; grows as Tasks 2–12 land)
 file(GLOB HF_PARSER_SRCS src/hf/parser/*.cpp)
 file(GLOB HF_FORMAT_SRCS src/hf/format/*.cpp)
 
-add_library(dp_ecm_hf SHARED
-    ${SDFC_CORE_SRC}
-    src/dp_ecm_hf_parser.cpp
-    ${HF_PARSER_SRCS}
-    ${HF_FORMAT_SRCS}
-)
-target_include_directories(dp_ecm_hf PRIVATE
-    include
-    src/hf
-)
-
-if(MSVC)
-    target_compile_options(dp_ecm_hf PRIVATE /W4 /permissive-)
-    set_target_properties(dp_ecm_hf PROPERTIES LINK_FLAGS
-        "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/dp_ecm_hf.def")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/dp_ecm_hf_parser.cpp")
+    add_library(dp_ecm_hf SHARED
+        ${SDFC_CORE_SRC}
+        src/dp_ecm_hf_parser.cpp
+        ${HF_PARSER_SRCS}
+        ${HF_FORMAT_SRCS}
+    )
+    target_include_directories(dp_ecm_hf PRIVATE
+        include
+        src/hf
+    )
+    if(MSVC)
+        target_compile_options(dp_ecm_hf PRIVATE /W4 /permissive-)
+        set_target_properties(dp_ecm_hf PROPERTIES LINK_FLAGS
+            "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/dp_ecm_hf.def")
+    else()
+        target_compile_options(dp_ecm_hf PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    set(HF_AVAILABLE TRUE)
+    message(STATUS "dp_ecm_hf    : configured")
 else()
-    target_compile_options(dp_ecm_hf PRIVATE -Wall -Wextra -Wpedantic)
+    set(HF_AVAILABLE FALSE)
+    message(WARNING "dp_ecm_hf    : SKIPPED — src/dp_ecm_hf_parser.cpp not found")
 endif()
 
 # ---- DP-ECM-1074 VU parser DLL (30–6000 MHz) ----
-add_library(dp_ecm_vu SHARED
-    ${SDFC_CORE_SRC}
-    src/dp_ecm_vu_parser.cpp
-)
-target_include_directories(dp_ecm_vu PRIVATE include)
-
-if(MSVC)
-    target_compile_options(dp_ecm_vu PRIVATE /W4 /permissive-)
-    set_target_properties(dp_ecm_vu PROPERTIES LINK_FLAGS
-        "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/dp_ecm_vu.def")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/dp_ecm_vu_parser.cpp")
+    add_library(dp_ecm_vu SHARED
+        ${SDFC_CORE_SRC}
+        src/dp_ecm_vu_parser.cpp
+    )
+    target_include_directories(dp_ecm_vu PRIVATE include)
+    if(MSVC)
+        target_compile_options(dp_ecm_vu PRIVATE /W4 /permissive-)
+        set_target_properties(dp_ecm_vu PROPERTIES LINK_FLAGS
+            "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/dp_ecm_vu.def")
+    else()
+        target_compile_options(dp_ecm_vu PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    set(VU_AVAILABLE TRUE)
+    message(STATUS "dp_ecm_vu    : configured")
 else()
-    target_compile_options(dp_ecm_vu PRIVATE -Wall -Wextra -Wpedantic)
+    set(VU_AVAILABLE FALSE)
+    message(WARNING "dp_ecm_vu    : SKIPPED — src/dp_ecm_vu_parser.cpp not found")
 endif()
 
 # ---- Unit tests (no external framework; plain asserts) ----
 enable_testing()
 
-add_executable(test_dp_ecm
-    tests/test_frames.cpp
-    ${SDFC_CORE_SRC}
-    src/dp_ecm_hf_parser.cpp
-    ${HF_PARSER_SRCS}
-    ${HF_FORMAT_SRCS}
-)
-target_include_directories(test_dp_ecm PRIVATE
-    include
-    src/hf
-)
-if(NOT MSVC)
-    target_compile_options(test_dp_ecm PRIVATE -Wall -Wextra)
+if(HF_AVAILABLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_frames.cpp")
+    add_executable(test_dp_ecm
+        tests/test_frames.cpp
+        ${SDFC_CORE_SRC}
+        src/dp_ecm_hf_parser.cpp
+        ${HF_PARSER_SRCS}
+        ${HF_FORMAT_SRCS}
+    )
+    target_include_directories(test_dp_ecm PRIVATE
+        include
+        src/hf
+    )
+    if(NOT MSVC)
+        target_compile_options(test_dp_ecm PRIVATE -Wall -Wextra)
+    endif()
+    add_test(NAME dp_ecm_frames COMMAND test_dp_ecm)
+    message(STATUS "test_dp_ecm  : configured")
+else()
+    message(WARNING "test_dp_ecm  : SKIPPED — HF not available or tests/test_frames.cpp not found")
 endif()
-add_test(NAME dp_ecm_frames COMMAND test_dp_ecm)
 
-add_executable(test_dp_ecm_vu
-    tests/test_frames_vu.cpp
-    ${SDFC_CORE_SRC}
-    src/dp_ecm_vu_parser.cpp
-)
-target_include_directories(test_dp_ecm_vu PRIVATE include)
-if(NOT MSVC)
-    target_compile_options(test_dp_ecm_vu PRIVATE -Wall -Wextra)
+if(VU_AVAILABLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_frames_vu.cpp")
+    add_executable(test_dp_ecm_vu
+        tests/test_frames_vu.cpp
+        ${SDFC_CORE_SRC}
+        src/dp_ecm_vu_parser.cpp
+    )
+    target_include_directories(test_dp_ecm_vu PRIVATE include)
+    if(NOT MSVC)
+        target_compile_options(test_dp_ecm_vu PRIVATE -Wall -Wextra)
+    endif()
+    add_test(NAME dp_ecm_vu_frames COMMAND test_dp_ecm_vu)
+    message(STATUS "test_dp_ecm_vu: configured")
+else()
+    message(WARNING "test_dp_ecm_vu: SKIPPED — VU not available or tests/test_frames_vu.cpp not found")
 endif()
-add_test(NAME dp_ecm_vu_frames COMMAND test_dp_ecm_vu)
