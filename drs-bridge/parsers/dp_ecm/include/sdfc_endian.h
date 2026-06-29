@@ -72,6 +72,10 @@ inline void store_u32le(uint8_t* p, uint32_t v) {
     p[3] = static_cast<uint8_t>((v >> 24) & 0xFF);
 }
 
+inline void store_i32le(uint8_t* p, int32_t v) {
+    store_u32le(p, static_cast<uint32_t>(v));
+}
+
 inline void store_u64le(uint8_t* p, uint64_t v) {
     store_u32le(p,     static_cast<uint32_t>(v & 0xFFFFFFFFu));
     store_u32le(p + 4, static_cast<uint32_t>(v >> 32));

@@ -289,3 +289,17 @@ order, troubleshooting common failures, air-gap considerations), see the
     [`.github/disabled/ci.yml`](.github/disabled/ci.yml).
   - Remaining B1.x items pending: full backlog at
     [`docs/ewtss/design-backlog.md`](docs/ewtss/design-backlog.md).
+
+## Build
+Both DLLs built cleanly with zero errors. The output structure is now:
+
+- build/
+  - ├── hf/Debug/dp_ecm_hf.dll      ← HF only
+  - └── vu/Debug/dp_ecm_vu.dll      ← VU only
+  - Three ways to build for the demo:
+  
+  - Scenario	Command (run from dp_ecm/)
+  - Both together	cmake -S . -B build then cmake --build build
+  - HF only	cmake -S hf -B hf/build then cmake --build hf/build
+  - VU only	cmake -S vu -B vu/build then cmake --build vu/build
+  - If you go to the demo with only HF files, use cmake -S hf -B hf/build directly — the VU parser never enters the picture.
