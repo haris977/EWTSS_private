@@ -4172,10 +4172,10 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
     if (!buf) { std::free(payload); return -1; }
 
     std::memcpy(buf, RESP_HEADER, MAGIC_LEN);
-    store_i16le(buf + RESP_OFF_STATUS, static_cast<int16_t>(status));
-    store_u32le(buf + RESP_OFF_SIZE,   static_cast<uint32_t>(plen));
-    store_u16le(buf + RESP_OFF_GROUP,  static_cast<uint16_t>(group));
-    store_u16le(buf + RESP_OFF_UNIT,   static_cast<uint16_t>(unit));
+    store_i16be(buf + RESP_OFF_STATUS, static_cast<int16_t>(status));
+    store_u32be(buf + RESP_OFF_SIZE,   static_cast<uint32_t>(plen));
+    store_u16be(buf + RESP_OFF_GROUP,  static_cast<uint16_t>(group));
+    store_u16be(buf + RESP_OFF_UNIT,   static_cast<uint16_t>(unit));
     if (plen > 0) std::memcpy(buf + RESP_OFF_PAYLOAD, payload, static_cast<size_t>(plen));
     std::memcpy(buf + RESP_OFF_PAYLOAD + plen, RESP_FOOTER, MAGIC_LEN);
     std::free(payload);

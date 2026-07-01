@@ -28,9 +28,9 @@ static std::vector<uint8_t> build_cmd(uint16_t group, uint16_t unit,
                                       const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> f;
     f.insert(f.end(), CMD_HEADER, CMD_HEADER + 4);
-    uint8_t sz[4]; store_u32le(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
-    uint8_t g[2]; store_u16le(g, group); f.insert(f.end(), g, g + 2);
-    uint8_t u[2]; store_u16le(u, unit);  f.insert(f.end(), u, u + 2);
+    uint8_t sz[4]; store_u32be(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
+    uint8_t g[2]; store_u16be(g, group); f.insert(f.end(), g, g + 2);
+    uint8_t u[2]; store_u16be(u, unit);  f.insert(f.end(), u, u + 2);
     f.insert(f.end(), payload.begin(), payload.end());
     f.insert(f.end(), CMD_FOOTER, CMD_FOOTER + 4);
     return f;
@@ -41,10 +41,10 @@ static std::vector<uint8_t> build_resp(int16_t status, uint16_t group, uint16_t 
                                        const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> f;
     f.insert(f.end(), RESP_HEADER, RESP_HEADER + 4);
-    uint8_t st[2]; store_i16le(st, status); f.insert(f.end(), st, st + 2);
-    uint8_t sz[4]; store_u32le(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
-    uint8_t g[2]; store_u16le(g, group); f.insert(f.end(), g, g + 2);
-    uint8_t u[2]; store_u16le(u, unit);  f.insert(f.end(), u, u + 2);
+    uint8_t st[2]; store_i16be(st, status); f.insert(f.end(), st, st + 2);
+    uint8_t sz[4]; store_u32be(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
+    uint8_t g[2]; store_u16be(g, group); f.insert(f.end(), g, g + 2);
+    uint8_t u[2]; store_u16be(u, unit);  f.insert(f.end(), u, u + 2);
     f.insert(f.end(), payload.begin(), payload.end());
     f.insert(f.end(), RESP_FOOTER, RESP_FOOTER + 4);
     return f;
