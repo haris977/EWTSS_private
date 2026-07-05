@@ -82,28 +82,28 @@ static constexpr uint32_t XML_MAGIC_END   = 0x00000000u;
 // Big-endian read helpers  (DDF-550 is entirely big-endian)
 // ---------------------------------------------------------------------------
 
-static uint16_t load_u16be(const uint8_t* p) {
+static uint16_t be_u16(const uint8_t* p) {
     return (static_cast<uint16_t>(p[0]) << 8) |
             static_cast<uint16_t>(p[1]);
 }
 
-static int16_t load_i16be(const uint8_t* p) {
-    return static_cast<int16_t>(load_u16be(p));
+static int16_t be_i16(const uint8_t* p) {
+    return static_cast<int16_t>(be_u16(p));
 }
 
-static uint32_t load_u32be(const uint8_t* p) {
+static uint32_t be_u32(const uint8_t* p) {
     return (static_cast<uint32_t>(p[0]) << 24) |
            (static_cast<uint32_t>(p[1]) << 16) |
            (static_cast<uint32_t>(p[2]) <<  8) |
             static_cast<uint32_t>(p[3]);
 }
 
-static uint64_t load_u64be(const uint8_t* p) {
-    return (static_cast<uint64_t>(load_u32be(p)) << 32) |
-            static_cast<uint64_t>(load_u32be(p + 4));
+static uint64_t be_u64(const uint8_t* p) {
+    return (static_cast<uint64_t>(be_u32(p)) << 32) |
+            static_cast<uint64_t>(be_u32(p + 4));
 }
 
-static void store_u32be(uint8_t* p, uint32_t v) {
+static void be_store_u32(uint8_t* p, uint32_t v) {
     p[0] = static_cast<uint8_t>((v >> 24) & 0xFFu);
     p[1] = static_cast<uint8_t>((v >> 16) & 0xFFu);
     p[2] = static_cast<uint8_t>((v >>  8) & 0xFFu);
@@ -328,17 +328,17 @@ static void decode_audio_opt_header(const uint8_t* oh, int oh_bytes, JsonWriter&
         j.key_str("warning", "audio optional header truncated");
         return;
     }
-    int16_t  audio_mode  = load_i16be(oh + 0x00);
-    int16_t  frame_len   = load_i16be(oh + 0x02);
-    uint32_t freq_low    = load_u32be(oh + 0x04);
-    uint32_t bandwidth   = load_u32be(oh + 0x08);
-    uint16_t demod       = load_u16be(oh + 0x0C);
+    int16_t  audio_mode  = be_i16(oh + 0x00);
+    int16_t  frame_len   = be_i16(oh + 0x02);
+    uint32_t freq_low    = be_u32(oh + 0x04);
+    uint32_t bandwidth   = be_u32(oh + 0x08);
+    uint16_t demod       = be_u16(oh + 0x0C);
     char     demod_name[9] = {};
     memcpy(demod_name, oh + 0x0E, 8);  // ASCII left-aligned NUL-padded
-    uint32_t freq_high   = load_u32be(oh + 0x16);
+    uint32_t freq_high   = be_u32(oh + 0x16);
     // 6 bytes reserved at 0x1A
-    uint64_t timestamp_ns = load_u64be(oh + 0x20);
-    int16_t  sig_source   = load_i16be(oh + 0x28);
+    uint64_t timestamp_ns = be_u64(oh + 0x20);
+    int16_t  sig_source   = be_i16(oh + 0x28);
 
     uint64_t freq_hz = ((uint64_t)freq_high << 32) | freq_low;
 
@@ -361,11 +361,11 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
     if (pkt_len < EB200_HDR_BYTES) return {};
 
     // EB200 header  (§5.1.7.2)
-    uint16_t ver_minor  = load_u16be(pkt + 4);
-    uint16_t ver_major  = load_u16be(pkt + 6);
-    uint16_t seq_lo     = load_u16be(pkt + 8);
-    uint16_t seq_hi     = load_u16be(pkt + 10);
-    uint32_t data_size  = load_u32be(pkt + 12);
+    uint16_t ver_minor  = be_u16(pkt + 4);
+    uint16_t ver_major  = be_u16(pkt + 6);
+    uint16_t seq_lo     = be_u16(pkt + 8);
+    uint16_t seq_hi     = be_u16(pkt + 10);
+    uint32_t data_size  = be_u32(pkt + 12);
     (void)ver_minor;
 
     uint32_t seq_num = ((uint32_t)seq_hi << 16) | seq_lo;
@@ -375,7 +375,7 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
     int            ga_avail = pkt_len - EB200_HDR_BYTES;
     if (ga_avail < 2) return {};
 
-    uint16_t trace_tag  = load_u16be(ga);
+    uint16_t trace_tag  = be_u16(ga);
     bool     is_advanced = (trace_tag >= TAG_ADVANCED_THRESHOLD);
 
     // Locate TraceData and its length
@@ -383,11 +383,11 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
     int            td_len = 0;
     if (!is_advanced) {
         if (ga_avail < GA_CONV_HDR) return {};
-        td_len = (int)load_u16be(ga + 2);
+        td_len = (int)be_u16(ga + 2);
         td     = ga + GA_CONV_HDR;
     } else {
         if (ga_avail < GA_ADV_HDR) return {};
-        td_len = (int)load_u32be(ga + 4);
+        td_len = (int)be_u32(ga + 4);
         td     = ga + GA_ADV_HDR;
     }
     // Clamp to actual bytes available
@@ -408,9 +408,9 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
     if (!is_advanced) {
         // Conventional TraceAttribute  (Table 6)
         if (td_len < TA_CONV_HDR) return j.str();
-        int16_t  n_items   = load_i16be(td + 0);
+        int16_t  n_items   = be_i16(td + 0);
         uint8_t  opt_len   = td[3];
-        uint32_t sel_flags = load_u32be(td + 4);
+        uint32_t sel_flags = be_u32(td + 4);
 
         j.key_int ("n_items",     n_items);
         j.key_uint("sel_flags",   sel_flags);
@@ -435,10 +435,10 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
     } else {
         // Advanced TraceAttribute  (Table 7)
         if (td_len < TA_ADV_HDR) return j.str();
-        uint32_t n_items   = load_u32be(td +  0);
-        uint32_t opt_len   = load_u32be(td +  8);
-        uint32_t flags_lo  = load_u32be(td + 12);
-        uint32_t flags_hi  = load_u32be(td + 16);
+        uint32_t n_items   = be_u32(td +  0);
+        uint32_t opt_len   = be_u32(td +  8);
+        uint32_t flags_lo  = be_u32(td + 12);
+        uint32_t flags_hi  = be_u32(td + 16);
 
         j.key_uint("n_items",      n_items);
         j.key_uint("sel_flags",    flags_lo);
@@ -592,9 +592,9 @@ SDFC_EXPORT int extract_frame(const uint8_t* buf,
     int ibuf = static_cast<int>(buf_len);
 
     // ---- EB200 path ----
-    if (load_u32be(buf) == EB200_MAGIC) {
+    if (be_u32(buf) == EB200_MAGIC) {
         if (ibuf < EB200_HDR_BYTES) return -1;
-        uint32_t data_size = load_u32be(buf + 12);
+        uint32_t data_size = be_u32(buf + 12);
         if (data_size < (uint32_t)EB200_HDR_BYTES) return -1;
         if (data_size > (uint32_t)MAX_FRAME_BUFFER_BYTES) return -1;
         if (ibuf < (int)data_size) return -1;
@@ -633,7 +633,7 @@ SDFC_EXPORT int extract_frame(const uint8_t* buf,
     // Need at least: magic(4) + len(4) + first XML byte(1) = 9 bytes to probe.
     if (ibuf < 9) return -1;
 
-    uint32_t xml_n = load_u32be(buf + 4);
+    uint32_t xml_n = be_u32(buf + 4);
     // Plausibility: a valid XML length is > 0 and leaves room for the 12-byte envelope.
     if (xml_n > 0 &&
         xml_n <= (uint32_t)(MAX_FRAME_BUFFER_BYTES - 12) &&
@@ -669,7 +669,7 @@ SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 
     int iframe = static_cast<int>(frame_len);
     std::string result;
-    if (load_u32be(frame) == EB200_MAGIC) {
+    if (be_u32(frame) == EB200_MAGIC) {
         result = parse_eb200(frame, iframe);
     } else {
         const char* root_tag = nullptr;
@@ -763,13 +763,13 @@ SDFC_EXPORT int format_response(const char* /*kind*/, const char* kwargs_json,
     auto* buf = static_cast<uint8_t*>(std::malloc((size_t)frame_total));
     if (!buf) return -1;
     uint8_t* p = buf;
-    store_u32be(p, XML_MAGIC_START);   p += 4;
-    store_u32be(p, (uint32_t)xml_total); p += 4;
+    be_store_u32(p, XML_MAGIC_START);   p += 4;
+    be_store_u32(p, (uint32_t)xml_total); p += 4;
     memcpy(p, xml_hdr,              (size_t)xml_hdr_len);   p += xml_hdr_len;
     memcpy(p, cmd_open,             (size_t)cmd_open_len);  p += cmd_open_len;
     memcpy(p, xml_body.c_str(),     (size_t)body_len);      p += body_len;
     memcpy(p, cmd_close,            (size_t)cmd_close_len); p += cmd_close_len;
-    store_u32be(p, XML_MAGIC_END);
+    be_store_u32(p, XML_MAGIC_END);
 
     *out_buf = buf;
     *out_len = (size_t)frame_total;

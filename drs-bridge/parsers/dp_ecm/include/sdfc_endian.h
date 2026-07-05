@@ -94,6 +94,12 @@ inline void store_u32le(uint8_t* p, uint32_t v) {
 }
 
 // ---- Big-endian writes (network byte order) ----
+// Payload fields going out to ECS also need big-endian: a client test against
+// real ECS showed garbage/negative values decoded from our little-endian
+// payload floats once the header switched to big-endian. This only affects
+// the encode/write direction (RESP payload we send) — the decode/read side
+// (CMD payload we receive) is intentionally left on load_*le pending its own
+// capture-based confirmation. Do not use these for reading inbound frames.
 inline void store_u16be(uint8_t* p, uint16_t v) {
     p[0] = static_cast<uint8_t>((v >> 8) & 0xFF);
     p[1] = static_cast<uint8_t>(v & 0xFF);
@@ -108,6 +114,27 @@ inline void store_u32be(uint8_t* p, uint32_t v) {
     p[1] = static_cast<uint8_t>((v >> 16) & 0xFF);
     p[2] = static_cast<uint8_t>((v >> 8) & 0xFF);
     p[3] = static_cast<uint8_t>(v & 0xFF);
+}
+
+inline void store_i32be(uint8_t* p, int32_t v) {
+    store_u32be(p, static_cast<uint32_t>(v));
+}
+
+inline void store_u64be(uint8_t* p, uint64_t v) {
+    store_u32be(p,     static_cast<uint32_t>(v >> 32));
+    store_u32be(p + 4, static_cast<uint32_t>(v & 0xFFFFFFFFu));
+}
+
+inline void store_f32be(uint8_t* p, float v) {
+    uint32_t bits;
+    std::memcpy(&bits, &v, sizeof(bits));
+    store_u32be(p, bits);
+}
+
+inline void store_f64be(uint8_t* p, double v) {
+    uint64_t bits;
+    std::memcpy(&bits, &v, sizeof(bits));
+    store_u64be(p, bits);
 }
 
 inline void store_i32le(uint8_t* p, int32_t v) {

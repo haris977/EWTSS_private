@@ -10,7 +10,7 @@ compiles to its own DLL but reuses the shared frame core.
 dp_ecm/
   include/
     sdfc_abi.h        # the frozen 4-symbol ABI (extract_frame/parse_message/format_response/free_result)
-    sdfc_endian.h     # explicit little-endian load/store helpers (never struct-cast wire bytes)
+    sdfc_endian.h     # explicit LE/BE load/store helpers (never struct-cast wire bytes)
     sdfc_frame.h      # frame constants, FrameHeader, frame scanner declarations
     json_writer.h     # minimal dependency-free JSON builder (emit path)
   src/
@@ -22,7 +22,15 @@ dp_ecm/
   CMakeLists.txt
 ```
 
-## Frame model (authoritative — DP-ECM-1071/1074, little-endian, no CRC)
+## Frame model (authoritative — DP-ECM-1071/1074, no CRC)
+
+**Byte order (confirmed 2026-07-01 against live ECS capture, updated 2026-07-03 after
+client test):** the 4 header fields (status/size/group/unit) are big-endian in both
+directions. RESP **payload** fields we send to ECS (encode side) are now also
+big-endian — a client test showed garbage/negative values decoded from LE payload
+floats once the header switched to BE. CMD payload fields we *receive* from ECS
+(decode side) are still read little-endian, pending their own capture-based
+confirmation — see `sdfc_endian.h` for the exact scope.
 
 | Type | Header | Footer | Overhead | Notes |
 |---|---|---|---:|---|
