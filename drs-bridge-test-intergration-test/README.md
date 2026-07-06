@@ -1,2 +1,0 @@
-# drs-bridge-test
-TESTING
