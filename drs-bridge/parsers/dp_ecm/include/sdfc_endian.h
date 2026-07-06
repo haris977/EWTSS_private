@@ -23,9 +23,11 @@ inline uint16_t load_u16le(const uint8_t* p) {
 
 // ---- Big-endian reads (network byte order) ----
 // Confirmed against a live ECS capture (2026-07-01): the CMD/RESP frame header
-// fields (payload_size, group_id, unit_id, status) are big-endian on the wire,
-// not little-endian. Payload fields are NOT yet confirmed either way — do not
-// switch those without a capture to check against.
+// fields (payload_size, group_id, unit_id, status) are big-endian on the wire.
+// Updated 2026-07-06: CMD payload fields are now also read big-endian, extending
+// the pattern confirmed for the Set Date/Time field (year decoded as 2026 under
+// BE vs. 59911 under LE against a live capture) to the rest of the CMD payload
+// decoders. See dp_ecm/README.md for the capture evidence.
 inline uint16_t load_u16be(const uint8_t* p) {
     return static_cast<uint16_t>(p[1]) |
            (static_cast<uint16_t>(p[0]) << 8);
@@ -40,6 +42,25 @@ inline uint32_t load_u32be(const uint8_t* p) {
            (static_cast<uint32_t>(p[2]) << 8)  |
            (static_cast<uint32_t>(p[1]) << 16) |
            (static_cast<uint32_t>(p[0]) << 24);
+}
+
+inline uint64_t load_u64be(const uint8_t* p) {
+    return (static_cast<uint64_t>(load_u32be(p)) << 32) |
+            static_cast<uint64_t>(load_u32be(p + 4));
+}
+
+inline float load_f32be(const uint8_t* p) {
+    uint32_t bits = load_u32be(p);
+    float f;
+    std::memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+
+inline double load_f64be(const uint8_t* p) {
+    uint64_t bits = load_u64be(p);
+    double d;
+    std::memcpy(&d, &bits, sizeof(d));
+    return d;
 }
 
 inline int16_t load_i16le(const uint8_t* p) {

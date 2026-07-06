@@ -93,8 +93,8 @@ int main() {
     // 5. System Version response (100/2, 20-byte payload) parses with version fields.
     {
         std::vector<uint8_t> p(20, 0);
-        store_u32le(p.data() + 0, 0x00020401);  // sjc_fw_version (float raw)
-        store_u16le(p.data() + 12, 7);          // processor_id at offset 12
+        store_u32be(p.data() + 0, 0x00020401);  // sjc_fw_version (float raw)
+        store_u16be(p.data() + 12, 7);          // processor_id at offset 12
         auto f = build_resp(0, 100, 2, p);
         uint8_t* frame_buf = nullptr; size_t flen = 0;
         int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);
@@ -112,12 +112,12 @@ int main() {
     // 6. FH detection response (101/40, 1 hopper) decodes hopper array.
     {
         std::vector<uint8_t> p;
-        uint8_t hc[4]; store_u16le(hc, 1); store_u16le(hc + 2, 0); // count=1, reserved
+        uint8_t hc[4]; store_u16be(hc, 1); store_u16be(hc + 2, 0); // count=1, reserved
         p.insert(p.end(), hc, hc + 4);
         std::vector<uint8_t> hop(40, 0);
-        store_u32le(hop.data() + 0, 3);                 // hopper number
-        float fmin = 5.0f; uint32_t b; std::memcpy(&b, &fmin, 4); store_u32le(hop.data() + 4, b);
-        store_u16le(hop.data() + 32, 1);                // active
+        store_u32be(hop.data() + 0, 3);                 // hopper number
+        float fmin = 5.0f; uint32_t b; std::memcpy(&b, &fmin, 4); store_u32be(hop.data() + 4, b);
+        store_u16be(hop.data() + 32, 1);                // active
         p.insert(p.end(), hop.begin(), hop.end());
         auto f = build_resp(0, 101, 40, p);
         uint8_t* frame_buf = nullptr; size_t flen = 0;
@@ -168,10 +168,10 @@ int main() {
         std::vector<uint8_t> p(36, 0);
         float t_int = 35.5f, t_ext = 28.0f, t_cpu = 52.1f, t_fpga = 61.3f;
         uint32_t b;
-        std::memcpy(&b, &t_int,  4); store_u32le(p.data() +  0, b);
-        std::memcpy(&b, &t_ext,  4); store_u32le(p.data() +  4, b);
-        std::memcpy(&b, &t_cpu,  4); store_u32le(p.data() +  8, b);
-        std::memcpy(&b, &t_fpga, 4); store_u32le(p.data() + 12, b);
+        std::memcpy(&b, &t_int,  4); store_u32be(p.data() +  0, b);
+        std::memcpy(&b, &t_ext,  4); store_u32be(p.data() +  4, b);
+        std::memcpy(&b, &t_cpu,  4); store_u32be(p.data() +  8, b);
+        std::memcpy(&b, &t_fpga, 4); store_u32be(p.data() + 12, b);
         auto f = build_resp(0, 100, 10, p);
         uint8_t* frame_buf = nullptr; size_t flen = 0;
         int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);
@@ -189,12 +189,12 @@ int main() {
     // 10. Wideband FFT response (101/44) — header fields + first power value.
     {
         std::vector<uint8_t> p(16 + 3 * 4, 0);
-        store_u32le(p.data() +  0, 1);    // start 1 MHz
-        store_u32le(p.data() +  4, 30);   // stop 30 MHz
-        store_u32le(p.data() +  8, 1000); // step 1000 kHz = 1 MHz
-        store_u32le(p.data() + 12, 3);    // 3 points
+        store_u32be(p.data() +  0, 1);    // start 1 MHz
+        store_u32be(p.data() +  4, 30);   // stop 30 MHz
+        store_u32be(p.data() +  8, 1000); // step 1000 kHz = 1 MHz
+        store_u32be(p.data() + 12, 3);    // 3 points
         float pw0 = -45.5f; uint32_t b; std::memcpy(&b, &pw0, 4);
-        store_u32le(p.data() + 16, b);    // power[0] = -45.5 dBm
+        store_u32be(p.data() + 16, b);    // power[0] = -45.5 dBm
         auto f = build_resp(0, 101, 44, p);
         uint8_t* frame_buf = nullptr; size_t flen = 0;
         int rc = extract_frame(f.data(), f.size(), &frame_buf, &flen);

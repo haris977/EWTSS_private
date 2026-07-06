@@ -28,10 +28,10 @@ static std::vector<uint8_t> build_cmd(uint16_t group, uint16_t unit,
                                       const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> f;
     f.insert(f.end(), CMD_HEADER, CMD_HEADER + 4);
-    uint8_t sz[4]; store_u32le(sz, static_cast<uint32_t>(payload.size()));
+    uint8_t sz[4]; store_u32be(sz, static_cast<uint32_t>(payload.size()));
     f.insert(f.end(), sz, sz + 4);
-    uint8_t g[2]; store_u16le(g, group); f.insert(f.end(), g, g + 2);
-    uint8_t u[2]; store_u16le(u, unit);  f.insert(f.end(), u, u + 2);
+    uint8_t g[2]; store_u16be(g, group); f.insert(f.end(), g, g + 2);
+    uint8_t u[2]; store_u16be(u, unit);  f.insert(f.end(), u, u + 2);
     f.insert(f.end(), payload.begin(), payload.end());
     f.insert(f.end(), CMD_FOOTER, CMD_FOOTER + 4);
     return f;
@@ -41,11 +41,11 @@ static std::vector<uint8_t> build_resp(int16_t status, uint16_t group, uint16_t 
                                        const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> f;
     f.insert(f.end(), RESP_HEADER, RESP_HEADER + 4);
-    uint8_t st[2]; store_i16le(st, status); f.insert(f.end(), st, st + 2);
-    uint8_t sz[4]; store_u32le(sz, static_cast<uint32_t>(payload.size()));
+    uint8_t st[2]; store_i16be(st, status); f.insert(f.end(), st, st + 2);
+    uint8_t sz[4]; store_u32be(sz, static_cast<uint32_t>(payload.size()));
     f.insert(f.end(), sz, sz + 4);
-    uint8_t g[2]; store_u16le(g, group); f.insert(f.end(), g, g + 2);
-    uint8_t u[2]; store_u16le(u, unit);  f.insert(f.end(), u, u + 2);
+    uint8_t g[2]; store_u16be(g, group); f.insert(f.end(), g, g + 2);
+    uint8_t u[2]; store_u16be(u, unit);  f.insert(f.end(), u, u + 2);
     f.insert(f.end(), payload.begin(), payload.end());
     f.insert(f.end(), RESP_FOOTER, RESP_FOOTER + 4);
     return f;
@@ -90,9 +90,9 @@ int main() {
     //            tuner[3](3xu16) fpga_type_id(u16)
     {
         std::vector<uint8_t> p(28, 0);
-        store_u32le(p.data() + 0, 0x00010200); // fw_version_raw
-        store_u16le(p.data() + 16, 12);        // VU: processor_id at offset 16
-        store_u16le(p.data() + 24, 3);         // VU: fpga_type_id at offset 24
+        store_u32be(p.data() + 0, 0x00010200); // fw_version_raw
+        store_u16be(p.data() + 16, 12);        // VU: processor_id at offset 16
+        store_u16be(p.data() + 24, 3);         // VU: fpga_type_id at offset 24
         auto f = build_resp(0, 100, 2, p);
         uint8_t* out_frame = nullptr;
         size_t out_len = 0;
@@ -114,15 +114,15 @@ int main() {
     // 5. FH Detection (101/40, 1 hopper) — VU band 30–6000 MHz, same structure as HF.
     {
         std::vector<uint8_t> p;
-        uint8_t hc[4]; store_u16le(hc, 1); store_u16le(hc + 2, 0);
+        uint8_t hc[4]; store_u16be(hc, 1); store_u16be(hc + 2, 0);
         p.insert(p.end(), hc, hc + 4);
         std::vector<uint8_t> hop(60, 0);  // VU S_HOPPER_DATA = 60 bytes (HF = 40)
-        store_u32le(hop.data() + 0, 7);                        // hopper number
+        store_u32be(hop.data() + 0, 7);                        // hopper number
         float fmin = 150.0f; uint32_t b; std::memcpy(&b, &fmin, 4);
-        store_u32le(hop.data() + 4, b);                        // min 150 MHz
+        store_u32be(hop.data() + 4, b);                        // min 150 MHz
         float fmax = 155.0f; std::memcpy(&b, &fmax, 4);
-        store_u32le(hop.data() + 8, b);                        // max 155 MHz
-        store_u16le(hop.data() + 32, 1);                       // active
+        store_u32be(hop.data() + 8, b);                        // max 155 MHz
+        store_u16be(hop.data() + 32, 1);                       // active
         p.insert(p.end(), hop.begin(), hop.end());
         auto f = build_resp(0, 101, 40, p);
         uint8_t* out_frame = nullptr;
@@ -144,8 +144,8 @@ int main() {
     // 6. Immediate Jam ACK (200/2, 8-byte payload) — VU-specific.
     {
         std::vector<uint8_t> p(8, 0);
-        store_u16le(p.data() + 0, 42);   // jam_id
-        store_u16le(p.data() + 4, 1);    // active = true
+        store_u16be(p.data() + 0, 42);   // jam_id
+        store_u16be(p.data() + 4, 1);    // active = true
         auto f = build_resp(0, 200, 2, p);
         uint8_t* out_frame = nullptr;
         size_t out_len = 0;
@@ -197,8 +197,8 @@ int main() {
     // 9. Responsive Sweep Jam ACK (200/8, 8-byte payload).
     {
         std::vector<uint8_t> p(8, 0);
-        store_u16le(p.data() + 0, 99);   // jam_id
-        store_u16le(p.data() + 4, 0);    // active = false (sweep ended)
+        store_u16be(p.data() + 0, 99);   // jam_id
+        store_u16be(p.data() + 4, 0);    // active = false (sweep ended)
         auto f = build_resp(0, 200, 8, p);
         uint8_t* out_frame = nullptr;
         size_t out_len = 0;

@@ -28,9 +28,9 @@ static std::vector<uint8_t> build_cmd(uint16_t group, uint16_t unit,
                                       const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> f;
     f.insert(f.end(), CMD_HEADER, CMD_HEADER + 4);
-    uint8_t sz[4]; store_u32le(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
-    uint8_t g[2]; store_u16le(g, group); f.insert(f.end(), g, g + 2);
-    uint8_t u[2]; store_u16le(u, unit);  f.insert(f.end(), u, u + 2);
+    uint8_t sz[4]; store_u32be(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
+    uint8_t g[2]; store_u16be(g, group); f.insert(f.end(), g, g + 2);
+    uint8_t u[2]; store_u16be(u, unit);  f.insert(f.end(), u, u + 2);
     f.insert(f.end(), payload.begin(), payload.end());
     f.insert(f.end(), CMD_FOOTER, CMD_FOOTER + 4);
     return f;
@@ -41,10 +41,10 @@ static std::vector<uint8_t> build_resp(int16_t status, uint16_t group, uint16_t 
                                        const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> f;
     f.insert(f.end(), RESP_HEADER, RESP_HEADER + 4);
-    uint8_t st[2]; store_i16le(st, status); f.insert(f.end(), st, st + 2);
-    uint8_t sz[4]; store_u32le(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
-    uint8_t g[2]; store_u16le(g, group); f.insert(f.end(), g, g + 2);
-    uint8_t u[2]; store_u16le(u, unit);  f.insert(f.end(), u, u + 2);
+    uint8_t st[2]; store_i16be(st, status); f.insert(f.end(), st, st + 2);
+    uint8_t sz[4]; store_u32be(sz, static_cast<uint32_t>(payload.size())); f.insert(f.end(), sz, sz + 4);
+    uint8_t g[2]; store_u16be(g, group); f.insert(f.end(), g, g + 2);
+    uint8_t u[2]; store_u16be(u, unit);  f.insert(f.end(), u, u + 2);
     f.insert(f.end(), payload.begin(), payload.end());
     f.insert(f.end(), RESP_FOOTER, RESP_FOOTER + 4);
     return f;
@@ -97,8 +97,8 @@ int main() {
     // 5. System Version response (100/2, 20-byte payload) parses with version fields.
     {
         std::vector<uint8_t> p(20, 0);
-        store_u32le(p.data() + 0, 0x00020401);  // fw raw
-        store_u16le(p.data() + 12, 7);          // HF: processor_id at offset 12
+        store_u32be(p.data() + 0, 0x00020401);  // fw raw
+        store_u16be(p.data() + 12, 7);          // HF: processor_id at offset 12
         auto f = build_resp(0, 100, 2, p);
         uint8_t* out_frame = nullptr;
         size_t out_len = 0;
@@ -117,13 +117,13 @@ int main() {
     // 6. FH detection response (101/40, 1 hopper) decodes hopper array.
     {
         std::vector<uint8_t> p;
-        uint8_t hc[4]; store_u16le(hc, 1); store_u16le(hc + 2, 0); // count=1, reserved
+        uint8_t hc[4]; store_u16be(hc, 1); store_u16be(hc + 2, 0); // count=1, reserved
         p.insert(p.end(), hc, hc + 4);
         std::vector<uint8_t> hop(40, 0);
-        store_u32le(hop.data() + 0, 3);                 // hopper number
+        store_u32be(hop.data() + 0, 3);                 // hopper number
         // min freq 5.0 MHz as float
-        float fmin = 5.0f; uint32_t b; std::memcpy(&b, &fmin, 4); store_u32le(hop.data() + 4, b);
-        store_u16le(hop.data() + 32, 1);                // active
+        float fmin = 5.0f; uint32_t b; std::memcpy(&b, &fmin, 4); store_u32be(hop.data() + 4, b);
+        store_u16be(hop.data() + 32, 1);                // active
         p.insert(p.end(), hop.begin(), hop.end());
         auto f = build_resp(0, 101, 40, p);
         uint8_t* out_frame = nullptr;
@@ -177,12 +177,12 @@ int main() {
         std::vector<uint8_t> p(24, 0);
         float t0 = 35.5f, t1 = 28.0f, t2f = 52.1f, t3 = 40.0f, t4 = 38.5f, t5 = 61.3f;
         uint32_t b;
-        std::memcpy(&b, &t0,  4); store_u32le(p.data() +  0, b);  // processor_temp_c
-        std::memcpy(&b, &t1,  4); store_u32le(p.data() +  4, b);  // psu_temp_c
-        std::memcpy(&b, &t2f, 4); store_u32le(p.data() +  8, b);  // fan_temp_c
-        std::memcpy(&b, &t3,  4); store_u32le(p.data() + 12, b);  // rf_psu_temp_c
-        std::memcpy(&b, &t4,  4); store_u32le(p.data() + 16, b);  // digital_temp_c
-        std::memcpy(&b, &t5,  4); store_u32le(p.data() + 20, b);  // fpga_temp_c
+        std::memcpy(&b, &t0,  4); store_u32be(p.data() +  0, b);  // processor_temp_c
+        std::memcpy(&b, &t1,  4); store_u32be(p.data() +  4, b);  // psu_temp_c
+        std::memcpy(&b, &t2f, 4); store_u32be(p.data() +  8, b);  // fan_temp_c
+        std::memcpy(&b, &t3,  4); store_u32be(p.data() + 12, b);  // rf_psu_temp_c
+        std::memcpy(&b, &t4,  4); store_u32be(p.data() + 16, b);  // digital_temp_c
+        std::memcpy(&b, &t5,  4); store_u32be(p.data() + 20, b);  // fpga_temp_c
         auto f = build_resp(0, 100, 10, p);
         uint8_t* out_frame = nullptr;
         size_t out_len = 0;
@@ -202,7 +202,7 @@ int main() {
     // 10. Fan Speed response (100/14, 4 bytes) — simplest fixed-size response.
     {
         std::vector<uint8_t> p(4, 0);
-        store_u32le(p.data(), 3600);  // fan_speed_rpm = 3600
+        store_u32be(p.data(), 3600);  // fan_speed_rpm = 3600
         auto f = build_resp(0, 100, 14, p);
         uint8_t* out_frame = nullptr;
         size_t out_len = 0;

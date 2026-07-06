@@ -73,16 +73,16 @@ static constexpr const char* HW_NAME = "dp_ecm_vu";
 //   @26 Reserved          (uint16, 2B)
 static void decode_system_version(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 28) { w.key_str("warning", "system_version payload < 28 bytes"); return; }
-    w.key_double("sjc_fw_version",    static_cast<double>(load_f32le(p +  0)));
-    w.key_double("driver_version",    static_cast<double>(load_f32le(p +  4)));
-    w.key_double("fpga_version",      static_cast<double>(load_f32le(p +  8)));
-    w.key_double("bsp_version",       static_cast<double>(load_f32le(p + 12)));
-    w.key_uint("processor_id",        load_u16le(p + 16));
+    w.key_double("sjc_fw_version",    static_cast<double>(load_f32be(p +  0)));
+    w.key_double("driver_version",    static_cast<double>(load_f32be(p +  4)));
+    w.key_double("fpga_version",      static_cast<double>(load_f32be(p +  8)));
+    w.key_double("bsp_version",       static_cast<double>(load_f32be(p + 12)));
+    w.key_uint("processor_id",        load_u16be(p + 16));
     char tuner[32];
     std::snprintf(tuner, sizeof(tuner), "[%u,%u,%u]",
-                  load_u16le(p + 18), load_u16le(p + 20), load_u16le(p + 22));
+                  load_u16be(p + 18), load_u16be(p + 20), load_u16be(p + 22));
     w.key_raw("sjc_rf_tuner_ids", tuner);
-    w.key_uint("fpga_type_id",        load_u16le(p + 24));
+    w.key_uint("fpga_type_id",        load_u16be(p + 24));
 }
 
 // 100/4 — Get SRx Checksum Details (1000 bytes).
@@ -147,12 +147,12 @@ static void decode_ibit_status(const uint8_t* p, int n, JsonWriter& w) {
 //   @20 FPGA Temperature       (float)
 static void decode_temperature(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 24) { w.key_str("warning", "temperature payload < 24 bytes"); return; }
-    w.key_double("processor_temp_c",   static_cast<double>(load_f32le(p +  0)));
-    w.key_double("psu_temp_c",         static_cast<double>(load_f32le(p +  4)));
-    w.key_double("fan_temp_c",         static_cast<double>(load_f32le(p +  8)));
-    w.key_double("rf_psu_temp_c",      static_cast<double>(load_f32le(p + 12)));
-    w.key_double("digital_temp_c",     static_cast<double>(load_f32le(p + 16)));
-    w.key_double("fpga_temp_c",        static_cast<double>(load_f32le(p + 20)));
+    w.key_double("processor_temp_c",   static_cast<double>(load_f32be(p +  0)));
+    w.key_double("psu_temp_c",         static_cast<double>(load_f32be(p +  4)));
+    w.key_double("fan_temp_c",         static_cast<double>(load_f32be(p +  8)));
+    w.key_double("rf_psu_temp_c",      static_cast<double>(load_f32be(p + 12)));
+    w.key_double("digital_temp_c",     static_cast<double>(load_f32be(p + 16)));
+    w.key_double("fpga_temp_c",        static_cast<double>(load_f32be(p + 20)));
 }
 
 // 100/12 — Set Fan Speed ACK (0 bytes payload, status only).
@@ -162,7 +162,7 @@ static void decode_temperature(const uint8_t* p, int n, JsonWriter& w) {
 // Per ICD Table 21: Fan Speed in RPM (uint32).
 static void decode_fan_speed_status(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "fan_speed_status payload < 4 bytes"); return; }
-    w.key_uint("fan_speed_rpm", load_u32le(p + 0));
+    w.key_uint("fan_speed_rpm", load_u32be(p + 0));
 }
 
 // 100/16 — Ethernet Test Status (12 bytes).
@@ -170,9 +170,9 @@ static void decode_fan_speed_status(const uint8_t* p, int n, JsonWriter& w) {
 // Result: 1 = PASS, 0 = FAIL.
 static void decode_ethernet_test(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 12) { w.key_str("warning", "ethernet_test payload < 12 bytes"); return; }
-    w.key_uint("tx_data", load_u32le(p + 0));
-    w.key_uint("rx_data", load_u32le(p + 4));
-    w.key_uint("result",  load_u32le(p + 8));
+    w.key_uint("tx_data", load_u32be(p + 0));
+    w.key_uint("rx_data", load_u32be(p + 4));
+    w.key_uint("result",  load_u32be(p + 8));
 }
 
 // 100/18 — UART Test Status (4 bytes).
@@ -201,12 +201,12 @@ static void decode_uart_test(const uint8_t* p, int n, JsonWriter& w) {
 //   @20 Digital 3.3V     (float)
 static void decode_fan_voltage(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 24) { w.key_str("warning", "fan_voltage payload < 24 bytes"); return; }
-    w.key_double("fan_adc_voltage_v",  static_cast<double>(load_f32le(p +  0)));
-    w.key_double("rf1_voltage_v",      static_cast<double>(load_f32le(p +  4)));
-    w.key_double("rf2_voltage_v",      static_cast<double>(load_f32le(p +  8)));
-    w.key_double("rf3_voltage_v",      static_cast<double>(load_f32le(p + 12)));
-    w.key_double("digital_5v_v",       static_cast<double>(load_f32le(p + 16)));
-    w.key_double("digital_3v3_v",      static_cast<double>(load_f32le(p + 20)));
+    w.key_double("fan_adc_voltage_v",  static_cast<double>(load_f32be(p +  0)));
+    w.key_double("rf1_voltage_v",      static_cast<double>(load_f32be(p +  4)));
+    w.key_double("rf2_voltage_v",      static_cast<double>(load_f32be(p +  8)));
+    w.key_double("rf3_voltage_v",      static_cast<double>(load_f32be(p + 12)));
+    w.key_double("digital_5v_v",       static_cast<double>(load_f32be(p + 16)));
+    w.key_double("digital_3v3_v",      static_cast<double>(load_f32be(p + 20)));
 }
 
 // 100/24 — PPS Test Status (16 bytes).
@@ -218,9 +218,9 @@ static void decode_fan_voltage(const uint8_t* p, int n, JsonWriter& w) {
 //   @13 Reserved x3 (uint8)
 static void decode_pps_test(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 16) { w.key_str("warning", "pps_test payload < 16 bytes"); return; }
-    w.key_uint("on_period",  load_u32le(p + 0));
-    w.key_uint("off_period", load_u32le(p + 4));
-    w.key_uint("pps_status", load_u32le(p + 8));
+    w.key_uint("on_period",  load_u32be(p + 0));
+    w.key_uint("off_period", load_u32be(p + 4));
+    w.key_uint("pps_status", load_u32be(p + 8));
     w.key_uint("result",     p[12]);
     //reseved 3 B
 }
@@ -255,7 +255,7 @@ static void decode_rs422_test(const uint8_t* p, int n, JsonWriter& w) {
 // Per ICD Table 38: FPGA Temperature (float, degrees Celsius).
 static void decode_fpga_temperature(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "fpga_temperature payload < 4 bytes"); return; }
-    w.key_double("fpga_temp_c", static_cast<double>(load_f32le(p + 0)));
+    w.key_double("fpga_temp_c", static_cast<double>(load_f32be(p + 0)));
 }
 
 // 100/30 — CBIT Status (4 bytes).
@@ -282,7 +282,7 @@ static void decode_cbit_status(const uint8_t* p, int n, JsonWriter& w) {
 static void decode_cmd_set_threshold(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "set_threshold cmd payload < 8 bytes"); return; }
     w.key_uint("adc_channel",    p[0]);
-    w.key_double("threshold_dbm", static_cast<double>(load_f32le(p + 4)));
+    w.key_double("threshold_dbm", static_cast<double>(load_f32be(p + 4)));
 }
 
 // 101/27 — Set Resolution (4 bytes).
@@ -316,10 +316,10 @@ static void decode_cmd_set_pulse_range(const uint8_t* p, int n, JsonWriter& w) {
         w.key_str("warning", "set_pulse_range cmd payload < 16 bytes"); 
         return; 
     }
-    w.key_double("fh_max_pulse_ms",    static_cast<double>(load_f32le(p +  0)));
-    w.key_double("fh_min_pulse_ms",    static_cast<double>(load_f32le(p +  4)));
-    w.key_double("burst_max_pulse_ms", static_cast<double>(load_f32le(p +  8)));
-    w.key_double("burst_min_pulse_ms", static_cast<double>(load_f32le(p + 12)));
+    w.key_double("fh_max_pulse_ms",    static_cast<double>(load_f32be(p +  0)));
+    w.key_double("fh_min_pulse_ms",    static_cast<double>(load_f32be(p +  4)));
+    w.key_double("burst_max_pulse_ms", static_cast<double>(load_f32be(p +  8)));
+    w.key_double("burst_min_pulse_ms", static_cast<double>(load_f32be(p + 12)));
 }
 
 // 101/55 — Set Minimum Hops Count (4 bytes).
@@ -330,7 +330,7 @@ static void decode_cmd_set_min_hops(const uint8_t* p, int n, JsonWriter& w) {
         w.key_str("warning", "set_min_hops cmd payload < 4 bytes"); 
         return; 
     }
-    w.key_uint("min_hops_count", load_u32le(p + 0));
+    w.key_uint("min_hops_count", load_u32be(p + 0));
 }
 
 // 101/37 — Configure Detection (12 bytes).
@@ -352,8 +352,8 @@ static void decode_cmd_configure_detection(const uint8_t* p, int n, JsonWriter& 
         "hopper_frequency", "fixed_frequency", "burst_frequency", "combined_signal"
     };
     uint8_t mode = p[6];
-    w.key_double("start_freq_hz", static_cast<double>(load_u16le(p + 0)) * 1e6);
-    w.key_double("stop_freq_hz",  static_cast<double>(load_u16le(p + 2)) * 1e6);
+    w.key_double("start_freq_hz", static_cast<double>(load_u16be(p + 0)) * 1e6);
+    w.key_double("stop_freq_hz",  static_cast<double>(load_u16be(p + 2)) * 1e6);
     w.key_uint("rf_attenuation_db", p[4]);
     w.key_int("if_attenuation_db",  static_cast<int8_t>(p[5]));
     w.key_uint("detection_mode",    mode);
@@ -366,16 +366,16 @@ static void decode_cmd_configure_detection(const uint8_t* p, int n, JsonWriter& 
 // Per ICD Table 51: start/stop freq as float MHz (distinct from 101/37 which uses uint16).
 static void decode_cmd_start_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "start_fh_detection cmd < 8 bytes"); return; }
-    w.key_double("start_freq_hz", static_cast<double>(load_f32le(p + 0)) * 1e6);
-    w.key_double("stop_freq_hz",  static_cast<double>(load_f32le(p + 4)) * 1e6);
+    w.key_double("start_freq_hz", static_cast<double>(load_f32be(p + 0)) * 1e6);
+    w.key_double("stop_freq_hz",  static_cast<double>(load_f32be(p + 4)) * 1e6);
 }
 
 // 101/43 — Get Wideband FFT Data command (8 bytes).
 // Per ICD Table 49: IF Attenuation is UNSIGNED char (unlike 101/69/83/85 which are signed).
 static void decode_cmd_get_wideband_fft(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "get_wideband_fft cmd < 8 bytes"); return; }
-    w.key_double("start_freq_hz",   static_cast<double>(load_u16le(p + 0)) * 1e6);
-    w.key_double("stop_freq_hz",    static_cast<double>(load_u16le(p + 2)) * 1e6);
+    w.key_double("start_freq_hz",   static_cast<double>(load_u16be(p + 0)) * 1e6);
+    w.key_double("stop_freq_hz",    static_cast<double>(load_u16be(p + 2)) * 1e6);
     w.key_uint("rf_attenuation_db", p[4]);
     w.key_uint("if_attenuation_db", p[5]);
 }
@@ -384,8 +384,8 @@ static void decode_cmd_get_wideband_fft(const uint8_t* p, int n, JsonWriter& w) 
 // Per ICD Table 53: freq-sweep layout, IF attenuation signed char.
 static void decode_cmd_start_ff_detection(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "start_ff_detection cmd < 8 bytes"); return; }
-    w.key_double("start_freq_hz",   static_cast<double>(load_u16le(p + 0)) * 1e6);
-    w.key_double("stop_freq_hz",    static_cast<double>(load_u16le(p + 2)) * 1e6);
+    w.key_double("start_freq_hz",   static_cast<double>(load_u16be(p + 0)) * 1e6);
+    w.key_double("stop_freq_hz",    static_cast<double>(load_u16be(p + 2)) * 1e6);
     w.key_uint("rf_attenuation_db", p[4]);
     w.key_int("if_attenuation_db",  static_cast<int8_t>(p[5]));
 }
@@ -394,8 +394,8 @@ static void decode_cmd_start_ff_detection(const uint8_t* p, int n, JsonWriter& w
 // Per ICD Table 57: same freq-sweep layout; IF attenuation signed.
 static void decode_cmd_start_burst_detection(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "start_burst_detection cmd < 8 bytes"); return; }
-    w.key_double("start_freq_hz",   static_cast<double>(load_u16le(p + 0)) * 1e6);
-    w.key_double("stop_freq_hz",    static_cast<double>(load_u16le(p + 2)) * 1e6);
+    w.key_double("start_freq_hz",   static_cast<double>(load_u16be(p + 0)) * 1e6);
+    w.key_double("stop_freq_hz",    static_cast<double>(load_u16be(p + 2)) * 1e6);
     w.key_uint("rf_attenuation_db", p[4]);
     w.key_int("if_attenuation_db",  static_cast<int8_t>(p[5]));
 }
@@ -404,8 +404,8 @@ static void decode_cmd_start_burst_detection(const uint8_t* p, int n, JsonWriter
 // Per ICD Table 59: same freq-sweep layout; IF attenuation signed.
 static void decode_cmd_start_scan_speed(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "start_scan_speed cmd < 8 bytes"); return; }
-    w.key_double("start_freq_hz",   static_cast<double>(load_u16le(p + 0)) * 1e6);
-    w.key_double("stop_freq_hz",    static_cast<double>(load_u16le(p + 2)) * 1e6);
+    w.key_double("start_freq_hz",   static_cast<double>(load_u16be(p + 0)) * 1e6);
+    w.key_double("stop_freq_hz",    static_cast<double>(load_u16be(p + 2)) * 1e6);
     w.key_uint("rf_attenuation_db", p[4]);
     w.key_int("if_attenuation_db",  static_cast<int8_t>(p[5]));
 }
@@ -425,14 +425,14 @@ static void decode_cmd_get_zoom_fft(const uint8_t* p, int n, JsonWriter& w) {
     static const int    BIN_COUNT[] = {1280, 1280, 1280, 1463, 1536, 1576};
     int32_t bw_idx      = load_i32le(p + 4);
     int32_t noise_level = load_i32le(p + 8);
-    w.key_double("center_freq_hz", static_cast<double>(load_f32le(p + 0)) * 1e6);
+    w.key_double("center_freq_hz", static_cast<double>(load_f32be(p + 0)) * 1e6);
     w.key_int("bw_index",          bw_idx);
     if (bw_idx >= 0 && bw_idx < 6) {
         w.key_double("bw_mhz",          BW_MHZ[bw_idx]);
         w.key_uint("expected_bin_count", static_cast<unsigned>(BIN_COUNT[bw_idx]));
     }
     w.key_bool("noise_leveling_enabled", noise_level == 0);
-    w.key_double("threshold_dbm",        static_cast<double>(load_f32le(p + 12)));
+    w.key_double("threshold_dbm",        static_cast<double>(load_f32be(p + 12)));
 }
 
 // 101/100 — Set Flatness Mode command (12 bytes).
@@ -441,11 +441,11 @@ static void decode_cmd_get_zoom_fft(const uint8_t* p, int n, JsonWriter& w) {
 static void decode_cmd_set_flatness_mode(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 12) { w.key_str("warning", "set_flatness_mode cmd < 12 bytes"); return; }
     static const char* MODE_NAMES[] = {"disable", "min_point", "avg_point"};
-    uint32_t mode = load_u32le(p + 0);
+    uint32_t mode = load_u32be(p + 0);
     w.key_uint("flatness_mode",     mode);
     // w.key_str("flatness_mode_name", mode < 3 ? MODE_NAMES[mode] : "unknown");
-    w.key_double("start_freq_hz",   static_cast<double>(load_f32le(p + 4)) * 1e6);
-    w.key_double("stop_freq_hz",    static_cast<double>(load_f32le(p + 8)) * 1e6);
+    w.key_double("start_freq_hz",   static_cast<double>(load_f32be(p + 4)) * 1e6);
+    w.key_double("stop_freq_hz",    static_cast<double>(load_f32be(p + 8)) * 1e6);
 }
 
 // 101/102 — Set Integration Time command (4 bytes).
@@ -459,7 +459,7 @@ static void decode_cmd_set_integration_time(const uint8_t* p, int n, JsonWriter&
         20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240,
         20480, 40960, 81920, 16380, 327680, 655360
     };
-    uint32_t idx = load_u32le(p + 0);
+    uint32_t idx = load_u32be(p + 0);
     w.key_uint("integration_time_index", idx);
     if (idx < 16) {
         w.key_uint("integration_time_us", TIME_US[idx]);
@@ -530,26 +530,26 @@ static void decode_cmd_start_follow_on_jam(const uint8_t* p, int n, JsonWriter& 
                                              "single", "two_tone", "wgn", "pink_noise", "swept"};
 
     // S_TRACKING_WINDOW
-    w.key_double("hopper_start_freq_hz",    static_cast<double>(load_f32le(p +  0)) * 1e6);
-    w.key_double("hopper_stop_freq_hz",     static_cast<double>(load_f32le(p +  4)) * 1e6);
-    w.key_double("detection_start_freq_hz", static_cast<double>(load_u16le(p +  8)) * 1e6);
-    w.key_double("detection_stop_freq_hz",  static_cast<double>(load_u16le(p + 10)) * 1e6);
+    w.key_double("hopper_start_freq_hz",    static_cast<double>(load_f32be(p +  0)) * 1e6);
+    w.key_double("hopper_stop_freq_hz",     static_cast<double>(load_f32be(p +  4)) * 1e6);
+    w.key_double("detection_start_freq_hz", static_cast<double>(load_u16be(p +  8)) * 1e6);
+    w.key_double("detection_stop_freq_hz",  static_cast<double>(load_u16be(p + 10)) * 1e6);
     w.key_uint("follow_on_selection",        p[12]);
 
     // S_TRACKING_INFO
-    w.key_double("hop_period_ms",   static_cast<double>(load_f32le(p + 16)));
-    w.key_double("inter_period_ms", static_cast<double>(load_f32le(p + 20)));
-    uint32_t pa_idx = load_u32le(p + 24);
+    w.key_double("hop_period_ms",   static_cast<double>(load_f32be(p + 16)));
+    w.key_double("inter_period_ms", static_cast<double>(load_f32be(p + 20)));
+    uint32_t pa_idx = load_u32be(p + 24);
     w.key_uint("pa_power_level_index", pa_idx);
     if (pa_idx < 5) w.key_uint("pa_power_w", PA_POWER_W[pa_idx]);
-    w.key_uint("modulation_type",  load_u32le(p + 28));
-    uint32_t fm_idx = load_u32le(p + 32);
+    w.key_uint("modulation_type",  load_u32be(p + 28));
+    uint32_t fm_idx = load_u32be(p + 32);
     w.key_uint("fm_deviation_index", fm_idx);
     if (fm_idx < 11) w.key_double("fm_deviation_khz", FM_DEV_KHZ[fm_idx]);
-    uint32_t exc_idx = load_u32le(p + 36);
+    uint32_t exc_idx = load_u32be(p + 36);
     w.key_uint("exciter_mod_signal_index", exc_idx);
     if (exc_idx >= 2 && exc_idx <= 6) w.key_str("exciter_mod_signal", EXCITER_SIG[exc_idx]);
-    w.key_double("hopper_power_level_dbm", static_cast<double>(load_f32le(p + 40)));
+    w.key_double("hopper_power_level_dbm", static_cast<double>(load_f32be(p + 40)));
 }
 
 // 101/33 — Stop Follow-On Jamming / Stop Responsive Sweep Jam: 0 bytes, shared unit ID.
@@ -583,13 +583,13 @@ static void decode_cmd_start_list_jam(const uint8_t* p, int n, JsonWriter& w) {
                                            150.0, 250.0, 500.0, 1000.0};
     static const std::string EXCITER_NAME[] = {"single", "two_tone", "white_gaussian_noise", "pink_noise", "swept"};
     // S_LIST_JAMMING_INFO
-    w.key_double("start_freq_hz",    static_cast<double>(load_u16le(p +  0)) * 1e6);
-    w.key_double("stop_freq_hz",     static_cast<double>(load_u16le(p +  2)) * 1e6);
-    w.key_uint("jam_freq_count",      load_u16le(p +  4));
-    w.key_uint("occupancy_threshold", load_u16le(p +  6));
-    w.key_uint("jam_cycle_count",     load_u16le(p +  8));
-    w.key_uint("look_through_count",  load_u16le(p + 10));
-    uint32_t jam_sel = load_u32le(p + 12);
+    w.key_double("start_freq_hz",    static_cast<double>(load_u16be(p +  0)) * 1e6);
+    w.key_double("stop_freq_hz",     static_cast<double>(load_u16be(p +  2)) * 1e6);
+    w.key_uint("jam_freq_count",      load_u16be(p +  4));
+    w.key_uint("occupancy_threshold", load_u16be(p +  6));
+    w.key_uint("jam_cycle_count",     load_u16be(p +  8));
+    w.key_uint("look_through_count",  load_u16be(p + 10));
+    uint32_t jam_sel = load_u32be(p + 12);
     w.key_uint("jam_selection", jam_sel);
     w.key_str("jam_selection_name", jam_sel == 0 ? "fixed_frequency"
                                   : jam_sel == 1 ? "burst" : "unknown");
@@ -604,7 +604,7 @@ static void decode_cmd_start_list_jam(const uint8_t* p, int n, JsonWriter& w) {
     w.key_str("exciter_modulating_signal_name",EXCITER_NAME[p[19]]);
     w.key_str("jam_mode", p[20] == 0 ? "tdm" : p[20] == 1 ? "fdm" : "unknown");
     // S_LIST_JAMMING_FREQUENCIES
-    uint16_t freq_count = load_u16le(p + 24);
+    uint16_t freq_count = load_u16be(p + 24);
     w.key_uint("list_freq_count", freq_count);
     if (freq_count == 0 || freq_count > 100) return;
 
@@ -618,7 +618,7 @@ static void decode_cmd_start_list_jam(const uint8_t* p, int n, JsonWriter& w) {
         if (i) freqs += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.6g",
-            static_cast<double>(load_f32le(p + FREQ_BASE + i * 4)) * 1e6);
+            static_cast<double>(load_f32be(p + FREQ_BASE + i * 4)) * 1e6);
         freqs += tmp;
     }
     freqs += "]";
@@ -630,7 +630,7 @@ static void decode_cmd_start_list_jam(const uint8_t* p, int n, JsonWriter& w) {
             if (i) bws += ',';
             char tmp[32];
             std::snprintf(tmp, sizeof(tmp), "%.6g",
-                static_cast<double>(load_f32le(p + BW_BASE + i * 4)));
+                static_cast<double>(load_f32be(p + BW_BASE + i * 4)));
             bws += tmp;
         }
         bws += "]";
@@ -643,7 +643,7 @@ static void decode_cmd_start_list_jam(const uint8_t* p, int n, JsonWriter& w) {
             if (i) thrs += ',';
             char tmp[32];
             std::snprintf(tmp, sizeof(tmp), "%.6g",
-                static_cast<double>(load_f32le(p + THR_BASE + i * 4)));
+                static_cast<double>(load_f32be(p + THR_BASE + i * 4)));
             thrs += tmp;
         }
         thrs += "]";
@@ -678,10 +678,10 @@ static void decode_cmd_start_responsive_sweep_jam(const uint8_t* p, int n, JsonW
     static const double   SWEEP_STEP_KHZ[] = {2.5, 5.0, 12.5, 25.0, 50.0, 100.0};
     static const unsigned POWER_W[]        = {63, 125, 250, 500, 1000};
 
-    w.key_double("detection_start_freq_hz", load_f64le(p +  0) * 1e6);
-    w.key_double("detection_stop_freq_hz",  load_f64le(p +  8) * 1e6);
-    w.key_double("sweep_start_freq_hz",     load_f64le(p + 16) * 1e6);
-    w.key_double("sweep_stop_freq_hz",      load_f64le(p + 24) * 1e6);
+    w.key_double("detection_start_freq_hz", load_f64be(p +  0) * 1e6);
+    w.key_double("detection_stop_freq_hz",  load_f64be(p +  8) * 1e6);
+    w.key_double("sweep_start_freq_hz",     load_f64be(p + 16) * 1e6);
+    w.key_double("sweep_stop_freq_hz",      load_f64be(p + 24) * 1e6);
     w.key_uint("sweep_rate", p[32]);
     w.key_uint("modulation_type", p[33]);
     uint8_t step_idx = p[34];
@@ -690,7 +690,7 @@ static void decode_cmd_start_responsive_sweep_jam(const uint8_t* p, int n, JsonW
     uint8_t pwr_idx = p[35];
     w.key_uint("power_level_index", pwr_idx);
     if (pwr_idx < 5) w.key_uint("power_level_w", POWER_W[pwr_idx]);
-    w.key_double("freq_sweep_time_ms", static_cast<double>(load_f32le(p + 36)));
+    w.key_double("freq_sweep_time_ms", static_cast<double>(load_f32be(p + 36)));
 
     uint8_t n_bands = p[200];
     w.key_uint("num_protected_bands", n_bands);
@@ -699,9 +699,9 @@ static void decode_cmd_start_responsive_sweep_jam(const uint8_t* p, int n, JsonW
         for (uint8_t i = 0; i < n_bands; ++i) {
             if (i) { starts += ','; stops += ','; }
             char tmp[32];
-            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(p +  40 + i * 8) * 1e6);
+            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64be(p +  40 + i * 8) * 1e6);
             starts += tmp;
-            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(p + 120 + i * 8) * 1e6);
+            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64be(p + 120 + i * 8) * 1e6);
             stops += tmp;
         }
         starts += "]"; 
@@ -750,7 +750,7 @@ static void decode_jam_config_block(const uint8_t* p, JsonWriter& w) {
     w.key_uint("fm_deviation_index", fm_idx);
     if (fm_idx < 11) w.key_double("fm_deviation_khz", FM_DEV_KHZ[fm_idx]);
     w.key_str("ssb_type", p[7] == 0 ? "lsb" : p[7] == 1 ? "usb" : "unknown");
-    w.key_double("sweep_switch_time_ms", load_f64le(p + 8));
+    w.key_double("sweep_switch_time_ms", load_f64be(p + 8));
     uint8_t wbn_idx = p[16];
     w.key_uint("wbn_bw_selection_index", wbn_idx);
     if (wbn_idx < 10) w.key_double("wbn_bandwidth_mhz", WBN_BW_MHZ[wbn_idx]);
@@ -764,7 +764,7 @@ static void decode_cmd_start_immediate_jam(const uint8_t* p, int n, JsonWriter& 
         return; 
     }
     decode_jam_config_block(p, w);
-    w.key_double("jam_freq_hz", load_f64le(p + 20) * 1e6);
+    w.key_double("jam_freq_hz", load_f64be(p + 20) * 1e6);
 }
 
 // 106/3 — Generate Multi Frequency TDM command (80 bytes).
@@ -783,14 +783,14 @@ static void decode_cmd_generate_tdm(const uint8_t* p, int n, JsonWriter& w) {
     for (int i = 0; i < 6; ++i) {
         if (i) freqs += ',';
         char tmp[32];
-        std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(q + i * 8) * 1e6);
+        std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64be(q + i * 8) * 1e6);
         freqs += tmp;
     }
     freqs += "]";
     w.key_raw("tdm_frequencies_hz",   freqs);
-    w.key_uint("modulating_signal_hz", load_u32le(q + 48));
-    w.key_uint("freq_on_time_us",      load_u32le(q + 52));
-    w.key_uint("freq_off_time_us",     load_u32le(q + 56));
+    w.key_uint("modulating_signal_hz", load_u32be(q + 48));
+    w.key_uint("freq_on_time_us",      load_u32be(q + 52));
+    w.key_uint("freq_off_time_us",     load_u32be(q + 56));
 }
 
 // 106/5 — Generate Multi Carrier FDM command (68 bytes).
@@ -804,7 +804,7 @@ static void decode_cmd_generate_fdm(const uint8_t* p, int n, JsonWriter& w) {
     for (int i = 0; i < 6; ++i) {
         if (i) freqs += ',';
         char tmp[32];
-        std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(q + i * 8) * 1e6);
+        std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64be(q + i * 8) * 1e6);
         freqs += tmp;
     }
     freqs += "]";
@@ -825,7 +825,7 @@ static void decode_cmd_enable_pa(const uint8_t* p, int n, JsonWriter& w) {
 // The 8192-byte audio buffer is not decoded to JSON; size and presence are reported only.
 static void decode_cmd_configure_ext_modulation(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "configure_ext_modulation cmd < 4 bytes"); return; }
-    uint32_t audio_size = load_u32le(p + 0);
+    uint32_t audio_size = load_u32be(p + 0);
     w.key_uint("audio_data_size",     audio_size);
     w.key_bool("audio_buffer_present", n >= 4 + static_cast<int>(audio_size) * 2);
 }
@@ -839,8 +839,8 @@ static void decode_cmd_generate_sweep(const uint8_t* p, int n, JsonWriter& w) {
     static const double   SWEEP_STEP_KHZ[] = {2.5, 5.0, 12.5, 25.0, 50.0, 100.0};
     static const unsigned POWER_W[]        = {63, 125, 250, 500, 750};
 
-    w.key_double("sweep_start_freq_hz", load_f64le(p +  0) * 1e6);
-    w.key_double("sweep_stop_freq_hz",  load_f64le(p +  8) * 1e6);
+    w.key_double("sweep_start_freq_hz", load_f64be(p +  0) * 1e6);
+    w.key_double("sweep_stop_freq_hz",  load_f64be(p +  8) * 1e6);
     w.key_uint("sweep_rate",            p[16]);
     w.key_uint("modulation_type",       p[17]);
     uint8_t step_idx = p[18];
@@ -849,7 +849,7 @@ static void decode_cmd_generate_sweep(const uint8_t* p, int n, JsonWriter& w) {
     uint8_t pwr_idx = p[19];
     w.key_uint("power_level_index", pwr_idx);
     if (pwr_idx < 5) w.key_uint("power_level_w", POWER_W[pwr_idx]);
-    w.key_double("freq_sweep_time_ms", static_cast<double>(load_f32le(p + 20)));
+    w.key_double("freq_sweep_time_ms", static_cast<double>(load_f32be(p + 20)));
 
     uint8_t n_bands = p[184];
     w.key_uint("num_protected_bands", n_bands);
@@ -861,9 +861,9 @@ static void decode_cmd_generate_sweep(const uint8_t* p, int n, JsonWriter& w) {
                 stops += ','; 
             }
             char tmp[32];
-            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(p +  24 + i * 8) * 1e6);
+            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64be(p +  24 + i * 8) * 1e6);
             starts += tmp;
-            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64le(p + 104 + i * 8) * 1e6);
+            std::snprintf(tmp, sizeof(tmp), "%.6g", load_f64be(p + 104 + i * 8) * 1e6);
             stops += tmp;
         }
         starts += "]"; stops += "]";
@@ -890,8 +890,8 @@ static void decode_cmd_enable_pa_sdu(const uint8_t* p, int n, JsonWriter& w) {
 //   @4 Data Values (uint16 × 1024, 2048B) — raw DSP waveform data, not decoded.
 static void decode_cmd_configure_prog_exciter(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "configure_prog_exciter cmd < 4 bytes"); return; }
-    w.key_uint("channel_no", load_u16le(p + 0));
-    w.key_uint("data_size",  load_u16le(p + 2));
+    w.key_uint("channel_no", load_u16be(p + 0));
+    w.key_uint("data_size",  load_u16be(p + 2));
 }
 
 // 106/55 — Generate Comb Noise command (20 bytes).
@@ -904,8 +904,8 @@ static void decode_cmd_generate_comb_noise(const uint8_t* p, int n, JsonWriter& 
     static const double   STEP_KHZ[] = {1.5625, 3.125, 6.25, 12.5};
     static const unsigned POWER_W[]  = {63, 125, 250, 500, 750};
 
-    w.key_double("start_freq_hz", load_f64le(p +  0) * 1e6);
-    w.key_double("stop_freq_hz",  load_f64le(p +  8) * 1e6);
+    w.key_double("start_freq_hz", load_f64be(p +  0) * 1e6);
+    w.key_double("stop_freq_hz",  load_f64be(p +  8) * 1e6);
     uint8_t step_idx = p[16];
     w.key_uint("comb_step_index", step_idx);
     if (step_idx < 4) w.key_double("comb_step_khz", STEP_KHZ[step_idx]);
@@ -928,7 +928,7 @@ static void decode_cmd_set_date_time(const uint8_t* p, int n, JsonWriter& w) {
     }
     w.key_uint("day",     p[0]);
     w.key_uint("month",   p[1]);
-    w.key_uint("year",    load_u16le(p + 2));
+    w.key_uint("year",    load_u16be(p + 2));
     w.key_uint("hour",    p[4]);
     w.key_uint("minute",  p[5]);
     w.key_uint("seconds", p[6]);
@@ -947,8 +947,8 @@ static void decode_cmd_set_date_time(const uint8_t* p, int n, JsonWriter& w) {
 // Per ICD Table 192: ASU SDU Signal Name (uint32) + ASU SDU Signal Value (uint32).
 static void decode_cmd_asu_sdu_config(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "asu_sdu_config cmd < 8 bytes"); return; }
-    w.key_uint("signal_name",  load_u32le(p + 0));
-    w.key_uint("signal_value", load_u32le(p + 4));
+    w.key_uint("signal_name",  load_u32be(p + 0));
+    w.key_uint("signal_value", load_u32be(p + 4));
 }
 
 // 112/3 — TRSDU Receiver Line Status: 0-byte command.
@@ -962,8 +962,8 @@ static void decode_cmd_asu_sdu_config(const uint8_t* p, int n, JsonWriter& w) {
 // channel_number (uint16) + channel_status: 1=Open, 0=Closed (uint16).
 static void decode_cmd_mrx_write_channel(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "mrx_write_channel cmd < 4 bytes"); return; }
-    w.key_uint("channel_number", load_u16le(p + 0));
-    uint16_t status = load_u16le(p + 2);
+    w.key_uint("channel_number", load_u16be(p + 0));
+    uint16_t status = load_u16be(p + 2);
     w.key_uint("channel_status", status);
     w.key_str("channel_op", status == 1 ? "open" : "close");
 }
@@ -974,7 +974,7 @@ static void decode_cmd_mrx_write_channel(const uint8_t* p, int n, JsonWriter& w)
 //          4/67 Stop IQ Optical, 7/13 IQ Socket Connect, 7/15 IQ Socket Close.
 static void decode_cmd_mrx_ch_only(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    w.key_uint("channel_number", load_u16le(p + 0));
+    w.key_uint("channel_number", load_u16be(p + 0));
 }
 
 // Generic MRX 4-byte command: channel_number (uint16) + bandwidth/param (uint16).
@@ -982,16 +982,16 @@ static void decode_cmd_mrx_ch_only(const uint8_t* p, int n, JsonWriter& w) {
 //          4/69 Optical Port Status, 4/71 Optical IP.
 static void decode_cmd_mrx_ch_bw(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    w.key_uint("channel_number",      load_u16le(p + 0));
-    w.key_uint("bandwidth_selection", load_u16le(p + 2));
+    w.key_uint("channel_number",      load_u16be(p + 0));
+    w.key_uint("bandwidth_selection", load_u16be(p + 2));
 }
 
 // 4/5 — Set Threshold command (8 bytes). Per ICD Table 232.
 // channel (uint16) + reserved (uint16) + threshold (float, dBm, range 0 to -150).
 static void decode_cmd_mrx_set_threshold(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "mrx_set_threshold cmd < 8 bytes"); return; }
-    w.key_uint("channel_number", load_u16le(p + 0));
-    w.key_double("threshold_dbm", static_cast<double>(load_f32le(p + 4)));
+    w.key_uint("channel_number", load_u16be(p + 0));
+    w.key_double("threshold_dbm", static_cast<double>(load_f32be(p + 4)));
 }
 
 // 4/17 — Demodulation and Bandwidth Selection command (8 bytes). Per ICD Table 234.
@@ -1000,12 +1000,12 @@ static void decode_cmd_mrx_set_threshold(const uint8_t* p, int n, JsonWriter& w)
 static void decode_cmd_mrx_demod_bw(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "mrx_demod_bw cmd < 8 bytes"); return; }
     static const char* DEMOD_NAMES[] = {"cw", "am", "fm", "lsb", "usb"};
-    w.key_uint("channel_number",      load_u16le(p + 0));
-    uint16_t demod = load_u16le(p + 2);
+    w.key_uint("channel_number",      load_u16be(p + 0));
+    uint16_t demod = load_u16be(p + 2);
     w.key_uint("demod_selection",     demod);
     w.key_str("demod_name",           demod < 5 ? DEMOD_NAMES[demod] : "unknown");
-    w.key_uint("bandwidth_selection", load_u16le(p + 4));
-    w.key_uint("lsb_usb_offset_khz", load_u16le(p + 6));
+    w.key_uint("bandwidth_selection", load_u16be(p + 4));
+    w.key_uint("lsb_usb_offset_khz", load_u16be(p + 6));
 }
 
 // 4/23 — Start IQ Data Logging in MSATA command (24 bytes). Per ICD Table 250.
@@ -1013,17 +1013,17 @@ static void decode_cmd_mrx_demod_bw(const uint8_t* p, int n, JsonWriter& w) {
 //   day/month/year/hour/minute/second (6× uint16) + reserved (4B).
 static void decode_cmd_mrx_start_iq_log(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 24) { w.key_str("warning", "mrx_start_iq_log cmd < 24 bytes"); return; }
-    w.key_uint("channel_number",      load_u16le(p + 0));
-    w.key_uint("bandwidth_selection", load_u16le(p + 2));
-    w.key_double("center_freq_hz",    static_cast<double>(load_f32le(p + 4)) * 1e6);
+    w.key_uint("channel_number",      load_u16be(p + 0));
+    w.key_uint("bandwidth_selection", load_u16be(p + 2));
+    w.key_double("center_freq_hz",    static_cast<double>(load_f32be(p + 4)) * 1e6);
     char dt[24];
     std::snprintf(dt, sizeof(dt), "%04u-%02u-%02u %02u:%02u:%02u",
-                  load_u16le(p + 12),  // year
-                  load_u16le(p + 10),  // month
-                  load_u16le(p +  8),  // day
-                  load_u16le(p + 14),  // hour
-                  load_u16le(p + 16),  // minute
-                  load_u16le(p + 18)); // second
+                  load_u16be(p + 12),  // year
+                  load_u16be(p + 10),  // month
+                  load_u16be(p +  8),  // day
+                  load_u16be(p + 14),  // hour
+                  load_u16be(p + 16),  // minute
+                  load_u16be(p + 18)); // second
     w.key_str("datetime", dt);
 }
 
@@ -1035,8 +1035,8 @@ static void decode_cmd_mrx_mem_scan(const uint8_t* p, int n, JsonWriter& w) {
         w.key_str("warning", "mrx_mem_scan cmd < 8 bytes"); 
         return; 
     }
-    w.key_uint("channel_number",  load_u16le(p + 0));
-    uint32_t count = load_u32le(p + 4);
+    w.key_uint("channel_number",  load_u16be(p + 0));
+    uint32_t count = load_u32be(p + 4);
     w.key_uint("frequency_count", count);
 
     const int ELEM = 12;
@@ -1047,8 +1047,8 @@ static void decode_cmd_mrx_mem_scan(const uint8_t* p, int n, JsonWriter& w) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter h;
-        h.key_double("freq_hz",           load_f64le(e + 0) * 1e6);
-        h.key_uint("bandwidth_selection", load_u16le(e + 8));
+        h.key_double("freq_hz",           load_f64be(e + 0) * 1e6);
+        h.key_uint("bandwidth_selection", load_u16be(e + 8));
         if (emitted++) arr += ',';
         arr += h.str();
         off += ELEM;
@@ -1061,19 +1061,19 @@ static void decode_cmd_mrx_mem_scan(const uint8_t* p, int n, JsonWriter& w) {
 // channel (uint16) + bite_antenna_selection (uint16) + center_freq_mhz (double, 8B).
 static void decode_cmd_mrx_center_freq(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 12) { w.key_str("warning", "mrx_center_freq cmd < 12 bytes"); return; }
-    w.key_uint("channel_number",         load_u16le(p + 0));
-    w.key_uint("bite_antenna_selection", load_u16le(p + 2));
-    w.key_double("center_freq_hz",       load_f64le(p + 4) * 1e6);
+    w.key_uint("channel_number",         load_u16be(p + 0));
+    w.key_uint("bite_antenna_selection", load_u16be(p + 2));
+    w.key_double("center_freq_hz",       load_f64be(p + 4) * 1e6);
 }
 
 // 5/3 — Attenuation Selection command (16 bytes). Per ICD Table 256.
 // channel (uint16) + reserved (uint16) + rf_atten (float) + if_atten (float) + cal_value (float).
 static void decode_cmd_mrx_attenuation(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 16) { w.key_str("warning", "mrx_attenuation cmd < 16 bytes"); return; }
-    w.key_uint("channel_number",  load_u16le(p +  0));
-    w.key_double("rf_atten_db",   static_cast<double>(load_f32le(p +  4)));
-    w.key_double("if_atten_db",   static_cast<double>(load_f32le(p +  8)));
-    w.key_double("cal_value_db",  static_cast<double>(load_f32le(p + 12)));
+    w.key_uint("channel_number",  load_u16be(p +  0));
+    w.key_double("rf_atten_db",   static_cast<double>(load_f32be(p +  4)));
+    w.key_double("if_atten_db",   static_cast<double>(load_f32be(p +  8)));
+    w.key_double("cal_value_db",  static_cast<double>(load_f32be(p + 12)));
 }
 
 // 6/9 — GO2Monitor Connection Establishment command (260 bytes). Per ICD Table 258.
@@ -1085,16 +1085,16 @@ static void decode_cmd_go2mon_connect(const uint8_t* p, int n, JsonWriter& w) {
     std::memcpy(port, p + 128, 128);
     w.key_str("ip_address",    ip);
     w.key_str("port_number",   port);
-    w.key_uint("channel_number", load_u16le(p + 256));
+    w.key_uint("channel_number", load_u16be(p + 256));
 }
 
 // 6/13 — Start GO2Monitor Transmission command (144 bytes). Per ICD Table 260.
 // channel (uint16) + bw (uint16) + reserved×2 (uint16) + center_freq_mhz (double, 8B) + date (char[128]).
 static void decode_cmd_go2mon_start(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 144) { w.key_str("warning", "go2mon_start cmd < 144 bytes"); return; }
-    w.key_uint("channel_number",      load_u16le(p + 0));
-    w.key_uint("bandwidth_selection", load_u16le(p + 2));
-    w.key_double("center_freq_hz",    load_f64le(p + 8) * 1e6);
+    w.key_uint("channel_number",      load_u16be(p + 0));
+    w.key_uint("bandwidth_selection", load_u16be(p + 2));
+    w.key_double("center_freq_hz",    load_f64be(p + 8) * 1e6);
     char date[129] = {};
     std::memcpy(date, p + 16, 128);
     w.key_str("date_str", date);
@@ -1104,38 +1104,38 @@ static void decode_cmd_go2mon_start(const uint8_t* p, int n, JsonWriter& w) {
 // bite_freq_mhz (double, 8B) + channel (uint16) + reserved (uint16).
 static void decode_cmd_mrx_signal_bite(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 12) { w.key_str("warning", "mrx_signal_bite cmd < 12 bytes"); return; }
-    w.key_double("bite_freq_hz",  load_f64le(p + 0) * 1e6);
-    w.key_uint("channel_number",  load_u16le(p + 8));
+    w.key_double("bite_freq_hz",  load_f64be(p + 0) * 1e6);
+    w.key_uint("channel_number",  load_u16be(p + 8));
 }
 
 // 7/3 — BITE/ANTENNA Switch Selection (4 bytes). Per ICD Table 275.
 // bite_antenna_selection (uint16) + channel (uint16). 0=Antenna, 1=BITE.
 static void decode_cmd_mrx_bite_ant(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    w.key_uint("bite_antenna_selection", load_u16le(p + 0));
-    w.key_uint("channel_number",         load_u16le(p + 2));
+    w.key_uint("bite_antenna_selection", load_u16be(p + 0));
+    w.key_uint("channel_number",         load_u16be(p + 2));
 }
 
 // 7/5 — Internal/External Reference Source Selection (4 bytes). Per ICD Table 277.
 // source_selection (uint16) + channel (uint16). 0=Internal (OCXO), 1=External.
 static void decode_cmd_mrx_ref_source(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    w.key_uint("ref_source_selection", load_u16le(p + 0));
-    w.key_uint("channel_number",       load_u16le(p + 2));
+    w.key_uint("ref_source_selection", load_u16be(p + 0));
+    w.key_uint("channel_number",       load_u16be(p + 2));
 }
 
 // 7/9 — AFC Enable/Disable (4 bytes). Per ICD Table 291. 0=Disable, 1=Enable.
 static void decode_cmd_mrx_afc(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    w.key_bool("afc_enabled",    load_u16le(p + 0) != 0);
-    w.key_uint("channel_number", load_u16le(p + 2));
+    w.key_bool("afc_enabled",    load_u16be(p + 0) != 0);
+    w.key_uint("channel_number", load_u16be(p + 2));
 }
 
 // 7/11 — RF Squelch ON/OFF (4 bytes). Per ICD Table 279. 0=OFF, 1=ON.
 static void decode_cmd_mrx_rf_squelch(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    w.key_bool("rf_squelch_enabled", load_u16le(p + 0) != 0);
-    w.key_uint("channel_number",     load_u16le(p + 2));
+    w.key_bool("rf_squelch_enabled", load_u16be(p + 0) != 0);
+    w.key_uint("channel_number",     load_u16be(p + 2));
 }
 
 // 7/17 — Spectrum Averaging Count (8 bytes). Per ICD Table 285.
@@ -1143,32 +1143,32 @@ static void decode_cmd_mrx_rf_squelch(const uint8_t* p, int n, JsonWriter& w) {
 // avg_count: 1-4. is_enabled: 1=Enable, 0=Disable.
 static void decode_cmd_mrx_spectrum_avg(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "mrx_spectrum_avg cmd < 8 bytes"); return; }
-    w.key_bool("averaging_enabled", load_u16le(p + 0) != 0);
-    w.key_uint("average_count",     load_u16le(p + 2));
-    w.key_uint("channel_number",    load_u16le(p + 4));
+    w.key_bool("averaging_enabled", load_u16be(p + 0) != 0);
+    w.key_uint("average_count",     load_u16be(p + 2));
+    w.key_uint("channel_number",    load_u16be(p + 4));
 }
 
 // 7/19 — Smart RF AGC (4 bytes). Per ICD Table 287. 0=Disable, 1=Enable.
 static void decode_cmd_mrx_rf_agc(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) return;
-    w.key_bool("rf_agc_enabled", load_u16le(p + 0) != 0);
-    w.key_uint("channel_number", load_u16le(p + 2));
+    w.key_bool("rf_agc_enabled", load_u16be(p + 0) != 0);
+    w.key_uint("channel_number", load_u16be(p + 2));
 }
 
 // 7/21 — Audio Squelch ON/OFF (8 bytes). Per ICD Table 289.
 // squelch_selection (uint16) + channel (uint16) + threshold (float, dBm). 0=OFF, 1=ON.
 static void decode_cmd_mrx_audio_squelch(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "mrx_audio_squelch cmd < 8 bytes"); return; }
-    w.key_bool("audio_squelch_enabled", load_u16le(p + 0) != 0);
-    w.key_uint("channel_number",        load_u16le(p + 2));
-    w.key_double("threshold_dbm",       static_cast<double>(load_f32le(p + 4)));
+    w.key_bool("audio_squelch_enabled", load_u16be(p + 0) != 0);
+    w.key_uint("channel_number",        load_u16be(p + 2));
+    w.key_double("threshold_dbm",       static_cast<double>(load_f32be(p + 4)));
 }
 
 // 111/5 — Reference Input Selection command (4 bytes).
 // Per ICD Table 77: Reference Selection (uint16) + Reserved (uint16). 0=INTERNAL, 1=EXTERNAL.
 static void decode_cmd_reference_input(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "reference_input cmd < 4 bytes"); return; }
-    uint16_t sel = load_u16le(p + 0);
+    uint16_t sel = load_u16be(p + 0);
     w.key_uint("reference_selection", sel);
     w.key_str("reference_name", sel == 0 ? "internal" : sel == 1 ? "external" : "unknown");
 }
@@ -1178,7 +1178,7 @@ static void decode_cmd_reference_input(const uint8_t* p, int n, JsonWriter& w) {
 // Per-entry: start_freq_mhz (float) + stop_freq_mhz (float). Max 1000 entries.
 static void decode_cmd_send_protected_scan_list(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "send_protected_scan_list cmd < 4 bytes"); return; }
-    uint16_t count = load_u16le(p + 0);
+    uint16_t count = load_u16be(p + 0);
     w.key_uint("protected_band_count", count);
 
     const int ELEM = 8;
@@ -1189,8 +1189,8 @@ static void decode_cmd_send_protected_scan_list(const uint8_t* p, int n, JsonWri
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter b;
-        b.key_double("start_freq_hz", static_cast<double>(load_f32le(e + 0)) * 1e6);
-        b.key_double("stop_freq_hz",  static_cast<double>(load_f32le(e + 4)) * 1e6);
+        b.key_double("start_freq_hz", static_cast<double>(load_f32be(e + 0)) * 1e6);
+        b.key_double("stop_freq_hz",  static_cast<double>(load_f32be(e + 4)) * 1e6);
         if (emitted++) arr += ',';
         arr += b.str();
         off += ELEM;
@@ -1206,7 +1206,7 @@ static void decode_cmd_protected_scan_enable(const uint8_t* p, int n, JsonWriter
         w.key_str("warning", "protected_scan_enable cmd < 4 bytes"); 
         return; 
     }
-    w.key_bool("protected_scan_enabled", load_u16le(p + 0) == 1);
+    w.key_bool("protected_scan_enabled", load_u16be(p + 0) == 1);
 }
 
 // 111/17 — FH Split band Enable/Disable command (4 bytes).
@@ -1220,14 +1220,14 @@ static void decode_cmd_fh_splitband_enable(const uint8_t* p, int n, JsonWriter& 
 // Per ICD Table 87: split band frequency (float, MHz).
 static void decode_cmd_send_fh_splitband_freq(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "fh_splitband_freq cmd < 4 bytes"); return; }
-    w.key_double("splitband_freq_hz", static_cast<double>(load_f32le(p + 0)) * 1e6);
+    w.key_double("splitband_freq_hz", static_cast<double>(load_f32be(p + 0)) * 1e6);
 }
 
 // 111/23 — Protected-Band Spectrum Enable/Disable command (4 bytes).
 // Per ICD Table 89: enable_disable (uint16) + reserved (uint16). 1=Enable, 0=Disable.
 static void decode_cmd_protected_spectrum_enable(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "protected_spectrum_enable cmd < 4 bytes"); return; }
-    w.key_bool("protected_spectrum_enabled", load_u16le(p + 0) == 1);
+    w.key_bool("protected_spectrum_enabled", load_u16be(p + 0) == 1);
 }
 
 // 111/29 — Auto Threshold Enable/Disable command (4 bytes).
@@ -1242,9 +1242,9 @@ static void decode_cmd_auto_threshold_enable(const uint8_t* p, int n, JsonWriter
 //   hop_period (float, ms) + enable (uint8) + reserved (3×uint8). 1=Enable, 0=Disable.
 static void decode_cmd_hopper_channelization_enable(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 16) { w.key_str("warning", "hopper_channelization_enable cmd < 16 bytes"); return; }
-    w.key_double("start_freq_hz",         static_cast<double>(load_f32le(p + 0)) * 1e6);
-    w.key_double("stop_freq_hz",          static_cast<double>(load_f32le(p + 4)) * 1e6);
-    w.key_double("hop_period_ms",         static_cast<double>(load_f32le(p + 8)));
+    w.key_double("start_freq_hz",         static_cast<double>(load_f32be(p + 0)) * 1e6);
+    w.key_double("stop_freq_hz",          static_cast<double>(load_f32be(p + 4)) * 1e6);
+    w.key_double("hop_period_ms",         static_cast<double>(load_f32be(p + 8)));
     w.key_bool("channelization_enabled",  p[12] == 1);
 }
 
@@ -1265,7 +1265,7 @@ static void decode_cmd_hopper_channelization_enable(const uint8_t* p, int n, Jso
 // VU band: 30 MHz – 6000 MHz.
 static void decode_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "fh payload < 4 bytes"); return; }
-    uint16_t count = load_u16le(p + 0);
+    uint16_t count = load_u16be(p + 0);
     w.key_uint("hopper_count", count);
 
     std::string arr = "[";
@@ -1276,24 +1276,24 @@ static void decode_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter h;
-        h.key_uint("hopper_number",        load_u32le(e +  0));
-        h.key_double("min_freq_hz",  static_cast<double>(load_f32le(e +  4)) * 1e6);
-        h.key_double("max_freq_hz",  static_cast<double>(load_f32le(e +  8)) * 1e6);
-        h.key_double("pulse_length_s",     static_cast<double>(load_f32le(e + 12)) / 1e3);
-        h.key_double("inter_hop_period_s", static_cast<double>(load_f32le(e + 16)) / 1e3);
-        h.key_uint("detected_count",       load_u32le(e + 20));
+        h.key_uint("hopper_number",        load_u32be(e +  0));
+        h.key_double("min_freq_hz",  static_cast<double>(load_f32be(e +  4)) * 1e6);
+        h.key_double("max_freq_hz",  static_cast<double>(load_f32be(e +  8)) * 1e6);
+        h.key_double("pulse_length_s",     static_cast<double>(load_f32be(e + 12)) / 1e3);
+        h.key_double("inter_hop_period_s", static_cast<double>(load_f32be(e + 16)) / 1e3);
+        h.key_uint("detected_count",       load_u32be(e + 20));
         char toa[16];
         std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", e[24], e[25], e[26]);
         h.key_str("toa", toa);
-        h.key_double("power_dbm",  static_cast<double>(load_f32le(e + 28)));
-        h.key_bool("active",       load_u16le(e + 32) == 1);
-        h.key_double("snr_db",     static_cast<double>(load_f32le(e + 36)));
+        h.key_double("power_dbm",  static_cast<double>(load_f32be(e + 28)));
+        h.key_bool("active",       load_u16be(e + 32) == 1);
+        h.key_double("snr_db",     static_cast<double>(load_f32be(e + 36)));
         // VU-specific extension bytes 40-59
-        h.key_double("min_freq_detected_hz", static_cast<double>(load_f32le(e + 40)) * 1e6);
-        h.key_double("max_freq_detected_hz", static_cast<double>(load_f32le(e + 44)) * 1e6);
-        h.key_double("signal_bw_khz",        static_cast<double>(load_f32le(e + 48)));
-        h.key_double("hop_rate",             static_cast<double>(load_f32le(e + 52)));
-        h.key_double("confidence",           static_cast<double>(load_f32le(e + 56)));
+        h.key_double("min_freq_detected_hz", static_cast<double>(load_f32be(e + 40)) * 1e6);
+        h.key_double("max_freq_detected_hz", static_cast<double>(load_f32be(e + 44)) * 1e6);
+        h.key_double("signal_bw_khz",        static_cast<double>(load_f32be(e + 48)));
+        h.key_double("hop_rate",             static_cast<double>(load_f32be(e + 52)));
+        h.key_double("confidence",           static_cast<double>(load_f32be(e + 56)));
         if (emitted++) arr += ',';
         arr += h.str();
         off += ELEM;
@@ -1310,26 +1310,26 @@ static void decode_fh_detection(const uint8_t* p, int n, JsonWriter& w) {
 //   @20 TOA H:M:S:reserved (4B)  @24 Duration H:M:S:reserved (4B)
 //   @28 Freq Active (uint16)  @30 Reserved (uint16)  @32 SNR (float)
 static void decode_ff_entry(const uint8_t* e, JsonWriter& f) {
-    f.key_double("freq_hz",          static_cast<double>(load_f32le(e +  0)) * 1e6);
-    f.key_double("current_power_dbm",static_cast<double>(load_f32le(e +  4)));
-    f.key_uint("active_count",        load_u32le(e +  8));
-    f.key_double("min_power_dbm",    static_cast<double>(load_f32le(e + 12)));
-    f.key_double("max_power_dbm",    static_cast<double>(load_f32le(e + 16)));
+    f.key_double("freq_hz",          static_cast<double>(load_f32be(e +  0)) * 1e6);
+    f.key_double("current_power_dbm",static_cast<double>(load_f32be(e +  4)));
+    f.key_uint("active_count",        load_u32be(e +  8));
+    f.key_double("min_power_dbm",    static_cast<double>(load_f32be(e + 12)));
+    f.key_double("max_power_dbm",    static_cast<double>(load_f32be(e + 16)));
     char toa[16];
     std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", e[20], e[21], e[22]);
     f.key_str("toa", toa);
     char dur[16];
     std::snprintf(dur, sizeof(dur), "%02u:%02u:%02u", e[24], e[25], e[26]);
     f.key_str("duration", dur);
-    f.key_bool("freq_active", load_u16le(e + 28) == 1);
-    f.key_double("snr_db",    static_cast<double>(load_f32le(e + 32)));
+    f.key_bool("freq_active", load_u16be(e + 28) == 1);
+    f.key_double("snr_db",    static_cast<double>(load_f32be(e + 32)));
 }
 
 // 101/44 — Wideband FFT Data response (4 + 1600*4 + 4 = 6408 bytes).
 // Per ICD Table 50: FFT Bin Count (uint32) + 1600 power floats + Scan Speed (uint32).
 static void decode_wideband_fft_1600(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "wideband_fft payload < 8 bytes"); return; }
-    uint32_t bin_count = load_u32le(p + 0);
+    uint32_t bin_count = load_u32be(p + 0);
     w.key_uint("fft_bin_count", bin_count);
 
     const int FFT_BYTES = 1600 * 4;
@@ -1344,7 +1344,7 @@ static void decode_wideband_fft_1600(const uint8_t* p, int n, JsonWriter& w) {
         if (i) arr += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.2f",
-            static_cast<double>(load_f32le(p + 4 + i * 4)));
+            static_cast<double>(load_f32be(p + 4 + i * 4)));
         arr += tmp;
     }
     arr += "]";
@@ -1352,7 +1352,7 @@ static void decode_wideband_fft_1600(const uint8_t* p, int n, JsonWriter& w) {
 
     int scan_off = 4 + FFT_BYTES;
     if (scan_off + 4 <= n) {
-        w.key_uint("scan_speed", load_u32le(p + scan_off));
+        w.key_uint("scan_speed", load_u32be(p + scan_off));
     }
 }
 
@@ -1368,7 +1368,7 @@ static void decode_ff_detection(const uint8_t* p, int n, JsonWriter& w) {
     }
 
     // Part 1
-    uint32_t bin_count = load_u32le(p + 0);
+    uint32_t bin_count = load_u32be(p + 0);
     w.key_uint("fft_bin_count", bin_count);
     uint32_t emit_fft = (bin_count < 1600) ? bin_count : 1600;
     std::string fft_arr = "[";
@@ -1376,18 +1376,18 @@ static void decode_ff_detection(const uint8_t* p, int n, JsonWriter& w) {
         if (i) fft_arr += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.2f",
-            static_cast<double>(load_f32le(p + 4 + i * 4)));
+            static_cast<double>(load_f32be(p + 4 + i * 4)));
         fft_arr += tmp;
     }
     fft_arr += "]";
     w.key_raw("wideband_power_dbm", fft_arr);
-    w.key_uint("scan_speed", load_u32le(p + 4 + 1600 * 4));
+    w.key_uint("scan_speed", load_u32be(p + 4 + 1600 * 4));
 
     // Part 2
     const uint8_t* ff_p  = p + FFT_BLOCK;
     int            ff_rem = n - FFT_BLOCK;
     if (ff_rem < 4) return;
-    uint32_t ff_count = load_u32le(ff_p + 0);
+    uint32_t ff_count = load_u32be(ff_p + 0);
     w.key_uint("ff_count", ff_count);
 
     const int FF_ELEM = 36;
@@ -1414,7 +1414,7 @@ static void decode_ff_detection(const uint8_t* p, int n, JsonWriter& w) {
 //   @12 Active Count (uint32)  @16 TOA H:M:S:reserved (4B)  @20 SNR (float)
 static void decode_burst_detection(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "burst_detection payload < 4 bytes"); return; }
-    uint32_t burst_count = load_u32le(p + 0);
+    uint32_t burst_count = load_u32be(p + 0);
     w.key_uint("burst_count", burst_count);
 
     const int ELEM = 24;
@@ -1425,14 +1425,14 @@ static void decode_burst_detection(const uint8_t* p, int n, JsonWriter& w) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter b;
-        b.key_double("freq_hz",          static_cast<double>(load_f32le(e +  0)) * 1e6);
-        b.key_double("current_power_dbm",static_cast<double>(load_f32le(e +  4)));
-        b.key_double("pulse_length_ms",  static_cast<double>(load_f32le(e +  8)));
-        b.key_uint("active_count",        load_u32le(e + 12));
+        b.key_double("freq_hz",          static_cast<double>(load_f32be(e +  0)) * 1e6);
+        b.key_double("current_power_dbm",static_cast<double>(load_f32be(e +  4)));
+        b.key_double("pulse_length_ms",  static_cast<double>(load_f32be(e +  8)));
+        b.key_uint("active_count",        load_u32be(e + 12));
         char toa[16];
         std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", e[16], e[17], e[18]);
         b.key_str("toa", toa);
-        b.key_double("snr_db", static_cast<double>(load_f32le(e + 20)));
+        b.key_double("snr_db", static_cast<double>(load_f32be(e + 20)));
         if (emitted++) arr += ',';
         arr += b.str();
         off += ELEM;
@@ -1447,7 +1447,7 @@ static void decode_burst_detection(const uint8_t* p, int n, JsonWriter& w) {
 //   Same 36-byte struct as FF detection (decode_ff_entry).
 static void decode_stop_scan_speed(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "stop_scan_speed payload < 4 bytes"); return; }
-    uint32_t ff_count = load_u32le(p + 0);
+    uint32_t ff_count = load_u32be(p + 0);
     w.key_uint("ff_count", ff_count);
 
     const int FF_ELEM = 36;
@@ -1479,7 +1479,7 @@ static void decode_zoom_fft(const uint8_t* p, int n, JsonWriter& w) {
         if (i) arr += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.2f",
-            static_cast<double>(load_f32le(p + i * 4)));
+            static_cast<double>(load_f32be(p + i * 4)));
         arr += tmp;
     }
     arr += "]";
@@ -1494,9 +1494,9 @@ static void decode_zoom_fft(const uint8_t* p, int n, JsonWriter& w) {
 //   @14 Reserved (uint16)
 static void decode_signal_bite(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 16) { w.key_str("warning", "signal_bite payload < 16 bytes"); return; }
-    w.key_double("bite_freq_hz",   load_f64le(p + 0) * 1e6);
-    w.key_double("bite_power_dbm", static_cast<double>(load_f32le(p + 8)));
-    w.key_uint("bite_result",      load_u16le(p + 12));
+    w.key_double("bite_freq_hz",   load_f64be(p + 0) * 1e6);
+    w.key_double("bite_power_dbm", static_cast<double>(load_f32be(p + 8)));
+    w.key_uint("bite_result",      load_u16be(p + 12));
 }
 
 // 111/8 — Module Health Status response (4 bytes).
@@ -1521,7 +1521,7 @@ static void decode_module_health(const uint8_t* p, int n, JsonWriter& w) {
 //   @24 Frequency Band  (uint32, 4B)
 static void decode_pdw_channelization(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "pdw_channelization payload < 8 bytes"); return; }
-    uint32_t count = load_u32le(p + 0);
+    uint32_t count = load_u32be(p + 0);
     w.key_uint("channelization_count", count);
 
     char toa[16];
@@ -1536,12 +1536,12 @@ static void decode_pdw_channelization(const uint8_t* p, int n, JsonWriter& w) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter c;
-        c.key_double("toi",             load_f64le(e +  0));
-        c.key_double("freq_index_hz",   static_cast<double>(load_f32le(e +  8)) * 1e6);
-        c.key_double("pulse_length_ms", static_cast<double>(load_f32le(e + 12)));
-        c.key_double("power_level_dbm", static_cast<double>(load_f32le(e + 16)));
-        c.key_uint("bandwidth",          load_u32le(e + 20));
-        c.key_uint("freq_band",          load_u32le(e + 24));
+        c.key_double("toi",             load_f64be(e +  0));
+        c.key_double("freq_index_hz",   static_cast<double>(load_f32be(e +  8)) * 1e6);
+        c.key_double("pulse_length_ms", static_cast<double>(load_f32be(e + 12)));
+        c.key_double("power_level_dbm", static_cast<double>(load_f32be(e + 16)));
+        c.key_uint("bandwidth",          load_u32be(e + 20));
+        c.key_uint("freq_band",          load_u32be(e + 24));
         if (emitted++) arr += ',';
         arr += c.str();
         off += ELEM;
@@ -1563,8 +1563,8 @@ static void decode_storage_details(const uint8_t* p, int n, JsonWriter& w) {
     w.key_uint("disk_space_1",           p[0]);
     w.key_uint("disk_space_2",           p[1]);
     w.key_uint("disk_space_3",           p[2]);
-    w.key_double("available_disk_space", load_f64le(p +  4));
-    w.key_double("total_disk_space",     load_f64le(p + 12));
+    w.key_double("available_disk_space", load_f64be(p +  4));
+    w.key_double("total_disk_space",     load_f64be(p + 12));
 }
 
 // 111/28 — Read Protected Band List response (variable).
@@ -1573,7 +1573,7 @@ static void decode_storage_details(const uint8_t* p, int n, JsonWriter& w) {
 // Per-entry: start_freq_mhz (float) + stop_freq_mhz (float).
 static void decode_protected_band_list(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "protected_band_list payload < 4 bytes"); return; }
-    uint16_t count = load_u16le(p + 0);
+    uint16_t count = load_u16be(p + 0);
     w.key_uint("protected_band_count", count);
 
     const int ELEM = 8;
@@ -1584,8 +1584,8 @@ static void decode_protected_band_list(const uint8_t* p, int n, JsonWriter& w) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter b;
-        b.key_double("start_freq_hz", static_cast<double>(load_f32le(e + 0)) * 1e6);
-        b.key_double("stop_freq_hz",  static_cast<double>(load_f32le(e + 4)) * 1e6);
+        b.key_double("start_freq_hz", static_cast<double>(load_f32be(e + 0)) * 1e6);
+        b.key_double("stop_freq_hz",  static_cast<double>(load_f32be(e + 4)) * 1e6);
         if (emitted++) arr += ',';
         arr += b.str();
         off += ELEM;
@@ -1609,7 +1609,7 @@ static void decode_stop_jam_response(const uint8_t* p, int n, JsonWriter& w) {
 // Per ICD Table 155: Software buffer size (uint32).
 static void decode_ext_modulation_response(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "ext_modulation_response < 4 bytes"); return; }
-    w.key_uint("software_buffer_size", load_u32le(p + 0));
+    w.key_uint("software_buffer_size", load_u32be(p + 0));
 }
 
 // =============================================================================
@@ -1624,7 +1624,7 @@ static void decode_ext_modulation_response(const uint8_t* p, int n, JsonWriter& 
 //   @6 Reserved (uint16)
 static void decode_list_jam_report(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "list_jam_report payload < 4 bytes"); return; }
-    uint32_t count = load_u32le(p + 0);
+    uint32_t count = load_u32be(p + 0);
     w.key_uint("list_jam_freq_count", count);
 
     static const char* STATUS_NAMES[] = {
@@ -1638,8 +1638,8 @@ static void decode_list_jam_report(const uint8_t* p, int n, JsonWriter& w) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter f;
-        f.key_uint("freq_hz", load_u32le(e + 0));
-        uint16_t status = load_u16le(e + 4);
+        f.key_uint("freq_hz", load_u32be(e + 0));
+        uint16_t status = load_u16be(e + 4);
         f.key_uint("status", status);
         f.key_str("status_name", status < 4 ? STATUS_NAMES[status] : "unknown");
         if (emitted++) arr += ',';
@@ -1658,7 +1658,7 @@ static void decode_list_jam_report(const uint8_t* p, int n, JsonWriter& w) {
 // Per ICD Table 181: bin count (uint32) + threshold bin data (float × 1600).
 static void decode_auto_threshold(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "auto_threshold payload < 4 bytes"); return; }
-    uint32_t bin_count = load_u32le(p + 0);
+    uint32_t bin_count = load_u32be(p + 0);
     w.key_uint("bin_count", bin_count);
 
     uint32_t emit = (bin_count < 1600) ? bin_count : 1600;
@@ -1670,7 +1670,7 @@ static void decode_auto_threshold(const uint8_t* p, int n, JsonWriter& w) {
         if (i) arr += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.2f",
-            static_cast<double>(load_f32le(p + 4 + i * 4)));
+            static_cast<double>(load_f32be(p + 4 + i * 4)));
         arr += tmp;
     }
     arr += "]";
@@ -1685,7 +1685,7 @@ static void decode_auto_threshold(const uint8_t* p, int n, JsonWriter& w) {
 // Error Value (int16) + Reserved (uint16).
 static void decode_asu_sdu_response(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "asu_sdu_response < 4 bytes"); return; }
-    w.key_int("error_value", load_i16le(p + 0));
+    w.key_int("error_value", load_i16be(p + 0));
 }
 
 // 112/4 — TRSDU Receiver Line Status response (4 bytes). Per ICD Table 195.
@@ -1718,10 +1718,10 @@ static void decode_pa_receiver_status(const uint8_t* p, int n, JsonWriter& w) {
 // FW version (float) + Driver (float) + FPGA (float) + MRX Tuner ID (uint16) + Reserved (uint16).
 static void decode_mrx_system_version(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 16) { w.key_str("warning", "mrx_system_version payload < 16 bytes"); return; }
-    w.key_double("monitoring_fw_version", static_cast<double>(load_f32le(p +  0)));
-    w.key_double("driver_version",        static_cast<double>(load_f32le(p +  4)));
-    w.key_double("fpga_version",          static_cast<double>(load_f32le(p +  8)));
-    w.key_uint("mrx_tuner_id",             load_u16le(p + 12));
+    w.key_double("monitoring_fw_version", static_cast<double>(load_f32be(p +  0)));
+    w.key_double("driver_version",        static_cast<double>(load_f32be(p +  4)));
+    w.key_double("fpga_version",          static_cast<double>(load_f32be(p +  8)));
+    w.key_uint("mrx_tuner_id",             load_u16be(p + 12));
 }
 
 // 1/4 — Get MRX Checksum Details response (1024 bytes). Per ICD Table 201.
@@ -1781,15 +1781,15 @@ static void decode_mrx_ibit_status(const uint8_t* p, int n, JsonWriter& w) {
 //   ControlBoard, RFPSU, FPGA.
 static void decode_mrx_temperature(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 36) { w.key_str("warning", "mrx_temperature payload < 36 bytes"); return; }
-    w.key_double("bpt_temp_c",            static_cast<double>(load_f32le(p +  0)));
-    w.key_double("psu_8156_temp_c",       static_cast<double>(load_f32le(p +  4)));
-    w.key_double("tuner_temp_c",          static_cast<double>(load_f32le(p +  8)));
-    w.key_double("psu_7255_temp_c",       static_cast<double>(load_f32le(p + 12)));
-    w.key_double("processor_temp_c",      static_cast<double>(load_f32le(p + 16)));
-    w.key_double("psu_temp_c",            static_cast<double>(load_f32le(p + 20)));
-    w.key_double("control_board_temp_c",  static_cast<double>(load_f32le(p + 24)));
-    w.key_double("rf_psu_temp_c",         static_cast<double>(load_f32le(p + 28)));
-    w.key_double("fpga_temp_c",           static_cast<double>(load_f32le(p + 32)));
+    w.key_double("bpt_temp_c",            static_cast<double>(load_f32be(p +  0)));
+    w.key_double("psu_8156_temp_c",       static_cast<double>(load_f32be(p +  4)));
+    w.key_double("tuner_temp_c",          static_cast<double>(load_f32be(p +  8)));
+    w.key_double("psu_7255_temp_c",       static_cast<double>(load_f32be(p + 12)));
+    w.key_double("processor_temp_c",      static_cast<double>(load_f32be(p + 16)));
+    w.key_double("psu_temp_c",            static_cast<double>(load_f32be(p + 20)));
+    w.key_double("control_board_temp_c",  static_cast<double>(load_f32be(p + 24)));
+    w.key_double("rf_psu_temp_c",         static_cast<double>(load_f32be(p + 28)));
+    w.key_double("fpga_temp_c",           static_cast<double>(load_f32be(p + 32)));
 }
 
 // 3/2 — MRX Board Count and Tuner ID response (4 bytes). Per ICD Table 217.
@@ -1797,8 +1797,8 @@ static void decode_mrx_temperature(const uint8_t* p, int n, JsonWriter& w) {
 // Note: MRX channels are inaccessible unless board_count == 1.
 static void decode_mrx_board_count(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "mrx_board_count payload < 4 bytes"); return; }
-    w.key_uint("available_board_count",  load_u16le(p + 0));
-    w.key_uint("available_mrx_tuner_id", load_u16le(p + 2));
+    w.key_uint("available_board_count",  load_u16be(p + 0));
+    w.key_uint("available_mrx_tuner_id", load_u16be(p + 2));
 }
 
 // 3/18, 3/22 — MRX Channel Status responses (16 bytes each, 8× uint16).
@@ -1808,7 +1808,7 @@ static void decode_mrx_channel_status(const uint8_t* p, int n, JsonWriter& w) {
     std::string arr = "[";
     for (int i = 0; i < 8; ++i) {
         if (i) arr += ',';
-        arr += std::to_string(load_u16le(p + i * 2));
+        arr += std::to_string(load_u16be(p + i * 2));
     }
     arr += "]";
     w.key_raw("channel_status", arr);
@@ -1831,7 +1831,7 @@ static void decode_mrx_cbit_status(const uint8_t* p, int n, JsonWriter& w) {
 // Raw audio (PCM 8kHz 16-bit) not decoded — emit metadata only.
 static void decode_mrx_audio_data(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "mrx_audio_data payload < 4 bytes"); return; }
-    uint32_t audio_size = load_u32le(p + 0);
+    uint32_t audio_size = load_u32be(p + 0);
     w.key_uint("audio_data_size_samples", audio_size);
     w.key_bool("audio_buffer_present", n >= static_cast<int>(4 + audio_size * 2));
 }
@@ -1849,7 +1849,7 @@ static void decode_mrx_iq_status(const uint8_t* p, int n, JsonWriter& w) {
 // channel_number (uint16) + reserved (uint16) + file_path (char[128]).
 static void decode_mrx_iq_log_stop(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 132) { w.key_str("warning", "mrx_iq_log_stop payload < 132 bytes"); return; }
-    w.key_uint("channel_number", load_u16le(p + 0));
+    w.key_uint("channel_number", load_u16be(p + 0));
     char path[129] = {};
     std::memcpy(path, p + 4, 128);
     w.key_str("file_path", path);
@@ -1861,9 +1861,9 @@ static void decode_mrx_iq_log_stop(const uint8_t* p, int n, JsonWriter& w) {
 //   hour/min/sec/reserved (4×uint8) + millisecond (uint16) + bandwidth (uint16).
 static void decode_mrx_mem_scan_data(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "mrx_mem_scan_data payload < 8 bytes"); return; }
-    uint32_t count = load_u32le(p + 0);
+    uint32_t count = load_u32be(p + 0);
     w.key_uint("available_count",   count);
-    w.key_uint("scan_speed_ch_sec", load_u16le(p + 4));
+    w.key_uint("scan_speed_ch_sec", load_u16be(p + 4));
 
     const int ELEM = 20;
     int off = 8;
@@ -1873,13 +1873,13 @@ static void decode_mrx_mem_scan_data(const uint8_t* p, int n, JsonWriter& w) {
         if (off + ELEM > n) break;
         const uint8_t* e = p + off;
         JsonWriter h;
-        h.key_double("power_dbm",    static_cast<double>(load_f32le(e + 0)));
-        h.key_double("freq_hz",      load_f64le(e + 4) * 1e6);
+        h.key_double("power_dbm",    static_cast<double>(load_f32be(e + 0)));
+        h.key_double("freq_hz",      load_f64be(e + 4) * 1e6);
         char toa[12];
         std::snprintf(toa, sizeof(toa), "%02u:%02u:%02u", e[12], e[13], e[14]);
         h.key_str("toa", toa);
-        h.key_uint("millisecond",    load_u16le(e + 16));
-        h.key_uint("bandwidth_code", load_u16le(e + 18));
+        h.key_uint("millisecond",    load_u16be(e + 16));
+        h.key_uint("bandwidth_code", load_u16be(e + 18));
         if (emitted++) arr += ',';
         arr += h.str();
         off += ELEM;
@@ -1895,7 +1895,7 @@ static void decode_mrx_ddc_fft(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { 
         w.key_str("warning", "mrx_ddc_fft payload < 4 bytes"); 
         return; }
-    uint16_t bin_count = load_u16le(p + 0);
+    uint16_t bin_count = load_u16be(p + 0);
     w.key_uint("bin_count", bin_count);
     const uint32_t MAX_BINS = 4096;
     uint32_t emit = (static_cast<uint32_t>(bin_count) < MAX_BINS) ? bin_count : MAX_BINS;
@@ -1908,7 +1908,7 @@ static void decode_mrx_ddc_fft(const uint8_t* p, int n, JsonWriter& w) {
         if (i) arr += ',';
         char tmp[32];
         std::snprintf(tmp, sizeof(tmp), "%.4g",
-                      static_cast<double>(load_f32le(p + 4 + i * 4)));
+                      static_cast<double>(load_f32be(p + 4 + i * 4)));
         arr += tmp;
     }
     arr += "]";
@@ -1920,11 +1920,11 @@ static void decode_mrx_ddc_fft(const uint8_t* p, int n, JsonWriter& w) {
 // able_to_start_transfer, reserved — all uint16.
 static void decode_mrx_optical_port_status(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 12) { w.key_str("warning", "mrx_optical_port_status payload < 12 bytes"); return; }
-    w.key_uint("port_number",   load_u16le(p +  0));
-    w.key_uint("port_id",       load_u16le(p +  2));
-    w.key_uint("port_alive",    load_u16le(p +  4));
-    w.key_uint("already_trans", load_u16le(p +  6));
-    w.key_uint("able_to_start", load_u16le(p +  8));
+    w.key_uint("port_number",   load_u16be(p +  0));
+    w.key_uint("port_id",       load_u16be(p +  2));
+    w.key_uint("port_alive",    load_u16be(p +  4));
+    w.key_uint("already_trans", load_u16be(p +  6));
+    w.key_uint("able_to_start", load_u16be(p +  8));
 }
 
 // 4/72 — Optical Interface IP Address response (24 bytes). Per ICD Table 272.
@@ -1937,7 +1937,7 @@ static void decode_mrx_optical_ip(const uint8_t* p, int n, JsonWriter& w) {
     std::string ports = "[";
     for (int i = 0; i < 9; ++i) {
         if (i) ports += ',';
-        ports += std::to_string(load_u16le(p + 4 + i * 2));
+        ports += std::to_string(load_u16be(p + 4 + i * 2));
     }
     ports += "]";
     w.key_raw("port_ids", ports);
@@ -1951,9 +1951,9 @@ static void decode_mrx_signal_bite_resp(const uint8_t* p, int n, JsonWriter& w) 
         w.key_str("warning", "mrx_signal_bite_resp payload < 16 bytes"); 
         return; 
     }
-    w.key_double("observed_freq_hz",   load_f64le(p + 0) * 1e6);
-    w.key_double("observed_power_dbm", static_cast<double>(load_f32le(p + 8)));
-    w.key_uint("result",               load_u16le(p + 12));
+    w.key_double("observed_freq_hz",   load_f64be(p + 0) * 1e6);
+    w.key_double("observed_power_dbm", static_cast<double>(load_f32be(p + 8)));
+    w.key_uint("result",               load_u16be(p + 12));
 }
 
 // 200/* — VU Jamming ACK responses (Group 200, VU-specific).
@@ -1981,8 +1981,8 @@ static void decode_vu_jam_ack(uint16_t unit_id, const uint8_t* p, int n, JsonWri
     w.key_str("jam_kind", kind);
 
     if (n >= 8) {
-        w.key_uint("jam_id",     load_u16le(p + 0));
-        w.key_bool("jam_active", load_u16le(p + 4) == 1);
+        w.key_uint("jam_id",     load_u16be(p + 0));
+        w.key_bool("jam_active", load_u16be(p + 4) == 1);
     } else if (n > 0) {
         w.key_str("warning", "jam ack payload < 8 bytes");
         w.key_str("raw_hex", to_hex(p, n));
