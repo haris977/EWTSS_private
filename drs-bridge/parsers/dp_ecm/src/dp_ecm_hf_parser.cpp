@@ -3859,7 +3859,7 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
             }
         }
     }
-
+        // ************
     int total = RESP_OVERHEAD + plen;
     uint8_t* buf = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(total)));
     if (!buf) { std::free(payload); return -1; }
