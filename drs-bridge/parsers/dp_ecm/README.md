@@ -25,12 +25,17 @@ dp_ecm/
 ## Frame model (authoritative — DP-ECM-1071/1074, no CRC)
 
 **Byte order (confirmed 2026-07-01 against live ECS capture, updated 2026-07-03 after
-client test):** the 4 header fields (status/size/group/unit) are big-endian in both
-directions. RESP **payload** fields we send to ECS (encode side) are now also
-big-endian — a client test showed garbage/negative values decoded from LE payload
-floats once the header switched to BE. CMD payload fields we *receive* from ECS
-(decode side) are still read little-endian, pending their own capture-based
-confirmation — see `sdfc_endian.h` for the exact scope.
+client test, updated again 2026-07-06):** the 4 header fields (status/size/group/unit)
+are big-endian in both directions. RESP **payload** fields we send to ECS (encode side)
+are now also big-endian — a client test showed garbage/negative values decoded from LE
+payload floats once the header switched to BE. CMD payload fields we *receive* from
+ECS (decode side) are still read little-endian by default, pending their own
+capture-based confirmation per field — **except** `decode_cmd_set_date_time` (109/11)
+and its mirror decoders (`decode_mrx_date_time_cmd` HF 7/23, `decode_cmd_set_datetime`
+VU 7/23), which are now confirmed and fixed to big-endian: a live capture's "Set Date
+and Time" command decoded its `year` field as 59911 under little-endian and 2026 under
+big-endian, matching the real capture date exactly. See `sdfc_endian.h` for the exact
+scope; a broader audit of the remaining CMD-payload decoders is in progress.
 
 | Type | Header | Footer | Overhead | Notes |
 |---|---|---|---:|---|

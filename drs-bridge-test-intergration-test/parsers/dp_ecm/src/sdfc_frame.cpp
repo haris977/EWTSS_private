@@ -20,19 +20,19 @@ bool decode_header(const uint8_t* frame, int frame_len, int frame_type, FrameHea
 
     if (frame_type == FRAME_COMMAND) {
         if (frame_len < CMD_OVERHEAD) return false;
-        out.payload_size = load_u32le(frame + CMD_OFF_SIZE);
-        out.group_id     = load_u16le(frame + CMD_OFF_GROUP);
-        out.unit_id      = load_u16le(frame + CMD_OFF_UNIT);
+        out.payload_size = load_u32be(frame + CMD_OFF_SIZE);
+        out.group_id     = load_u16be(frame + CMD_OFF_GROUP);
+        out.unit_id      = load_u16be(frame + CMD_OFF_UNIT);
         out.payload_off  = CMD_OFF_PAYLOAD;
         out.total_len    = CMD_OVERHEAD + static_cast<int>(out.payload_size);
         return true;
     }
     if (frame_type == FRAME_RESPONSE) {
         if (frame_len < RESP_OVERHEAD) return false;
-        out.status       = load_i16le(frame + RESP_OFF_STATUS);
-        out.payload_size = load_u32le(frame + RESP_OFF_SIZE);
-        out.group_id     = load_u16le(frame + RESP_OFF_GROUP);
-        out.unit_id      = load_u16le(frame + RESP_OFF_UNIT);
+        out.status       = load_i16be(frame + RESP_OFF_STATUS);
+        out.payload_size = load_u32be(frame + RESP_OFF_SIZE);
+        out.group_id     = load_u16be(frame + RESP_OFF_GROUP);
+        out.unit_id      = load_u16be(frame + RESP_OFF_UNIT);
         out.payload_off  = RESP_OFF_PAYLOAD;
         out.total_len    = RESP_OVERHEAD + static_cast<int>(out.payload_size);
         return true;
@@ -60,7 +60,7 @@ static int try_frame(const uint8_t* buf, int buf_len,
     // Need enough bytes to read the size field.
     if (buf_len < size_off + 4) return FRAME_INCOMPLETE;
 
-    uint32_t payload_size = load_u32le(buf + size_off);
+    uint32_t payload_size = load_u32be(buf + size_off);
     if (payload_size > static_cast<uint32_t>(MAX_PAYLOAD)) return FRAME_CORRUPT;
 
     int total = overhead + static_cast<int>(payload_size);

@@ -503,7 +503,7 @@ static void decode_cmd_set_date_time(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "set_date_time cmd < 8 bytes"); return; }
     w.key_uint("day",     p[0]);
     w.key_uint("month",   p[1]);
-    w.key_uint("year",    load_u16le(p + 2));
+    w.key_uint("year",    load_u16be(p + 2));
     w.key_uint("hour",    p[4]);
     w.key_uint("minute",  p[5]);
     w.key_uint("seconds", p[6]);
@@ -1981,7 +1981,7 @@ static void decode_mrx_date_time_cmd(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) return;
     w.key_uint("day",     p[0]);
     w.key_uint("month",   p[1]);
-    w.key_uint("year",    load_u16le(p + 2));
+    w.key_uint("year",    load_u16be(p + 2));
     w.key_uint("hour",    p[4]);
     w.key_uint("minute",  p[5]);
     w.key_uint("seconds", p[6]);

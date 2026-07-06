@@ -76,12 +76,12 @@ static void get_hms(const json& j, const char* prefix,
 static int enc_system_version(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 20) return -1;
     std::memset(buf, 0, 20);
-    store_f32le(buf +  0, (float)j.value("sjc_fw_version",  0.0));
-    store_f32le(buf +  4, (float)j.value("driver_version",  0.0));
-    store_f32le(buf +  8, (float)j.value("fpga_version",    0.0));
-    store_u16le(buf + 12, (uint16_t)j.value("processor_id",    0));
-    store_u16le(buf + 14, (uint16_t)j.value("sjc_rf_tuner_id", 0));
-    store_u16le(buf + 16, (uint16_t)j.value("fpga_type_id",    0));
+    store_f32be(buf +  0, (float)j.value("sjc_fw_version",  0.0));
+    store_f32be(buf +  4, (float)j.value("driver_version",  0.0));
+    store_f32be(buf +  8, (float)j.value("fpga_version",    0.0));
+    store_u16be(buf + 12, (uint16_t)j.value("processor_id",    0));
+    store_u16be(buf + 14, (uint16_t)j.value("sjc_rf_tuner_id", 0));
+    store_u16be(buf + 16, (uint16_t)j.value("fpga_type_id",    0));
     return 20;
 }
 
@@ -142,28 +142,28 @@ static int enc_ibit_status(const json& j, uint8_t* buf, int max_len) {
 // 100/10 Temperature — 24B (6 × f32)
 static int enc_temperature(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 24) return -1;
-    store_f32le(buf +  0, (float)j.value("processor_temp_c", 0.0));
-    store_f32le(buf +  4, (float)j.value("psu_temp_c",       0.0));
-    store_f32le(buf +  8, (float)j.value("fan_temp_c",       0.0));
-    store_f32le(buf + 12, (float)j.value("rf_psu_temp_c",    0.0));
-    store_f32le(buf + 16, (float)j.value("digital_temp_c",   0.0));
-    store_f32le(buf + 20, (float)j.value("fpga_temp_c",      0.0));
+    store_f32be(buf +  0, (float)j.value("processor_temp_c", 0.0));
+    store_f32be(buf +  4, (float)j.value("psu_temp_c",       0.0));
+    store_f32be(buf +  8, (float)j.value("fan_temp_c",       0.0));
+    store_f32be(buf + 12, (float)j.value("rf_psu_temp_c",    0.0));
+    store_f32be(buf + 16, (float)j.value("digital_temp_c",   0.0));
+    store_f32be(buf + 20, (float)j.value("fpga_temp_c",      0.0));
     return 24;
 }
 
 // 100/14 Fan Speed Status — 4B
 static int enc_fan_speed_status(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 4) return -1;
-    store_u32le(buf, (uint32_t)j.value("fan_speed_rpm", 0));
+    store_u32be(buf, (uint32_t)j.value("fan_speed_rpm", 0));
     return 4;
 }
 
 // 100/16 Ethernet Test — 12B
 static int enc_ethernet_test(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 12) return -1;
-    store_u32le(buf + 0, (uint32_t)j.value("tx_data", 0));
-    store_u32le(buf + 4, (uint32_t)j.value("rx_data", 0));
-    store_u32le(buf + 8, (uint32_t)j.value("result",  0));
+    store_u32be(buf + 0, (uint32_t)j.value("tx_data", 0));
+    store_u32be(buf + 4, (uint32_t)j.value("rx_data", 0));
+    store_u32be(buf + 8, (uint32_t)j.value("result",  0));
     return 12;
 }
 
@@ -180,12 +180,12 @@ static int enc_uart_test(const json& j, uint8_t* buf, int max_len) {
 // 100/22 Fan Voltage Status — 24B (6 × f32)
 static int enc_fan_voltage_status(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 24) return -1;
-    store_f32le(buf +  0, (float)j.value("fan_adc_voltage_v", 0.0));
-    store_f32le(buf +  4, (float)j.value("rf1_voltage_v",     0.0));
-    store_f32le(buf +  8, (float)j.value("rf2_voltage_v",     0.0));
-    store_f32le(buf + 12, (float)j.value("rf3_voltage_v",     0.0));
-    store_f32le(buf + 16, (float)j.value("digital_5v_v",      0.0));
-    store_f32le(buf + 20, (float)j.value("digital_3v3_v",     0.0));
+    store_f32be(buf +  0, (float)j.value("fan_adc_voltage_v", 0.0));
+    store_f32be(buf +  4, (float)j.value("rf1_voltage_v",     0.0));
+    store_f32be(buf +  8, (float)j.value("rf2_voltage_v",     0.0));
+    store_f32be(buf + 12, (float)j.value("rf3_voltage_v",     0.0));
+    store_f32be(buf + 16, (float)j.value("digital_5v_v",      0.0));
+    store_f32be(buf + 20, (float)j.value("digital_3v3_v",     0.0));
     return 24;
 }
 
@@ -193,9 +193,9 @@ static int enc_fan_voltage_status(const json& j, uint8_t* buf, int max_len) {
 static int enc_pps_test(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 16) return -1;
     std::memset(buf, 0, 16);
-    store_u32le(buf + 0, (uint32_t)j.value("on_period_us",  0));
-    store_u32le(buf + 4, (uint32_t)j.value("off_period_us", 0));
-    store_u32le(buf + 8, (uint32_t)j.value("pps_status",    0));
+    store_u32be(buf + 0, (uint32_t)j.value("on_period_us",  0));
+    store_u32be(buf + 4, (uint32_t)j.value("off_period_us", 0));
+    store_u32be(buf + 8, (uint32_t)j.value("pps_status",    0));
     buf[12] = (uint8_t)j.value("result", 0);
     return 16;
 }
@@ -203,7 +203,7 @@ static int enc_pps_test(const json& j, uint8_t* buf, int max_len) {
 // 100/28 FPGA Temperature Details — 4B
 static int enc_fpga_temperature_details(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 4) return -1;
-    store_f32le(buf, (float)j.value("fpga_temperature", 0.0));
+    store_f32be(buf, (float)j.value("fpga_temperature", 0.0));
     return 4;
 }
 
@@ -233,8 +233,8 @@ static int enc_fh_detection(const json& j, uint8_t* buf, int max_len) {
     int hc = j.value("hopper_count", 0);
     if (hc <= 0 || 4 + hc * 40 > max_len) return -1;
 
-    store_u16le(buf + 0, (uint16_t)hc);
-    store_u16le(buf + 2, 0);
+    store_u16be(buf + 0, (uint16_t)hc);
+    store_u16be(buf + 2, 0);
 
     if (!j.contains("detections") || !j["detections"].is_array()) return -1;
     const auto& arr = j["detections"];
@@ -244,20 +244,20 @@ static int enc_fh_detection(const json& j, uint8_t* buf, int max_len) {
         if (written >= hc) break;
         uint8_t* s = buf + 4 + written * 40;
 
-        store_u32le(s +  0, (uint32_t)e.value("hopper_number",       0));
-        store_f32le(s +  4, (float)(e.value("min_freq_hz",          0.0) / 1e6));
-        store_f32le(s +  8, (float)(e.value("max_freq_hz",          0.0) / 1e6));
-        store_f32le(s + 12, (float)(e.value("pulse_length_s",       0.0) * 1e3));
-        store_f32le(s + 16, (float)(e.value("inter_hop_period_s",   0.0) * 1e3));
-        store_u32le(s + 20, (uint32_t)e.value("detected_count",     0));
+        store_u32be(s +  0, (uint32_t)e.value("hopper_number",       0));
+        store_f32be(s +  4, (float)(e.value("min_freq_hz",          0.0) / 1e6));
+        store_f32be(s +  8, (float)(e.value("max_freq_hz",          0.0) / 1e6));
+        store_f32be(s + 12, (float)(e.value("pulse_length_s",       0.0) * 1e3));
+        store_f32be(s + 16, (float)(e.value("inter_hop_period_s",   0.0) * 1e3));
+        store_u32be(s + 20, (uint32_t)e.value("detected_count",     0));
         s[24] = (uint8_t)e.value("toa_h",   0);
         s[25] = (uint8_t)e.value("toa_m",   0);
         s[26] = (uint8_t)e.value("toa_s",   0);
         s[27] = 0;
-        store_f32le(s + 28, (float)e.value("power_dbm",             0.0));
-        store_u16le(s + 32, (uint16_t)e.value("freq_active",        0));
-        store_u16le(s + 34, 0);
-        store_f32le(s + 36, (float)e.value("snr_db",                0.0));
+        store_f32be(s + 28, (float)e.value("power_dbm",             0.0));
+        store_u16be(s + 32, (uint16_t)e.value("freq_active",        0));
+        store_u16be(s + 34, 0);
+        store_f32be(s + 36, (float)e.value("snr_db",                0.0));
         ++written;
     }
     return 4 + written * 40;
@@ -271,14 +271,14 @@ static int enc_wideband_fft(const json& j, uint8_t* buf, int max_len) {
     int total = 16 + pc * 4;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u32le(buf +  0, (uint32_t)(j.value("start_freq_hz", 0.0) / 1e6));
-    store_u32le(buf +  4, (uint32_t)(j.value("stop_freq_hz",  0.0) / 1e6));
-    store_u32le(buf +  8, (uint32_t)(j.value("step_freq_hz",  0.0) / 1e3));
-    store_u32le(buf + 12, (uint32_t)pc);
+    store_u32be(buf +  0, (uint32_t)(j.value("start_freq_hz", 0.0) / 1e6));
+    store_u32be(buf +  4, (uint32_t)(j.value("stop_freq_hz",  0.0) / 1e6));
+    store_u32be(buf +  8, (uint32_t)(j.value("step_freq_hz",  0.0) / 1e3));
+    store_u32be(buf + 12, (uint32_t)pc);
     if (j.contains("power_dbm") && j["power_dbm"].is_array()) {
         const auto& pa = j["power_dbm"];
         for (int i = 0; i < pc && i < (int)pa.size(); ++i)
-            store_f32le(buf + 16 + i * 4, (float)pa[i].get<double>());
+            store_f32be(buf + 16 + i * 4, (float)pa[i].get<double>());
     }
     return total;
 }
@@ -300,7 +300,7 @@ static int enc_ff_detection(const json& j, uint8_t* buf, int max_len) {
     if (FFT_BLOCK + 4 + fc * FF_ELEM > max_len) return -1;
 
     std::memset(buf, 0, (size_t)FFT_BLOCK);
-    store_u32le(buf + FFT_BLOCK, (uint32_t)fc);
+    store_u32be(buf + FFT_BLOCK, (uint32_t)fc);
     if (fc == 0) return FFT_BLOCK + 4;
 
     if (!j.contains("detections") || !j["detections"].is_array())
@@ -315,16 +315,16 @@ static int enc_ff_detection(const json& j, uint8_t* buf, int max_len) {
         get_hms(e, "duration", dh, dm, ds);
 
         uint8_t* sl = buf + FFT_BLOCK + 4 + written * FF_ELEM;
-        store_f32le(sl +  0, (float)(e.value("freq_hz",           0.0) / 1e6));
-        store_f32le(sl +  4, (float)e.value("current_power_dbm", 0.0));
-        store_u32le(sl +  8, (uint32_t)e.value("active_count",   0));
-        store_f32le(sl + 12, (float)e.value("min_power_dbm",     0.0));
-        store_f32le(sl + 16, (float)e.value("max_power_dbm",     0.0));
+        store_f32be(sl +  0, (float)(e.value("freq_hz",           0.0) / 1e6));
+        store_f32be(sl +  4, (float)e.value("current_power_dbm", 0.0));
+        store_u32be(sl +  8, (uint32_t)e.value("active_count",   0));
+        store_f32be(sl + 12, (float)e.value("min_power_dbm",     0.0));
+        store_f32be(sl + 16, (float)e.value("max_power_dbm",     0.0));
         sl[20] = h;  sl[21] = m;  sl[22] = s;  sl[23] = 0;
         sl[24] = dh; sl[25] = dm; sl[26] = ds; sl[27] = 0;
-        store_u16le(sl + 28, (uint16_t)e.value("freq_active", 0));
-        store_u16le(sl + 30, 0);
-        store_f32le(sl + 32, (float)e.value("snr_db", 0.0));
+        store_u16be(sl + 28, (uint16_t)e.value("freq_active", 0));
+        store_u16be(sl + 30, 0);
+        store_f32be(sl + 32, (float)e.value("snr_db", 0.0));
         ++written;
     }
     return FFT_BLOCK + 4 + written * FF_ELEM;
@@ -342,7 +342,7 @@ static int enc_burst_detection(const json& j, uint8_t* buf, int max_len) {
     if (bc < 0) bc = 0;
     if (4 + bc * ELEM > max_len) return -1;
 
-    store_u32le(buf, (uint32_t)bc);
+    store_u32be(buf, (uint32_t)bc);
     if (bc == 0) return 4;
 
     if (!j.contains("detections") || !j["detections"].is_array()) return 4;
@@ -355,12 +355,12 @@ static int enc_burst_detection(const json& j, uint8_t* buf, int max_len) {
         get_hms(e, "toa", h, m, s);
 
         uint8_t* sl = buf + 4 + written * ELEM;
-        store_f32le(sl +  0, (float)(e.value("freq_hz",           0.0) / 1e6));
-        store_f32le(sl +  4, (float)e.value("current_power_dbm", 0.0));
-        store_f32le(sl +  8, (float)e.value("pulse_length_ms",   0.0));
-        store_u32le(sl + 12, (uint32_t)e.value("active_count",   0));
+        store_f32be(sl +  0, (float)(e.value("freq_hz",           0.0) / 1e6));
+        store_f32be(sl +  4, (float)e.value("current_power_dbm", 0.0));
+        store_f32be(sl +  8, (float)e.value("pulse_length_ms",   0.0));
+        store_u32be(sl + 12, (uint32_t)e.value("active_count",   0));
         sl[16] = h; sl[17] = m; sl[18] = s; sl[19] = 0;
-        store_f32le(sl + 20, (float)e.value("snr_db", 0.0));
+        store_f32be(sl + 20, (float)e.value("snr_db", 0.0));
         ++written;
     }
     return 4 + written * ELEM;
@@ -376,7 +376,7 @@ static int enc_stop_scan_speed(const json& j, uint8_t* buf, int max_len) {
 
     int fc = j.value("ff_count", 0);
     if (fc > 1600) fc = 1600;
-    store_u32le(buf, (uint32_t)fc);
+    store_u32be(buf, (uint32_t)fc);
     if (fc == 0) return TOTAL;
 
     if (!j.contains("detections") || !j["detections"].is_array()) return TOTAL;
@@ -390,16 +390,16 @@ static int enc_stop_scan_speed(const json& j, uint8_t* buf, int max_len) {
         get_hms(e, "duration", dh, dm, ds);
 
         uint8_t* sl = buf + 4 + written * 36;
-        store_f32le(sl +  0, (float)(e.value("freq_hz",           0.0) / 1e6));
-        store_f32le(sl +  4, (float)e.value("current_power_dbm", 0.0));
-        store_u32le(sl +  8, (uint32_t)e.value("active_count",   0));
-        store_f32le(sl + 12, (float)e.value("min_power_dbm",     0.0));
-        store_f32le(sl + 16, (float)e.value("max_power_dbm",     0.0));
+        store_f32be(sl +  0, (float)(e.value("freq_hz",           0.0) / 1e6));
+        store_f32be(sl +  4, (float)e.value("current_power_dbm", 0.0));
+        store_u32be(sl +  8, (uint32_t)e.value("active_count",   0));
+        store_f32be(sl + 12, (float)e.value("min_power_dbm",     0.0));
+        store_f32be(sl + 16, (float)e.value("max_power_dbm",     0.0));
         sl[20] = h;  sl[21] = m;  sl[22] = s;  sl[23] = 0;
         sl[24] = dh; sl[25] = dm; sl[26] = ds; sl[27] = 0;
-        store_u16le(sl + 28, (uint16_t)e.value("freq_active", 0));
-        store_u16le(sl + 30, 0);
-        store_f32le(sl + 32, (float)e.value("snr_db", 0.0));
+        store_u16be(sl + 28, (uint16_t)e.value("freq_active", 0));
+        store_u16be(sl + 30, 0);
+        store_f32be(sl + 32, (float)e.value("snr_db", 0.0));
         ++written;
     }
     return TOTAL;
@@ -413,12 +413,12 @@ static int enc_zoom_fft(const json& j, uint8_t* buf, int max_len) {
     int total = 4 + sc * 4;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u32le(buf, (uint32_t)sc);
+    store_u32be(buf, (uint32_t)sc);
     if (sc == 0) return 4;
     if (!j.contains("power_dbm") || !j["power_dbm"].is_array()) return total;
     const auto& arr = j["power_dbm"];
     for (int i = 0; i < sc && i < (int)arr.size(); ++i)
-        store_f32le(buf + 4 + i * 4, (float)arr[i].get<double>());
+        store_f32be(buf + 4 + i * 4, (float)arr[i].get<double>());
     return total;
 }
 
@@ -435,14 +435,14 @@ static int enc_auto_threshold_value(const json& j, uint8_t* buf, int max_len) {
 
     int bc = j.value("auto_threshold_bin_count", 0);
     if (bc > 1600) bc = 1600;
-    store_u32le(buf, (uint32_t)bc);
+    store_u32be(buf, (uint32_t)bc);
     if (bc == 0) return TOTAL;
 
     if (!j.contains("auto_threshold_bin_data") || !j["auto_threshold_bin_data"].is_array())
         return TOTAL;
     const auto& arr = j["auto_threshold_bin_data"];
     for (int i = 0; i < bc && i < (int)arr.size(); ++i)
-        store_f32le(buf + 4 + i * 4, (float)arr[i].get<double>());
+        store_f32be(buf + 4 + i * 4, (float)arr[i].get<double>());
     return TOTAL;
 }
 
@@ -457,7 +457,7 @@ static int enc_channelization(const json& j, const char* arr_key,
     int total = 8 + count * 28;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u32le(buf, (uint32_t)count);
+    store_u32be(buf, (uint32_t)count);
 
     uint8_t h = 0, m = 0, s = 0;
     get_hms(j, "toa", h, m, s);
@@ -471,12 +471,12 @@ static int enc_channelization(const json& j, const char* arr_key,
     for (const auto& e : arr) {
         if (written >= count) break;
         uint8_t* sl = buf + 8 + written * 28;
-        store_f64le(sl +  0, e.value("toi",             0.0));
-        store_f32le(sl +  8, (float)(e.value("freq_index_hz", 0.0) / 1e6));
-        store_f32le(sl + 12, (float)e.value("pulse_length_ms", 0.0));
-        store_f32le(sl + 16, (float)e.value("power_level_dbm", 0.0));
-        store_u32le(sl + 20, (uint32_t)e.value("bandwidth",    0));
-        store_u32le(sl + 24, (uint32_t)e.value("freq_band",    0));
+        store_f64be(sl +  0, e.value("toi",             0.0));
+        store_f32be(sl +  8, (float)(e.value("freq_index_hz", 0.0) / 1e6));
+        store_f32be(sl + 12, (float)e.value("pulse_length_ms", 0.0));
+        store_f32be(sl + 16, (float)e.value("power_level_dbm", 0.0));
+        store_u32be(sl + 20, (uint32_t)e.value("bandwidth",    0));
+        store_u32be(sl + 24, (uint32_t)e.value("freq_band",    0));
         ++written;
     }
     return 8 + written * 28;
@@ -496,9 +496,9 @@ static int enc_hopper_channelization(const json& j, uint8_t* buf, int max_len) {
 static int enc_signal_bite_resp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 12) return -1;
     std::memset(buf, 0, 12);
-    store_f32le(buf + 0, (float)(j.value("bite_freq_hz",   0.0) / 1e6));
-    store_f32le(buf + 4, (float)j.value("bite_power_dbm", 0.0));
-    store_u16le(buf + 8, (uint16_t)j.value("bite_result", 0));
+    store_f32be(buf + 0, (float)(j.value("bite_freq_hz",   0.0) / 1e6));
+    store_f32be(buf + 4, (float)j.value("bite_power_dbm", 0.0));
+    store_u16be(buf + 8, (uint16_t)j.value("bite_result", 0));
     return 12;
 }
 
@@ -521,9 +521,9 @@ static int enc_pdw_channelization(const json& j, uint8_t* buf, int max_len) {
 static int enc_bite_observed_rsp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 16) return -1;
     std::memset(buf, 0, 16);
-    store_f64le(buf + 0, j.value("observed_bite_freq_mhz",  0.0));
-    store_f32le(buf + 8, (float)j.value("observed_bite_power_dbm", 0.0));
-    store_u16le(buf + 12, (uint16_t)j.value("bite_result",  0));
+    store_f64be(buf + 0, j.value("observed_bite_freq_mhz",  0.0));
+    store_f32be(buf + 8, (float)j.value("observed_bite_power_dbm", 0.0));
+    store_u16be(buf + 12, (uint16_t)j.value("bite_result",  0));
     return 16;
 }
 
@@ -535,8 +535,8 @@ static int enc_storage_details(const json& j, uint8_t* buf, int max_len) {
     buf[0] = (uint8_t)j.value("disk_space_1", 0);
     buf[1] = (uint8_t)j.value("disk_space_2", 0);
     buf[2] = (uint8_t)j.value("disk_space_3", 0);
-    store_f64le(buf +  4, j.value("available_disk_space", 0.0));
-    store_f64le(buf + 12, j.value("total_disk_space",     0.0));
+    store_f64be(buf +  4, j.value("available_disk_space", 0.0));
+    store_f64be(buf + 12, j.value("total_disk_space",     0.0));
     return 20;
 }
 
@@ -548,7 +548,7 @@ static int enc_read_protected_band_list(const json& j, uint8_t* buf, int max_len
     int total = 4 + count * 8;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u16le(buf, (uint16_t)count);
+    store_u16be(buf, (uint16_t)count);
     if (count == 0) return 4;
     if (!j.contains("protected_bands") || !j["protected_bands"].is_array()) return 4;
     const auto& arr = j["protected_bands"];
@@ -556,8 +556,8 @@ static int enc_read_protected_band_list(const json& j, uint8_t* buf, int max_len
     for (const auto& e : arr) {
         if (written >= count) break;
         uint8_t* sl = buf + 4 + written * 8;
-        store_f32le(sl + 0, (float)(e.value("start_freq_hz", 0.0) / 1e6));
-        store_f32le(sl + 4, (float)(e.value("stop_freq_hz",  0.0) / 1e6));
+        store_f32be(sl + 0, (float)(e.value("start_freq_hz", 0.0) / 1e6));
+        store_f32be(sl + 4, (float)(e.value("stop_freq_hz",  0.0) / 1e6));
         ++written;
     }
     return 4 + written * 8;
@@ -571,7 +571,7 @@ static int enc_read_protected_band_list(const json& j, uint8_t* buf, int max_len
 static int enc_asu_sdu_config_rsp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 4) return -1;
     std::memset(buf, 0, 4);
-    store_i16le(buf, (int16_t)j.value("error_value", 0));
+    store_i16be(buf, (int16_t)j.value("error_value", 0));
     return 4;
 }
 
@@ -603,7 +603,7 @@ static int enc_list_jam_report(const json& j, uint8_t* buf, int max_len) {
     int total = 4 + count * 8;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u32le(buf, (uint32_t)count);
+    store_u32be(buf, (uint32_t)count);
     if (count == 0) return 4;
     if (!j.contains("frequencies") || !j["frequencies"].is_array()) return 4;
     const auto& arr = j["frequencies"];
@@ -611,8 +611,8 @@ static int enc_list_jam_report(const json& j, uint8_t* buf, int max_len) {
     for (const auto& e : arr) {
         if (written >= count) break;
         uint8_t* sl = buf + 4 + written * 8;
-        store_u32le(sl + 0, (uint32_t)e.value("freq_hz", 0));
-        store_u16le(sl + 4, (uint16_t)e.value("status",  0));
+        store_u32be(sl + 0, (uint32_t)e.value("freq_hz", 0));
+        store_u16be(sl + 4, (uint16_t)e.value("status",  0));
         ++written;
     }
     return 4 + written * 8;
@@ -654,7 +654,7 @@ static int enc_stop_immediate_jam_rsp(const json& j, uint8_t* buf, int max_len) 
 // 106/40 Ext Modulation Response — 4B
 static int enc_ext_modulation_response(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 4) return -1;
-    store_u32le(buf, (uint32_t)j.value("software_buffer_size", 0));
+    store_u32be(buf, (uint32_t)j.value("software_buffer_size", 0));
     return 4;
 }
 
@@ -663,8 +663,8 @@ static int enc_ext_modulation_response(const json& j, uint8_t* buf, int max_len)
 static int enc_immediate_jam_ack(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 8) return -1;
     std::memset(buf, 0, 8);
-    store_u16le(buf + 0, (uint16_t)j.value("jam_id",     0));
-    store_u16le(buf + 4, (uint16_t)j.value("jam_active", 0));
+    store_u16be(buf + 0, (uint16_t)j.value("jam_id",     0));
+    store_u16be(buf + 4, (uint16_t)j.value("jam_active", 0));
     return 8;
 }
 
@@ -676,10 +676,10 @@ static int enc_immediate_jam_ack(const json& j, uint8_t* buf, int max_len) {
 static int enc_mrx_system_version(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 16) return -1;
     std::memset(buf, 0, 16);
-    store_f32le(buf +  0, (float)j.value("fw_version",     0.0));
-    store_f32le(buf +  4, (float)j.value("driver_version", 0.0));
-    store_f32le(buf +  8, (float)j.value("fpga_version",   0.0));
-    store_u16le(buf + 12, (uint16_t)j.value("rf_tuner_id", 0));
+    store_f32be(buf +  0, (float)j.value("fw_version",     0.0));
+    store_f32be(buf +  4, (float)j.value("driver_version", 0.0));
+    store_f32be(buf +  8, (float)j.value("fpga_version",   0.0));
+    store_u16be(buf + 12, (uint16_t)j.value("rf_tuner_id", 0));
     return 16;
 }
 
@@ -748,14 +748,14 @@ static int enc_mrx_temperature(const json& j, uint8_t* buf, int max_len) {
         "rf_psu_temp_c", "fpga_temp_c"
     };
     for (int i = 0; i < 9; ++i)
-        store_f32le(buf + i * 4, (float)j.value(NAMES[i], 0.0));
+        store_f32be(buf + i * 4, (float)j.value(NAMES[i], 0.0));
     return 36;
 }
 
 // 1/14 MRx Fan Speed — 4B
 static int enc_mrx_fan_speed(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 4) return -1;
-    store_u32le(buf, (uint32_t)j.value("fan_speed_rpm", 0));
+    store_u32be(buf, (uint32_t)j.value("fan_speed_rpm", 0));
     return 4;
 }
 
@@ -789,8 +789,8 @@ static int enc_mrx_cbit_status(const json& j, uint8_t* buf, int max_len) {
 static int enc_mrx_board_count_rsp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 4) return -1;
     std::memset(buf, 0, 4);
-    store_u16le(buf + 0, (uint16_t)j.value("board_count",        0));
-    store_u16le(buf + 2, (uint16_t)j.value("available_tuner_id", 0));
+    store_u16be(buf + 0, (uint16_t)j.value("board_count",        0));
+    store_u16be(buf + 2, (uint16_t)j.value("available_tuner_id", 0));
     return 4;
 }
 
@@ -806,7 +806,7 @@ static int enc_mrx_channels_16b(const json& j, const char* arr_key,
     int written = 0;
     for (const auto& e : arr) {
         if (written >= 8) break;
-        store_u16le(buf + written * 2, (uint16_t)e.value(status_key, 0));
+        store_u16be(buf + written * 2, (uint16_t)e.value(status_key, 0));
         ++written;
     }
     return 16;
@@ -818,8 +818,8 @@ static int enc_mrx_tuning_details_rsp(const json& j, uint8_t* buf, int max_len) 
     std::memset(buf, 0, 8);
     buf[0] = (uint8_t)j.value("srx_tuned_status",     0);
     buf[1] = (uint8_t)j.value("mrx_tuned_status",     0);
-    store_u16le(buf + 2, (uint16_t)j.value("srx_scan_mode_status",   0));
-    store_u16le(buf + 4, (uint16_t)j.value("tuned_center_freq_mhz",  0));
+    store_u16be(buf + 2, (uint16_t)j.value("srx_scan_mode_status",   0));
+    store_u16be(buf + 4, (uint16_t)j.value("tuned_center_freq_mhz",  0));
     buf[6] = (uint8_t)j.value("memory_scan_tuned", 0);
     buf[7] = (uint8_t)j.value("bite_selection",    0);
     return 8;
@@ -837,12 +837,12 @@ static int enc_mrx_audio_data_rsp(const json& j, uint8_t* buf, int max_len) {
     int total = 4 + sz * 2;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u32le(buf, (uint32_t)sz);
+    store_u32be(buf, (uint32_t)sz);
     if (sz == 0) return 4;
     if (!j.contains("audio_data") || !j["audio_data"].is_array()) return total;
     const auto& arr = j["audio_data"];
     for (int i = 0; i < sz && i < (int)arr.size(); ++i)
-        store_u16le(buf + 4 + i * 2, (uint16_t)arr[i].get<int>());
+        store_u16be(buf + 4 + i * 2, (uint16_t)arr[i].get<int>());
     return total;
 }
 
@@ -861,7 +861,7 @@ static int enc_mrx_iq_start_rsp(const json& j, uint8_t* buf, int max_len) {
 static int enc_mrx_iq_logging_stop_rsp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 132) return -1;
     std::memset(buf, 0, 132);
-    store_u16le(buf, (uint16_t)j.value("mrx_channel", 0));
+    store_u16be(buf, (uint16_t)j.value("mrx_channel", 0));
     std::string fp = j.value("file_path", "");
     size_t n = std::min(fp.size(), (size_t)127);
     std::memcpy(buf + 4, fp.data(), n);
@@ -879,8 +879,8 @@ static int enc_mrx_memory_scan_data_rsp(const json& j, uint8_t* buf, int max_len
     int total = 8 + count * 20;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u32le(buf + 0, (uint32_t)count);
-    store_u16le(buf + 4, (uint16_t)j.value("scan_speed_channels_per_sec", 0));
+    store_u32be(buf + 0, (uint32_t)count);
+    store_u16be(buf + 4, (uint16_t)j.value("scan_speed_channels_per_sec", 0));
     if (count == 0) return 8;
     if (!j.contains("scan_data") || !j["scan_data"].is_array()) return 8;
     const auto& arr = j["scan_data"];
@@ -888,9 +888,9 @@ static int enc_mrx_memory_scan_data_rsp(const json& j, uint8_t* buf, int max_len
     for (const auto& e : arr) {
         if (written >= count) break;
         uint8_t* sl = buf + 8 + written * 20;
-        store_f32le(sl +  0, (float)e.value("power_dbm", 0.0));
-        store_f64le(sl +  4, e.value("freq_hz", 0.0) / 1e6);
-        store_u16le(sl + 18, (uint16_t)e.value("bandwidth_list", 0));
+        store_f32be(sl +  0, (float)e.value("power_dbm", 0.0));
+        store_f64be(sl +  4, e.value("freq_hz", 0.0) / 1e6);
+        store_u16be(sl + 18, (uint16_t)e.value("bandwidth_list", 0));
         ++written;
     }
     return 8 + written * 20;
@@ -904,13 +904,13 @@ static int enc_mrx_ddc_fft_rsp(const json& j, uint8_t* buf, int max_len) {
     int total = 4 + bc * 4;
     if (total > max_len) return -1;
     std::memset(buf, 0, (size_t)total);
-    store_u16le(buf, (uint16_t)bc);
+    store_u16be(buf, (uint16_t)bc);
     if (bc == 0) return total;
     if (!j.contains("ddc_fft_power_dbm") || !j["ddc_fft_power_dbm"].is_array())
         return total;
     const auto& arr = j["ddc_fft_power_dbm"];
     for (int i = 0; i < bc && i < (int)arr.size(); ++i)
-        store_f32le(buf + 4 + i * 4, (float)arr[i].get<double>());
+        store_f32be(buf + 4 + i * 4, (float)arr[i].get<double>());
     return total;
 }
 
@@ -919,9 +919,9 @@ static int enc_mrx_ddc_fft_rsp(const json& j, uint8_t* buf, int max_len) {
 static int enc_mrx_smart_scan_read_rsp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 16) return -1;
     std::memset(buf, 0, 16);
-    store_f64le(buf +  0, j.value("freq_hz", 0.0) / 1e6);
-    store_u16le(buf +  8, (uint16_t)j.value("mrx_channel", 0));
-    store_f32le(buf + 12, (float)j.value("amplitude",    0.0));
+    store_f64be(buf +  0, j.value("freq_hz", 0.0) / 1e6);
+    store_u16be(buf +  8, (uint16_t)j.value("mrx_channel", 0));
+    store_f32be(buf + 12, (float)j.value("amplitude",    0.0));
     return 16;
 }
 
@@ -929,11 +929,11 @@ static int enc_mrx_smart_scan_read_rsp(const json& j, uint8_t* buf, int max_len)
 static int enc_mrx_optical_port_status_rsp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 12) return -1;
     std::memset(buf, 0, 12);
-    store_u16le(buf +  0, (uint16_t)j.value("port_number",          0));
-    store_u16le(buf +  2, (uint16_t)j.value("port_id",              0));
-    store_u16le(buf +  4, (uint16_t)j.value("port_alive_status",    0));
-    store_u16le(buf +  6, (uint16_t)j.value("already_transmitting", 0));
-    store_u16le(buf +  8, (uint16_t)j.value("can_start_transfer",   0));
+    store_u16be(buf +  0, (uint16_t)j.value("port_number",          0));
+    store_u16be(buf +  2, (uint16_t)j.value("port_id",              0));
+    store_u16be(buf +  4, (uint16_t)j.value("port_alive_status",    0));
+    store_u16be(buf +  6, (uint16_t)j.value("already_transmitting", 0));
+    store_u16be(buf +  8, (uint16_t)j.value("can_start_transfer",   0));
     return 12;
 }
 
@@ -953,7 +953,7 @@ static int enc_mrx_optical_ip_rsp(const json& j, uint8_t* buf, int max_len) {
     if (j.contains("port_ids") && j["port_ids"].is_array()) {
         const auto& arr = j["port_ids"];
         for (int i = 0; i < 9 && i < (int)arr.size(); ++i)
-            store_u16le(buf + 4 + i * 2, (uint16_t)arr[i].get<int>());
+            store_u16be(buf + 4 + i * 2, (uint16_t)arr[i].get<int>());
     }
     return 24;
 }
@@ -968,7 +968,7 @@ static int enc_mrx_agc_status_rsp(const json& j, uint8_t* buf, int max_len) {
     std::memset(buf, 0, 4);
     buf[0] = (uint8_t)j.value("rf_attenuation_db", 0);
     buf[1] = (uint8_t)j.value("if_attenuation_db", 0);
-    store_u16le(buf + 2, (uint16_t)j.value("agc_running", 0));
+    store_u16be(buf + 2, (uint16_t)j.value("agc_running", 0));
     return 4;
 }
 
@@ -981,9 +981,9 @@ static int enc_mrx_agc_status_rsp(const json& j, uint8_t* buf, int max_len) {
 static int enc_mrx_signal_bite_rsp(const json& j, uint8_t* buf, int max_len) {
     if (max_len < 16) return -1;
     std::memset(buf, 0, 16);
-    store_f64le(buf +  0, j.value("observed_freq_hz", 0.0) / 1e6);
-    store_f32le(buf +  8, (float)j.value("observed_power_dbm", 0.0));
-    store_u16le(buf + 12, (uint16_t)j.value("result", 0));
+    store_f64be(buf +  0, j.value("observed_freq_hz", 0.0) / 1e6);
+    store_f32be(buf +  8, (float)j.value("observed_power_dbm", 0.0));
+    store_u16be(buf + 12, (uint16_t)j.value("result", 0));
     return 16;
 }
 
@@ -1113,10 +1113,10 @@ extern "C" SDFC_EXPORT int format_response(const char* /*kind*/,
     if (!frame) { std::free(payload); return -1; }
 
     std::memcpy(frame, RESP_HEADER, MAGIC_LEN);
-    store_i16le(frame + RESP_OFF_STATUS, static_cast<int16_t>(status));
-    store_u32le(frame + RESP_OFF_SIZE,   static_cast<uint32_t>(plen));
-    store_u16le(frame + RESP_OFF_GROUP,  static_cast<uint16_t>(group));
-    store_u16le(frame + RESP_OFF_UNIT,   static_cast<uint16_t>(unit));
+    store_i16be(frame + RESP_OFF_STATUS, static_cast<int16_t>(status));
+    store_u32be(frame + RESP_OFF_SIZE,   static_cast<uint32_t>(plen));
+    store_u16be(frame + RESP_OFF_GROUP,  static_cast<uint16_t>(group));
+    store_u16be(frame + RESP_OFF_UNIT,   static_cast<uint16_t>(unit));
     if (plen > 0)
         std::memcpy(frame + RESP_OFF_PAYLOAD, payload, static_cast<size_t>(plen));
     std::memcpy(frame + RESP_OFF_PAYLOAD + plen, RESP_FOOTER, MAGIC_LEN);
