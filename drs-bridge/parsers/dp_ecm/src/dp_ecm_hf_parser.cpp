@@ -264,8 +264,8 @@ static void decode_cmd_get_zoom_fft(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 16) { w.key_str("warning", "get_zoom_fft cmd < 16 bytes"); return; }
     static const double BW_MHZ[]    = {0.5, 1.0, 2.0, 4.0, 6.0, 8.0};
     static const int    BIN_COUNT[] = {1280, 1280, 1280, 1463, 1536, 1576};
-    int32_t bw_idx      = load_i32le(p + 4);
-    int32_t noise_level = load_i32le(p + 8);
+    int32_t bw_idx      = load_i32be(p + 4);
+    int32_t noise_level = load_i32be(p + 8);
     w.key_double("center_freq_hz", static_cast<double>(load_f32be(p + 0)) * 1e6);
     w.key_int("bw_index", bw_idx);
     if (bw_idx >= 0 && bw_idx < 6) {

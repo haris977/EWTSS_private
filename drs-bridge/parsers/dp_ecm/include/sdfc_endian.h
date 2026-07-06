@@ -44,6 +44,10 @@ inline uint32_t load_u32be(const uint8_t* p) {
            (static_cast<uint32_t>(p[0]) << 24);
 }
 
+inline int32_t load_i32be(const uint8_t* p) {
+    return static_cast<int32_t>(load_u32be(p));
+}
+
 inline uint64_t load_u64be(const uint8_t* p) {
     return (static_cast<uint64_t>(load_u32be(p)) << 32) |
             static_cast<uint64_t>(load_u32be(p + 4));

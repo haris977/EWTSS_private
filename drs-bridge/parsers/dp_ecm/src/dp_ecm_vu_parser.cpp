@@ -413,7 +413,7 @@ static void decode_cmd_start_scan_speed(const uint8_t* p, int n, JsonWriter& w) 
 static void decode_cmd_get_zoom_fft(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 8) { w.key_str("warning", "get_zoom_fft cmd < 8 bytes"); return; }
     static const double BW_MHZ[] = {2.5, 5.0, 10.0};
-    int32_t bw_idx = load_i32le(p + 4);
+    int32_t bw_idx = load_i32be(p + 4);
     w.key_double("center_freq_hz", static_cast<double>(load_f32be(p + 0)) * 1e6);
     w.key_int("bw_index", bw_idx);
     if (bw_idx >= 0 && bw_idx < 3)

@@ -40,7 +40,7 @@ bool decode_header(const uint8_t* frame, int frame_len, int frame_type, FrameHea
     if (frame_type == FRAME_STREAM) {
         if (frame_len < STREAM_OVERHEAD) return false;
         // msg_number at offset 4, size at offset 8
-        out.payload_size = load_u32le(frame + 8);
+        out.payload_size = load_u32be(frame + 8);
         out.payload_off  = 12;
         out.total_len    = STREAM_OVERHEAD + static_cast<int>(out.payload_size);
         return true;
