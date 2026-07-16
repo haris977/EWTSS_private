@@ -404,6 +404,12 @@ static std::string impl_parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
         doc.load_buffer(frame, static_cast<size_t>(frame_len));
     // See ca120_parser.cpp's parse_xml for why this new failure path is an
     // accepted, intentional behavior change (design spec §3).
+    //
+    // Also: pugixml's default parse flags decode XML entities (&amp; -> &),
+    // normalize EOL, and normalize attribute whitespace -- the old hand-rolled
+    // scanning never did any of this (returned raw bytes verbatim). Accepted,
+    // disclosed deviation from strict byte-identical output -- see design
+    // spec §3.2. Low practical impact: no real ICD sample uses entities.
     if (!presult) return {};
 
     pugi::xml_node root = doc.first_child();

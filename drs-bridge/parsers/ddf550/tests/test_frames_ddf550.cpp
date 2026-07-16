@@ -704,6 +704,44 @@ static void test_wrapped_xml_demodulation_settings() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: <Param> value containing an XML entity reference is decoded, not
+// left as raw bytes -- pins the disclosed, accepted pugixml behavior change
+// from design spec §3.2 (xml-parsing-pugixml-migration-design.md): pugixml's
+// default parse flags decode XML entities (&amp; -> &), whereas the deleted
+// hand-rolled scanning helpers (xml_attr/xml_text/xml_param_value) returned
+// raw, undecoded substring bytes verbatim. This is NOT testing a bug -- it
+// confirms the accepted, disclosed new behavior stays stable going forward.
+//
+// Verified empirically against the vendored pugixml build (single decode
+// pass, standard XML semantics): a single-escaped entity "&amp;" decodes to
+// "&". A *double*-escaped "&amp;amp;" decodes to the literal text "&amp;"
+// (only the outer entity is consumed), not to a bare "&" -- so this test
+// uses one level of escaping to exactly match the design spec's own example
+// (§3.2: "decode XML entities (&amp; -> &)").
+// ---------------------------------------------------------------------------
+
+static void test_param_value_entity_decoded() {
+    const char* xml =
+        "<Request type=\"set\" id=\"1\">"
+        "<Command name=\"TestCmd\">"
+        "<Param name=\"zNote\">A &amp; B</Param>"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    // Decoded value: pugixml turned the "&amp;" entity into a literal "&".
+    CHECK(json_has(json, "\"zNote\":\"A & B\""));
+    // Discriminating: the raw, undecoded entity text must NOT survive into
+    // the JSON -- that would mean entity decoding silently regressed back to
+    // the old hand-rolled scanner's raw-bytes-verbatim behavior.
+    CHECK(!json_has(json, "A &amp; B"));
+}
+
+// ---------------------------------------------------------------------------
 // Test: Wrapped XML ScanRangeAdd command
 // ---------------------------------------------------------------------------
 
@@ -1347,6 +1385,7 @@ int main() {
     test_wrapped_xml_trace_disable();
     test_wrapped_xml_trace_delete();
     test_wrapped_xml_demodulation_settings();
+    test_param_value_entity_decoded();
     test_wrapped_xml_scanrange_add();
     test_wrapped_xml_scanrange_delete_all();
     test_xml_param_self_closing_does_not_corrupt_scan();

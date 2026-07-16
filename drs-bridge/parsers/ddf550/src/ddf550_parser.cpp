@@ -446,6 +446,12 @@ static std::string impl_parse_xml_ddf550(const uint8_t* frame, int frame_len,
         doc.load_buffer(frame, static_cast<size_t>(frame_len));
     // See ca120_parser.cpp's parse_xml for why this new failure path is an
     // accepted, intentional behavior change (design spec §3).
+    //
+    // Also: pugixml's default parse flags decode XML entities (&amp; -> &),
+    // normalize EOL, and normalize attribute whitespace -- the old hand-rolled
+    // scanning never did any of this (returned raw bytes verbatim). Accepted,
+    // disclosed deviation from strict byte-identical output -- see design
+    // spec §3.2. Low practical impact: no real ICD sample uses entities.
     if (!presult) return {};
 
     pugi::xml_node root = doc.first_child();
@@ -513,6 +519,13 @@ static std::string impl_parse_xml_ddf550(const uint8_t* frame, int frame_len,
     // DFData preclassifier output fields -- every direct child of the
     // root, generic over field name. Only iterate element nodes, skipping
     // whitespace and text nodes between elements.
+    //
+    // Narrower disclosed difference (design spec §3.2): a self-closing
+    // <Tag/> direct child now emits an empty-string field ("Tag":"") via
+    // this node_element filter, whereas the old xml_all_dfdata_fields
+    // explicitly skipped self-closing children (no field added at all).
+    // No current DFData fixture uses a self-closing field, so this is
+    // unexercised in practice.
     if (is_dfdata) {
         const char* cl_id = root.attribute("DDF-CL-ID").value();
         if (*cl_id) j.key_str("ddf_cl_id", cl_id);

@@ -623,6 +623,12 @@ static std::string impl_parse_xml(const uint8_t* frame, int frame_len, int frame
     // (it requires a matching close tag by name); this catches the
     // remaining corner case where a well-closed-looking frame is malformed
     // *inside*. Accepted, intentional behavior change -- see design spec §3.
+    //
+    // Also: pugixml's default parse flags decode XML entities (&amp; -> &),
+    // normalize EOL, and normalize attribute whitespace -- the old hand-rolled
+    // scanning never did any of this (returned raw bytes verbatim). Accepted,
+    // disclosed deviation from strict byte-identical output -- see design
+    // spec §3.2. Low practical impact: no real ICD sample uses entities.
     if (!presult) return {};
 
     pugi::xml_node root = doc.first_child();
@@ -683,6 +689,12 @@ static std::string impl_parse_xml(const uint8_t* frame, int frame_len, int frame
         const char* dtype  = ds.attribute("type").value();
         if (*action) j.key_str("datastream_action", action);
         if (*dtype)  j.key_str("datastream_type",   dtype);
+        // Narrower disclosed difference (design spec §3.2): IP/Port lookup
+        // narrowed from the old xml_text(xml, frame_len, "IP") whole-buffer
+        // search to this direct-child-of-DataStream scoping via
+        // ds.child(...) -- more correct, matches every current fixture, but
+        // would differ from the old behavior if a future message ever
+        // nested IP/Port deeper than a direct child of DataStream.
         const char* ip   = ds.child("IP").text().get();
         const char* port = ds.child("Port").text().get();
         if (*ip)   j.key_str("stream_ip",   ip);
