@@ -675,6 +675,11 @@ static std::string impl_parse_xml(const uint8_t* frame, int frame_len, int frame
     pugi::xml_node ds = find_first(root, "DataStream");
     if (ds) {
         const char* action = ds.attribute("action").value();
+        // Deliberate behavior change from old hand-rolled xml_attr scanning:
+        // the old code searched the entire buffer and incorrectly returned the
+        // root message's type attribute (e.g. "get"/"set") instead of DataStream's
+        // own type attribute. pugixml's node-scoped .attribute() now correctly
+        // returns DataStream's type (e.g. "IFData").
         const char* dtype  = ds.attribute("type").value();
         if (*action) j.key_str("datastream_action", action);
         if (*dtype)  j.key_str("datastream_type",   dtype);

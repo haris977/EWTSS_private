@@ -468,6 +468,7 @@ static void test_xml_datastream_reply() {
     CHECK(contains(json, "reply"), "DataStream reply msg_kind == reply");
     CHECK(contains(json, "9200"),       "DataStream reply has port 9200");
     CHECK(contains(json, "192.168.1.1"),"DataStream reply has IP");
+    CHECK(contains(json, "IFData"), "DataStream reply datastream_type == IFData (not the root's own type=get)");
     free_result(json);
     free_result(out);
 }
