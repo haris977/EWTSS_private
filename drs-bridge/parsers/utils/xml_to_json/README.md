@@ -1,5 +1,14 @@
 # xml_to_json — hand-written XML→JSON parser
 
+**Superseded for production use (2026-07-16):** CA120/DDF-550/DDF-1GTX's
+production `parse_message` now use pugixml directly, keeping each parser's
+existing curated JSON output instead of adopting this module's generic
+mirror shape — see
+[xml-parsing-pugixml-migration-design.md](../../../../docs/ewtss/specs/xml-parsing-pugixml-migration-design.md).
+This module remains committed and tested but is not used by any production
+parser; kept for historical reference and in case a future need for the
+full generic-mirror shape resurfaces.
+
 Standalone, dependency-free C++17 module. Converts CA120/DDF-550/DDF-1GTX-style
 XML control messages (`<Request>`/`<Reply>`/`<Event>`/`<RDFS>` envelopes with
 attributes, nesting, and repeated sibling tags) into JSON, without pulling in
