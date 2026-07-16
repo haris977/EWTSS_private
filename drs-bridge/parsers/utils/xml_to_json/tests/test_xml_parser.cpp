@@ -100,6 +100,25 @@ void test_malformed_mismatched_tag() {
     check(r.error_offset > 0, "malformed_mismatched_tag: expected a nonzero error offset");
 }
 
+void test_text_preserved_verbatim() {
+    std::string xml = "<Tag>  hello  </Tag>";
+    XmlParseResult r = parse_xml(xml.c_str(), xml.size());
+    check(r.ok, "text_preserved_verbatim: expected ok");
+    check(r.root.text == "  hello  ", "text_preserved_verbatim: expected verbatim text with both leading and trailing spaces preserved, got \"" + r.root.text + "\"");
+}
+
+void test_depth_guard_no_crash() {
+    std::string xml;
+    int depth = 100;
+    for (int i = 0; i < depth; ++i) xml += "<a>";
+    xml += "leaf";
+    for (int i = 0; i < depth; ++i) xml += "</a>";
+
+    XmlParseResult r = parse_xml(xml.c_str(), xml.size());
+    check(!r.ok, "depth_guard_no_crash: expected failure on pathologically deep nesting (not a crash)");
+    check(!r.error.empty(), "depth_guard_no_crash: expected a non-empty error message");
+}
+
 }  // namespace
 
 int main() {
@@ -110,6 +129,8 @@ int main() {
     test_repeated_siblings();
     test_empty_element_equivalence();
     test_malformed_mismatched_tag();
+    test_text_preserved_verbatim();
+    test_depth_guard_no_crash();
 
     if (failures == 0) {
         std::printf("ALL TESTS PASSED\n");
