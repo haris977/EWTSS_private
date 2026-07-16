@@ -25,6 +25,8 @@
 #include "sdfc_abi.h"
 #include "sdfc_endian.h"
 #include "json_writer.h"
+#include "pugixml.hpp"
+#include "pugixml_helpers.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -96,67 +98,33 @@ static int xml_closing_end(const uint8_t* xml, int len, const char* tag) {
     return -1;
 }
 
-// Extract attribute value from xml[0..len).  Handles single and double quotes.
-static std::string xml_attr(const char* xml, int len, const char* attr) {
-    std::string key(" ");
-    key += attr;
-    key += '=';
-    const char* end = xml + len;
-    const char* p   = xml;
-    while (p < end) {
-        p = std::search(p, end, key.data(), key.data() + key.size());
-        if (p >= end) break;
-        p += (int)key.size();
-        if (p >= end) break;
-        char q = *p;
-        if (q != '"' && q != '\'') { continue; }
-        const char* vs = p + 1;
-        const char* ve = std::find(vs, end, q);
-        if (ve >= end) break;
-        return std::string(vs, ve);
+// ---------------------------------------------------------------------------
+// Content parsing now uses pugixml (find_first from pugixml_helpers.h;
+// param_value/tag_or_param below are specific to this file's Param-lookup
+// pattern) -- content parsing only; xml_closing_end above is
+// frame-boundary detection and still byte-scanning, see extract_frame.
+// ---------------------------------------------------------------------------
+
+// Returns the value of the first <Param name="param_name">VALUE</Param>
+// anywhere in the document, or "" if not found. This incidentally fixes a
+// pre-existing bug in the old xml_param_value/Command-name lookup, which
+// used unbounded std::strstr on a malloc'd frame buffer with no guaranteed
+// trailing NUL -- pugixml operates on the parsed tree, so there is no
+// equivalent overrun risk.
+static std::string param_value(pugi::xml_node root, const char* name) {
+    for (pugi::xpath_node xn : root.select_nodes(".//Param")) {
+        pugi::xml_node p = xn.node();
+        if (std::strcmp(p.attribute("name").value(), name) == 0) return p.text().get();
     }
     return {};
 }
 
-// Extract text between <tag> (with optional attributes) and </tag>.
-static std::string xml_text(const char* xml, int len, const char* tag) {
-    std::string open("<");
-    open += tag;
-    const char* end = xml + len;
-    const char* p   = xml;
-    while (p < end) {
-        p = std::search(p, end, open.data(), open.data() + open.size());
-        if (p >= end) break;
-        const char* nx = p + open.size();
-        if (nx >= end) break;
-        if (*nx != ' ' && *nx != '>' && *nx != '/' &&
-            *nx != '\r' && *nx != '\n') { p = nx; continue; }
-        // Advance to closing '>'
-        const char* gt = std::find(nx, end, '>');
-        if (gt >= end) break;
-        if (gt > nx && *(gt - 1) == '/') return {};  // self-closing
-        const char* ts = gt + 1;
-        char close[80];
-        std::snprintf(close, sizeof(close), "</%s>", tag);
-        const char* te = std::search(ts, end, close, close + strlen(close));
-        if (te >= end) return {};
-        return std::string(ts, te);
-    }
-    return {};
-}
-
-// Extract VALUE from <Param name="param_name">VALUE</Param>
-static std::string xml_param_value(const char* xml, int len, const char* param_name) {
-    std::string search(" name=\"");
-    search += param_name;
-    search += "\">";
-    const char* end = xml + len;
-    const char* p = std::search(xml, end, search.data(), search.data() + search.size());
-    if (p >= end) return {};
-    const char* vs = p + search.size();
-    const char* ve = std::search(vs, end, "</Param>", "</Param>" + 8);
-    if (ve >= end) return {};
-    return std::string(vs, ve);
+// Tries <Param name="X">, falls back to a direct <X> tag -- matches the
+// repeated "if (v.empty()) v = xml_text(...)" pattern in the original.
+static std::string tag_or_param(pugi::xml_node root, const char* name) {
+    std::string v = param_value(root, name);
+    if (!v.empty()) return v;
+    return find_first(root, name).text().get();
 }
 
 // ---------------------------------------------------------------------------
@@ -426,119 +394,97 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
     return j.str();
 }
 
-// ---------------------------------------------------------------------------
-// parse_xml_ddf1gtx — decodes one XML frame (control / DDFCL / DFData) to JSON
-// ---------------------------------------------------------------------------
-
-static std::string parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
-                                      int frame_type)
+// impl_parse_xml_ddf1gtx holds the real logic; parse_xml_ddf1gtx (below)
+// wraps it in try/catch so no C++ exception escapes toward parse_message's
+// extern "C" boundary (sdfc_abi.h rule 2) -- same rationale and idiom as
+// ca120_parser.cpp's impl_parse_xml/parse_xml split.
+static std::string impl_parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
+                                           int frame_type)
 {
-    const char* xml     = reinterpret_cast<const char*>(frame);
-    int         xml_len = frame_len;
+    pugi::xml_document doc;
+    pugi::xml_parse_result presult =
+        doc.load_buffer(frame, static_cast<size_t>(frame_len));
+    // See ca120_parser.cpp's parse_xml for why this new failure path is an
+    // accepted, intentional behavior change (design spec §3).
+    if (!presult) return {};
 
-    // Skip XML declaration if present
-    if (xml_len > 5 && memcmp(xml, "<?xml", 5) == 0) {
-        const char* end = xml + xml_len;
-        const char* p   = xml;
-        while (p < end - 1 && !(p[0] == '?' && p[1] == '>')) ++p;
-        if (p < end - 1) p += 2;
-        while (p < end && static_cast<unsigned char>(*p) <= 0x20u) ++p;
-        xml     = p;
-        xml_len = (int)(end - p);
-    }
+    pugi::xml_node root = doc.first_child();
+    const char* root_name = root.name();
 
-    bool is_ddfcl_req = (xml_len > 12 && memcmp(xml, "<DDFCLReques", 12) == 0);
-    bool is_ddfcl_rep = (xml_len > 11 && memcmp(xml, "<DDFCLReply",  11) == 0);
-    bool is_dfdata    = (xml_len >  7 && memcmp(xml, "<DFData",       7) == 0);
+    bool is_ddfcl_req = (std::strcmp(root_name, "DDFCLRequest") == 0);
+    bool is_ddfcl_rep = (std::strcmp(root_name, "DDFCLReply")   == 0);
+    bool is_dfdata    = (std::strcmp(root_name, "DFData")       == 0);
 
-    const char* channel  = is_dfdata                          ? "preclassifier_output"
-                         : (is_ddfcl_req || is_ddfcl_rep)    ? "preclassifier"
-                                                              : "control";
-    const char* msg_kind = (frame_type == 1)                  ? "request"
-                         : is_dfdata                          ? "dfdata"
-                                                              : "reply";
+    const char* channel  = is_dfdata                       ? "preclassifier_output"
+                         : (is_ddfcl_req || is_ddfcl_rep)   ? "preclassifier"
+                                                             : "control";
+    const char* msg_kind = (frame_type == 1) ? "request"
+                         : is_dfdata         ? "dfdata"
+                                             : "reply";
 
     JsonWriter j;
     j.key_str("hw",       "ddf1gtx");
     j.key_str("channel",  channel);
     j.key_str("msg_kind", msg_kind);
 
-    // Root-level attributes
-    std::string id_attr   = xml_attr(xml, xml_len, "id");
-    std::string type_attr = xml_attr(xml, xml_len, "type");
-    if (!id_attr.empty())   j.key_str("msg_id",   id_attr.c_str());
-    if (!type_attr.empty()) j.key_str("msg_type", type_attr.c_str());
+    const char* id_attr   = root.attribute("id").value();
+    const char* type_attr = root.attribute("type").value();
+    if (*id_attr)   j.key_str("msg_id",   id_attr);
+    if (*type_attr) j.key_str("msg_type", type_attr);
 
-    // Command name — attribute of <Command name="...">
+    // Command name -- first <Command> anywhere in the document.
     {
-        const char* tag_start = std::strstr(xml, "<Command");
-        if (tag_start && (tag_start - xml) < xml_len) {
-            int avail = xml_len - (int)(tag_start - xml);
-            std::string cmd = xml_attr(tag_start, avail, "name");
-            if (!cmd.empty()) j.key_str("command_name", cmd.c_str());
-        }
+        pugi::xml_node cmd = find_first(root, "Command");
+        const char* cmd_name = cmd.attribute("name").value();
+        if (*cmd_name) j.key_str("command_name", cmd_name);
     }
 
     // --- DfMode (§4.1): eOperationMode ---
     {
-        std::string v = xml_param_value(xml, xml_len, "eOperationMode");
-        if (v.empty()) v = xml_text(xml, xml_len, "eOperationMode");
+        std::string v = tag_or_param(root, "eOperationMode");
         if (!v.empty()) j.key_str("operation_mode", v.c_str());
     }
-
     // --- MeasureSettingsFFM (§4.2): iFrequency, iFreqBegin, iFreqEnd, eAttSelect ---
     {
-        std::string freq = xml_param_value(xml, xml_len, "iFrequency");
-        if (freq.empty()) freq = xml_text(xml, xml_len, "iFrequency");
-        if (!freq.empty()) j.key_str("frequency_hz", freq.c_str());
+        std::string v = tag_or_param(root, "iFrequency");
+        if (!v.empty()) j.key_str("frequency_hz", v.c_str());
     }
     {
-        std::string v = xml_param_value(xml, xml_len, "iFreqBegin");
-        if (v.empty()) v = xml_text(xml, xml_len, "iFreqBegin");
+        std::string v = tag_or_param(root, "iFreqBegin");
         if (!v.empty()) j.key_str("freq_begin_hz", v.c_str());
     }
     {
-        std::string v = xml_param_value(xml, xml_len, "iFreqEnd");
-        if (v.empty()) v = xml_text(xml, xml_len, "iFreqEnd");
+        std::string v = tag_or_param(root, "iFreqEnd");
         if (!v.empty()) j.key_str("freq_end_hz", v.c_str());
     }
     {
-        std::string v = xml_param_value(xml, xml_len, "eAttSelect");
-        if (v.empty()) v = xml_text(xml, xml_len, "eAttSelect");
+        std::string v = tag_or_param(root, "eAttSelect");
         if (!v.empty()) j.key_str("att_select", v.c_str());
     }
-
     // --- DemodulationSettings (§4.3): eDemodulation, eAFBandwidth ---
     {
-        std::string v = xml_param_value(xml, xml_len, "eDemodulation");
-        if (v.empty()) v = xml_text(xml, xml_len, "eDemodulation");
+        std::string v = tag_or_param(root, "eDemodulation");
         if (!v.empty()) j.key_str("demodulation", v.c_str());
     }
     {
-        std::string v = xml_param_value(xml, xml_len, "eAFBandwidth");
-        if (v.empty()) v = xml_text(xml, xml_len, "eAFBandwidth");
+        std::string v = tag_or_param(root, "eAFBandwidth");
         if (!v.empty()) j.key_str("af_bandwidth", v.c_str());
     }
-
     // --- AudioMode (§4.4): eAudioMode ---
     {
-        std::string v = xml_param_value(xml, xml_len, "eAudioMode");
-        if (v.empty()) v = xml_text(xml, xml_len, "eAudioMode");
+        std::string v = tag_or_param(root, "eAudioMode");
         if (!v.empty()) j.key_str("audio_mode_str", v.c_str());
     }
-
-    // --- ScanRangeAdd (§4.8): iFreqBegin, iFreqEnd, eDFPanStep ---
+    // --- ScanRangeAdd (§4.8): eDFPanStep ---
     {
-        std::string v = xml_param_value(xml, xml_len, "eDFPanStep");
-        if (v.empty()) v = xml_text(xml, xml_len, "eDFPanStep");
+        std::string v = tag_or_param(root, "eDFPanStep");
         if (!v.empty()) j.key_str("df_pan_step", v.c_str());
     }
-
     // --- TraceEnable/TraceDisable/TraceDelete (§4.10-4.12): eTraceTag, zIP, iPort ---
     {
-        std::string tt = xml_param_value(xml, xml_len, "eTraceTag");
-        std::string ip = xml_param_value(xml, xml_len, "zIP");
-        std::string pt = xml_param_value(xml, xml_len, "iPort");
+        std::string tt = param_value(root, "eTraceTag");
+        std::string ip = param_value(root, "zIP");
+        std::string pt = param_value(root, "iPort");
         if (!tt.empty()) j.key_str("trace_tag_str", tt.c_str());
         if (!ip.empty()) j.key_str("trace_ip",      ip.c_str());
         if (!pt.empty()) j.key_str("trace_port",    pt.c_str());
@@ -546,16 +492,16 @@ static std::string parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
 
     // --- DFData preclassifier output (FORMAT02, §6.7.3) ---
     if (is_dfdata) {
-        std::string cl_id  = xml_attr(xml, xml_len, "DDF-CL-ID");
-        std::string eclass = xml_text(xml, xml_len, "EmitterClass");
-        std::string cfreq  = xml_text(xml, xml_len, "CenterFrequency");
-        std::string bear   = xml_text(xml, xml_len, "BearingAvg");
-        std::string lvl    = xml_text(xml, xml_len, "LevelAvg");
-        if (!cl_id.empty())  j.key_str("ddf_cl_id",      cl_id.c_str());
-        if (!eclass.empty()) j.key_str("emitter_class",   eclass.c_str());
-        if (!cfreq.empty())  j.key_str("center_freq_hz",  cfreq.c_str());
-        if (!bear.empty())   j.key_str("bearing_avg_deg", bear.c_str());
-        if (!lvl.empty())    j.key_str("level_avg_dbuv",  lvl.c_str());
+        const char* cl_id  = root.attribute("DDF-CL-ID").value();
+        std::string eclass = find_first(root, "EmitterClass").text().get();
+        std::string cfreq  = find_first(root, "CenterFrequency").text().get();
+        std::string bear   = find_first(root, "BearingAvg").text().get();
+        std::string lvl    = find_first(root, "LevelAvg").text().get();
+        if (*cl_id)           j.key_str("ddf_cl_id",      cl_id);
+        if (!eclass.empty())  j.key_str("emitter_class",   eclass.c_str());
+        if (!cfreq.empty())   j.key_str("center_freq_hz",  cfreq.c_str());
+        if (!bear.empty())    j.key_str("bearing_avg_deg", bear.c_str());
+        if (!lvl.empty())     j.key_str("level_avg_dbuv",  lvl.c_str());
     }
 
     // Raw XML (capped) for Python-side deep parsing
@@ -565,6 +511,14 @@ static std::string parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
     j.key_str("raw_xml", std::string(orig_xml, (size_t)raw_len));
 
     return j.str();
+}
+
+static std::string parse_xml_ddf1gtx(const uint8_t* frame, int frame_len, int frame_type) {
+    try {
+        return impl_parse_xml_ddf1gtx(frame, frame_len, frame_type);
+    } catch (...) {
+        return {};
+    }
 }
 
 // ---------------------------------------------------------------------------
