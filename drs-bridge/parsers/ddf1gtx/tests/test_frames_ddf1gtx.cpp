@@ -1107,6 +1107,52 @@ static void test_eb200_audio_iq_demod() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: Command-absent safety check on the Command-name lookup
+//
+// This is a correctness/safety test for the CURRENT (pugixml-based)
+// find_first(root, "Command") path -- it is NOT a "fails on old code,
+// passes on new code" regression test. The old hand-rolled lookup used
+// std::strstr(xml, "<Command") directly on the raw frame buffer. That
+// buffer is malloc'd by extract_frame and memcpy'd to exactly its content
+// length (see the raw-XML path below, and wrap_xml/raw_bytes above) --
+// there is no guaranteed trailing NUL. If no "<Command" substring exists
+// anywhere in the frame, strstr has no length bound and would keep
+// scanning past the buffer looking for a NUL terminator: a genuine
+// heap-over-read (undefined behavior -- not reliably reproducible as a
+// deterministic pass/fail, since whether/when it crashes depends on heap
+// layout). The new code (find_first over the parsed pugixml tree, which
+// is inherently length-bounded) has no equivalent risk.
+//
+// What this test actually proves: given a valid, tightly-sized frame
+// (buffer length == XML byte length, no padding/NUL) with no <Command>
+// element anywhere, parsing still succeeds and simply omits
+// "command_name" from the JSON -- i.e. the fixed code path handles the
+// Command-absent case safely and correctly.
+// ---------------------------------------------------------------------------
+
+static void test_command_absent_no_overrun() {
+    const char* xml = "<Reply type=\"get\" id=\"1\"></Reply>";
+    auto frame_bytes = raw_bytes(xml);  // sized to exactly strlen(xml), no NUL padding
+
+    uint8_t* frame = nullptr;
+    size_t frame_len = 0;
+    int r = extract_frame(frame_bytes.data(), frame_bytes.size(), &frame, &frame_len);
+    CHECK(r == 0);
+    CHECK(frame_len == strlen(xml));  // frame is exactly the XML's byte length
+
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(frame, frame_len, &json, &json_len);
+    CHECK(prc == 0);
+    CHECK(json != nullptr);
+    CHECK(json_has(json, "\"msg_kind\":\"reply\""));
+    CHECK(!json_has(json, "\"command_name\""));  // no <Command> present -> key omitted
+
+    free_result(json);
+    free_result(frame);
+}
+
+// ---------------------------------------------------------------------------
 // Test: EB200 unknown tag (e.g. 101) — still parsed, tag_name="unknown"
 // ---------------------------------------------------------------------------
 
@@ -1175,6 +1221,7 @@ int main() {
     test_parse_message_null();
     test_eb200_audio_iq_demod();
     test_eb200_unknown_tag();
+    test_command_absent_no_overrun();
 
     if (g_fails == 0) {
         std::printf("PASS  %d/%d checks\n", g_checks, g_checks);

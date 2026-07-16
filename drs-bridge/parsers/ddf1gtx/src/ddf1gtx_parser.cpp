@@ -106,11 +106,9 @@ static int xml_closing_end(const uint8_t* xml, int len, const char* tag) {
 // ---------------------------------------------------------------------------
 
 // Returns the value of the first <Param name="param_name">VALUE</Param>
-// anywhere in the document, or "" if not found. This incidentally fixes a
-// pre-existing bug in the old xml_param_value/Command-name lookup, which
-// used unbounded std::strstr on a malloc'd frame buffer with no guaranteed
-// trailing NUL -- pugixml operates on the parsed tree, so there is no
-// equivalent overrun risk.
+// anywhere in the document, or "" if not found. (The old xml_param_value
+// this replaces was already bounded/safe -- see the Command-name lookup
+// below for the actual pre-existing bug this migration fixes.)
 static std::string param_value(pugi::xml_node root, const char* name) {
     for (pugi::xpath_node xn : root.select_nodes(".//Param")) {
         pugi::xml_node p = xn.node();
@@ -433,6 +431,16 @@ static std::string impl_parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
     if (*type_attr) j.key_str("msg_type", type_attr);
 
     // Command name -- first <Command> anywhere in the document.
+    // Deliberate bug fix from the old hand-rolled scanning: the old code used
+    // std::strstr(xml, "<Command") -- strstr scans for a NUL terminator with
+    // no length bound, but `xml` here is a malloc'd frame buffer with no
+    // guaranteed trailing NUL (memcpy'd to exactly its content length in
+    // extract_frame). This was a genuine heap-over-read risk (undefined
+    // behavior, not reliably reproducible as a deterministic test failure --
+    // see test_command_absent_no_overrun() for a correctness check on the
+    // new, structurally-safe path instead). pugixml's find_first operates on
+    // the parsed tree, which is inherently length-bounded, so this risk is
+    // gone.
     {
         pugi::xml_node cmd = find_first(root, "Command");
         const char* cmd_name = cmd.attribute("name").value();
