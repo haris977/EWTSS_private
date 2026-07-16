@@ -999,13 +999,18 @@ static void test_dfdata_chirp() {
 }
 
 // ---------------------------------------------------------------------------
-// Test: DFData with whitespace between elements (regression: skip non-element nodes)
+// Test: DFData with whitespace between elements (sanity check: pretty-printed XML)
 // ---------------------------------------------------------------------------
 
 static void test_dfdata_with_whitespace() {
-    // Pretty-printed XML with newlines and indentation between child elements.
-    // Before the fix, the whitespace/text nodes would be treated as "field" elements,
-    // injecting spurious empty-string keys ("": "") into the fields JSON object.
+    // Pretty-printed XML with newlines and indentation between child elements --
+    // confirms pugixml's default parsing (which discards inter-element whitespace,
+    // since parse_ws_pcdata/parse_ws_pcdata_single are not set) still extracts all
+    // fields correctly. NOTE: this is a plain sanity check, not a regression test
+    // for the node_element filter below -- whitespace-only text between elements
+    // never becomes a node under pugi::parse_default, so this fixture can't
+    // exercise that filter either way. See test_dfdata_with_cdata() for the real
+    // regression test (a stray CDATA child is what actually triggers the bug).
     const char* xml =
         "<DFData DDF-CL-ID=\"7\">\n"
         "  <EmitterClass>Burst</EmitterClass>\n"
@@ -1025,8 +1030,44 @@ static void test_dfdata_with_whitespace() {
     CHECK(json_has(json, "\"BearingAvg\":\"120.5\""));
     CHECK(json_has(json, "\"CenterFrequency\":\"Hz\""));
     CHECK(json_has(json, "\"BearingAvg\":\"deg\""));
-    // Most importantly: the fields object should NOT contain an empty-string key
-    // that would result from parsing whitespace/text nodes.
+    // Also confirm no empty-string key sneaks in here either -- though under
+    // pugi::parse_default this was never actually at risk for whitespace nodes
+    // (see comment above); the genuine proof of the node_element filter is
+    // test_dfdata_with_cdata() below.
+    CHECK(!json_has(json, "\"\":\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: DFData with a stray CDATA child (regression: skip non-element nodes)
+// ---------------------------------------------------------------------------
+
+static void test_dfdata_with_cdata() {
+    // This is the actual regression test for the node_element filter in the
+    // DFData field-extraction loop. Unlike inter-element whitespace (see
+    // test_dfdata_with_whitespace() above), pugi::parse_cdata IS on by default,
+    // so a stray <![CDATA[...]]> as a direct child of <DFData> parses into a
+    // real pugi::node_cdata node with an empty name() and non-empty text().
+    // Without the "field.type() != pugi::node_element" filter, this node would
+    // be iterated as a "field" and inject a spurious "": "stray" key into the
+    // fields JSON object.
+    const char* xml =
+        "<DFData DDF-CL-ID=\"8\">"
+        "<EmitterClass>Hopper</EmitterClass>"
+        "<![CDATA[stray]]>"
+        "<BearingAvg Unit=\"deg\">45.0</BearingAvg>"
+        "</DFData>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"ddf_cl_id\":\"8\""));
+    CHECK(json_has(json, "\"EmitterClass\":\"Hopper\""));
+    CHECK(json_has(json, "\"BearingAvg\":\"45.0\""));
+    CHECK(json_has(json, "\"BearingAvg\":\"deg\""));
+    // The real proof: no spurious empty-string key from the CDATA node.
     CHECK(!json_has(json, "\"\":\""));
 }
 
@@ -1320,6 +1361,7 @@ int main() {
     test_dfdata_hopper();
     test_dfdata_chirp();
     test_dfdata_with_whitespace();
+    test_dfdata_with_cdata();
     test_raw_xml_leading_ws();
     test_raw_xml_no_close();
     test_too_short();
