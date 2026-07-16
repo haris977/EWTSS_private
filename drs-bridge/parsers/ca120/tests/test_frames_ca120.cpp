@@ -134,13 +134,16 @@ static void test_ammos_valid_if_frame() {
     auto dh = make_if_dh();
     auto f  = build_ammos(0x01u, 7u, dh);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 3, "AMMOS IF frame -> type 3 (streaming)");
-    CHECK(len == (int)f.size(), "AMMOS IF frame out_len matches input");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "AMMOS IF frame -> extracted successfully");
+    CHECK(len == f.size(), "AMMOS IF frame out_len matches input");
 
-    const char* json = parse_message(out.data(), len, 3);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0, "parse_message(AMMOS IF) -> success");
     CHECK(json != nullptr, "parse_message(AMMOS IF) -> non-null");
     CHECK(contains(json, "\"stream\""), "AMMOS IF json has stream key");
     CHECK(contains(json, "if_data"),   "AMMOS IF json stream == if_data");
@@ -149,23 +152,28 @@ static void test_ammos_valid_if_frame() {
     // source_id = 42
     CHECK(contains(json, "42"),        "AMMOS IF json has source_id value 42");
     free_result(json);
+    free_result(out);
 }
 
 static void test_ammos_audio_frame() {
     auto dh = make_audio_dh();
     auto f  = build_ammos(0x100u, 3u, dh);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 3, "AMMOS Audio frame -> type 3");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "AMMOS Audio frame -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 3);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0, "parse_message(AMMOS Audio) -> success");
     CHECK(json != nullptr, "parse_message(AMMOS Audio) -> non-null");
     CHECK(contains(json, "audio"),     "AMMOS Audio json stream == audio");
     CHECK(contains(json, "FM"),        "AMMOS Audio json demod_type == FM");
     CHECK(contains(json, "48000"),     "AMMOS Audio json sample_rate_hz == 48000");
     free_result(json);
+    free_result(out);
 }
 
 static void test_ammos_ddce_if_frame() {
@@ -191,16 +199,20 @@ static void test_ammos_ddce_if_frame() {
 
     auto f = build_ammos(0x60u, 1u, dh);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 3, "AMMOS DDCE-IF frame -> type 3");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "AMMOS DDCE-IF frame -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 3);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0, "parse_message(AMMOS DDCE-IF) -> success");
     CHECK(json != nullptr, "parse_message(AMMOS DDCE-IF) -> non-null");
     CHECK(contains(json, "ddce_if_data"), "AMMOS DDCE-IF json stream == ddce_if_data");
     CHECK(contains(json, "99"),           "AMMOS DDCE-IF json has source_id 99");
     free_result(json);
+    free_result(out);
 }
 
 static void test_ammos_spectrum_frame() {
@@ -221,17 +233,21 @@ static void test_ammos_spectrum_frame() {
 
     auto f = build_ammos(0x13u, 5u, dh);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 3, "AMMOS Spectrum frame -> type 3");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "AMMOS Spectrum frame -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 3);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0, "parse_message(AMMOS Spectrum) -> success");
     CHECK(json != nullptr, "parse_message(AMMOS Spectrum) -> non-null");
     CHECK(contains(json, "spectrum"),    "AMMOS Spectrum json stream == spectrum");
     CHECK(contains(json, "HANN"),        "AMMOS Spectrum json window_type == HANN");
     CHECK(contains(json, "CLEARWRITE"),  "AMMOS Spectrum json display_mode == CLEARWRITE");
     free_result(json);
+    free_result(out);
 }
 
 static void test_ammos_pdw_frame() {
@@ -252,42 +268,46 @@ static void test_ammos_pdw_frame() {
 
     auto f = build_ammos(0x200u, 2u, dh);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 3, "AMMOS PDW frame -> type 3");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "AMMOS PDW frame -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 3);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0, "parse_message(AMMOS PDW) -> success");
     CHECK(json != nullptr, "parse_message(AMMOS PDW) -> non-null");
     CHECK(contains(json, "\"pdw\""),    "AMMOS PDW json stream == pdw");
     CHECK(contains(json, "deadbeef"),   "AMMOS PDW json guid has GuidData1 deadbeef");
     CHECK(contains(json, "10"),         "AMMOS PDW json pdw_count == 10");
     free_result(json);
+    free_result(out);
 }
 
 static void test_ammos_incomplete_frame() {
     auto dh = make_if_dh();
     auto f  = build_ammos(0x01u, 1u, dh);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
+    uint8_t* out = nullptr;
+    size_t len = 0;
 
     // One byte short -> incomplete
-    int t = extract_frame(f.data(), (int)f.size() - 1, out.data(), &len);
-    CHECK(t == 0, "AMMOS truncated by 1 byte -> incomplete (0)");
+    int rc = extract_frame(f.data(), f.size() - 1, &out, &len);
+    CHECK(rc == -1, "AMMOS truncated by 1 byte -> incomplete (-1)");
 
     // Only magic present (4 bytes) -> incomplete (need FrameLength)
-    t = extract_frame(f.data(), 4, out.data(), &len);
-    CHECK(t == 0, "AMMOS only 4 bytes -> incomplete (0)");
+    rc = extract_frame(f.data(), 4, &out, &len);
+    CHECK(rc == -1, "AMMOS only 4 bytes -> incomplete (-1)");
 }
 
 static void test_ammos_bad_magic() {
     std::vector<uint8_t> f(8, 0xFF);
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
     // 0xFF is not '<', so neither XML nor AMMOS → -1
-    CHECK(t == -1, "non-magic non-XML bytes -> corrupt (-1)");
+    CHECK(rc == -1, "non-magic non-XML bytes -> corrupt (-1)");
 }
 
 static void test_ammos_iqdw_exceeds_limit() {
@@ -307,15 +327,19 @@ static void test_ammos_iqdw_exceeds_limit() {
     le32(mini, 16, 0u);            // DataHeaderLength
     le32(mini, 20, 0u);            // SignalGroup
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(mini.data(), (int)mini.size(), out.data(), &len);
-    CHECK(t == 3, "IQDW (0x201) frame with normal FrameLength -> accepted (type 3)");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(mini.data(), mini.size(), &out, &len);
+    CHECK(rc == 0, "IQDW (0x201) frame with normal FrameLength -> accepted");
 
-    const char* json = parse_message(out.data(), len, 3);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0, "parse_message(IQDW 0x201) -> success");
     CHECK(json != nullptr, "parse_message(IQDW 0x201) -> non-null");
     CHECK(contains(json, "iqdw"),     "IQDW 0x201 json stream contains iqdw");
     free_result(json);
+    free_result(out);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,18 +358,22 @@ static void test_xml_request() {
         "</Request>";
     auto f = xml_bytes(msg);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 1, "XML <Request> -> type 1 (cmd)");
-    CHECK(len == (int)f.size(), "XML Request out_len correct");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "XML <Request> -> extracted successfully");
+    CHECK(len == f.size(), "XML Request out_len correct");
 
-    const char* json = parse_message(out.data(), len, 1);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0,                 "parse_message(XML Request) -> success");
     CHECK(json != nullptr,           "parse_message(XML Request) -> non-null");
     CHECK(contains(json, "request"), "XML Request json msg_kind == request");
     CHECK(contains(json, "tuner"),   "XML Request json subsystems includes tuner");
     CHECK(contains(json, "\"set\""), "XML Request json msg_type == set");
     free_result(json);
+    free_result(out);
 }
 
 static void test_xml_multi_root_request() {
@@ -357,16 +385,20 @@ static void test_xml_multi_root_request() {
         "</Request>";
     auto f = xml_bytes(msg);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 1, "XML multi-root Request -> type 1");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "XML multi-root Request -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 1);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0,                           "parse_message(multi-root Request) -> success");
     CHECK(json != nullptr,                    "parse_message(multi-root Request) -> non-null");
     CHECK(contains(json, "digital_demodulator"),  "multi-root subsystems has digital_demodulator");
     CHECK(contains(json, "bitstream_processing"), "multi-root subsystems has bitstream_processing");
     free_result(json);
+    free_result(out);
 }
 
 static void test_xml_reply() {
@@ -374,15 +406,19 @@ static void test_xml_reply() {
         "<Reply type=\"set\" id=\"1\"><Tuner><ProcessingStatus/></Tuner></Reply>";
     auto f = xml_bytes(msg);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 2, "XML <Reply> -> type 2 (response)");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "XML <Reply> -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 2);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0,               "parse_message(XML Reply) -> success");
     CHECK(json != nullptr,        "parse_message(XML Reply) -> non-null");
     CHECK(contains(json, "reply"),"XML Reply json msg_kind == reply");
     free_result(json);
+    free_result(out);
 }
 
 static void test_xml_event() {
@@ -393,16 +429,20 @@ static void test_xml_event() {
         "</Event>";
     auto f = xml_bytes(msg);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 2, "XML <Event> -> type 2");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "XML <Event> -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 2);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0,                "parse_message(XML Event) -> success");
     CHECK(json != nullptr,         "parse_message(XML Event) -> non-null");
     CHECK(contains(json, "event"), "XML Event json msg_kind == event");
     CHECK(contains(json, "detected"), "XML Event json status == detected");
     free_result(json);
+    free_result(out);
 }
 
 static void test_xml_datastream_reply() {
@@ -414,36 +454,41 @@ static void test_xml_datastream_reply() {
         "</Reply>";
     auto f = xml_bytes(msg);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 2, "XML DataStream reply -> type 2");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "XML DataStream reply -> extracted successfully");
 
-    const char* json = parse_message(out.data(), len, 2);
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0,                     "parse_message(DataStream reply) -> success");
     CHECK(json != nullptr,              "parse_message(DataStream reply) -> non-null");
     CHECK(contains(json, "9200"),       "DataStream reply has port 9200");
     CHECK(contains(json, "192.168.1.1"),"DataStream reply has IP");
     free_result(json);
+    free_result(out);
 }
 
 static void test_xml_incomplete() {
     const char* partial = "<Request type=\"set\" id=\"3\"><Tuner>";
     auto f = xml_bytes(partial);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 0, "XML without closing </Request> -> incomplete (0)");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == -1, "XML without closing </Request> -> incomplete (-1)");
 }
 
 static void test_xml_leading_whitespace() {
     const char* msg = "   \r\n<Reply id=\"1\"><Control/></Reply>";
     auto f = xml_bytes(msg);
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    int t = extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    CHECK(t == 2, "XML Reply with leading whitespace -> type 2");
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "XML Reply with leading whitespace -> extracted successfully");
+    free_result(out);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,17 +500,18 @@ static void test_format_response_basic() {
         "{\"msg_type\":\"set\",\"id\":7,"
         "\"xml_body\":\"<Tuner><Frequency>100000000</Frequency></Tuner>\"}";
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int n = format_response(json, out.data());
-    CHECK(n > 0, "format_response returns positive byte count");
+    uint8_t* out_buf = nullptr;
+    size_t out_len = 0;
+    int rc = format_response("set", json, &out_buf, &out_len);
+    CHECK(rc == 0, "format_response returns success");
 
-    out[n] = 0;
-    const char* xml = reinterpret_cast<const char*>(out.data());
-    CHECK(std::strstr(xml, "<Request") != nullptr,   "format_response produces <Request");
-    CHECK(std::strstr(xml, "</Request>") != nullptr, "format_response produces </Request>");
-    CHECK(std::strstr(xml, "type=\"set\"") != nullptr, "format_response has type=set");
-    CHECK(std::strstr(xml, "id=\"7\"") != nullptr,     "format_response has id=7");
-    CHECK(std::strstr(xml, "Frequency") != nullptr,    "format_response body preserved");
+    std::string xml(reinterpret_cast<const char*>(out_buf), out_len);
+    CHECK(xml.find("<Request") != std::string::npos,   "format_response produces <Request");
+    CHECK(xml.find("</Request>") != std::string::npos, "format_response produces </Request>");
+    CHECK(xml.find("type=\"set\"") != std::string::npos, "format_response has type=set");
+    CHECK(xml.find("id=\"7\"") != std::string::npos,     "format_response has id=7");
+    CHECK(xml.find("Frequency") != std::string::npos,    "format_response body preserved");
+    free_result(out_buf);
 }
 
 static void test_format_response_with_time() {
@@ -473,21 +519,24 @@ static void test_format_response_with_time() {
         "{\"msg_type\":\"get\",\"id\":3,\"time\":12345,"
         "\"xml_body\":\"<Tuner/>\"}";
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int n = format_response(json, out.data());
-    CHECK(n > 0, "format_response with time -> positive byte count");
+    uint8_t* out_buf = nullptr;
+    size_t out_len = 0;
+    int rc = format_response("set", json, &out_buf, &out_len);
+    CHECK(rc == 0, "format_response with time -> success");
 
-    out[n] = 0;
-    const char* xml = reinterpret_cast<const char*>(out.data());
-    CHECK(std::strstr(xml, "time=\"12345\"") != nullptr, "format_response has time=12345");
+    std::string xml(reinterpret_cast<const char*>(out_buf), out_len);
+    CHECK(xml.find("time=\"12345\"") != std::string::npos, "format_response has time=12345");
+    free_result(out_buf);
 }
 
 static void test_format_response_missing_required_field() {
     // Missing xml_body
     const char* json = "{\"msg_type\":\"set\",\"id\":1}";
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int n = format_response(json, out.data());
-    CHECK(n == -1, "format_response with missing xml_body -> -1");
+    uint8_t* out_buf = nullptr;
+    size_t out_len = 0;
+    int rc = format_response("set", json, &out_buf, &out_len);
+    CHECK(rc == -1, "format_response with missing xml_body -> -1");
+    free_result(out_buf);
 }
 
 static void test_format_response_roundtrip() {
@@ -496,20 +545,26 @@ static void test_format_response_roundtrip() {
         "{\"msg_type\":\"set\",\"id\":9,"
         "\"xml_body\":\"<Tuner><Frequency>200000000</Frequency></Tuner>\"}";
 
-    std::vector<uint8_t> wire(MAX_FRAME_BUFFER_BYTES);
-    int wire_len = format_response(json, wire.data());
-    CHECK(wire_len > 0, "roundtrip: format_response produced bytes");
+    uint8_t* wire = nullptr;
+    size_t wire_len = 0;
+    int frc = format_response("set", json, &wire, &wire_len);
+    CHECK(frc == 0, "roundtrip: format_response produced bytes");
 
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int out_len = 0;
-    int t = extract_frame(wire.data(), wire_len, out.data(), &out_len);
-    CHECK(t == 1, "roundtrip: extract_frame of format_response output -> type 1 (cmd)");
+    uint8_t* out = nullptr;
+    size_t out_len = 0;
+    int rc = extract_frame(wire, wire_len, &out, &out_len);
+    CHECK(rc == 0, "roundtrip: extract_frame of format_response output -> extracted successfully");
 
-    const char* result = parse_message(out.data(), out_len, 1);
+    char* result = nullptr;
+    size_t result_len = 0;
+    int prc = parse_message(out, out_len, &result, &result_len);
+    CHECK(prc == 0,                      "roundtrip: parse_message -> success");
     CHECK(result != nullptr,             "roundtrip: parse_message -> non-null");
     CHECK(contains(result, "request"),   "roundtrip: msg_kind == request");
     CHECK(contains(result, "200000000"), "roundtrip: frequency value preserved");
     free_result(result);
+    free_result(out);
+    free_result(wire);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,11 +580,14 @@ static void test_free_result_real_pointer() {
     // Allocate a real parse result and free it
     auto dh = make_if_dh();
     auto f  = build_ammos(0x01u, 1u, dh);
-    std::vector<uint8_t> out(MAX_FRAME_BUFFER_BYTES);
-    int len = 0;
-    extract_frame(f.data(), (int)f.size(), out.data(), &len);
-    const char* json = parse_message(out.data(), len, 3);
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    extract_frame(f.data(), f.size(), &out, &len);
+    char* json = nullptr;
+    size_t json_len = 0;
+    parse_message(out, len, &json, &json_len);
     free_result(json);  // must not crash or leak
+    free_result(out);   // must not crash or leak
     CHECK(true, "free_result on real parse_message result does not crash");
 }
 
