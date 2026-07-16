@@ -19,6 +19,16 @@
 // convert JSON to XML" discussion this session -- once that's designed,
 // its own implementation replaces this stub.
 //
+// Note (added during the pugixml migration of the real ca120_parser.cpp):
+// this file's approach and the real parser's are NOT the same thing. This
+// file emits the full generic XML->JSON mirror shape ({hw, channel,
+// msg_kind, body: {...}}) via xml_to_json/. The real ca120_parser.cpp uses
+// pugixml too, but only to rebuild its existing curated field set
+// (msg_type, subsystems, frequency_hz, raw_xml, etc.) -- same JSON
+// contract as before, different parsing engine underneath. This file
+// remains an unadopted validation candidate; see
+// docs/ewtss/specs/xml-parsing-pugixml-migration-design.md §7.
+//
 // Build (from repo root; single line, shown wrapped for readability):
 //   g++ -std=c++17 -Wall -Wextra
 //       -I drs-bridge/parsers/dp_ecm/include

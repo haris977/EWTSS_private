@@ -8,7 +8,10 @@
 // Rules (do not break without cross-team sign-off):
 //   1. All four symbols use C linkage (extern "C") — no C++ name mangling.
 //   2. No C++ types cross the boundary (no std::string, no exceptions escape).
-//   3. No LGPL-licensed code is linked into the DLL.
+//   3. No LGPL-licensed code is linked into the DLL. pugixml (MIT/zlib) is
+//      an approved exception — linked into ca120/ddf550/ddf1gtx for XML
+//      content parsing (see docs/ewtss/specs/xml-parsing-pugixml-migration-design.md).
+//      The rule's intent is "no copyleft/LGPL," not "zero third-party code."
 //   4. All out-pointers are DLL-heap-allocated — caller MUST call free_result().
 //
 // Frame model (authoritative, per DP-ECM-1071/1074 vendor ICDs):
