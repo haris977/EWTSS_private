@@ -15,6 +15,8 @@
 #include "sdfc_abi.h"
 #include "sdfc_endian.h"
 #include "json_writer.h"
+#include "pugixml.hpp"
+#include "pugixml_helpers.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -82,7 +84,9 @@ static uint64_t freq64(const uint8_t* lo, const uint8_t* hi) {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers: minimal XML scanning  (no LGPL, no exceptions)
+// Content parsing now uses pugixml (find_first from pugixml_helpers.h) --
+// content parsing only; xml_closing_end below is frame-boundary detection
+// and still byte-scanning, see extract_frame.
 // ---------------------------------------------------------------------------
 
 // Find the byte offset PAST the first occurrence of "</tag>" in xml[0..len).
@@ -97,61 +101,6 @@ static int xml_closing_end(const uint8_t* xml, int len, const char* tag) {
             return i + clen;
     }
     return -1;
-}
-
-// Extract the value of attribute named `attr` (requires ' attr=' prefix).
-// Returns empty string if not found.
-static std::string xml_attr(const char* xml, int len, const char* attr) {
-    std::string key(" ");
-    key += attr;
-    key += '=';
-    const char* end = xml + len;
-    const char* p   = xml;
-    while (p < end) {
-        p = std::search(p, end, key.data(), key.data() + key.size());
-        if (p >= end) break;
-        p += (int)key.size();
-        if (p >= end) break;
-        char q = *p;
-        if (q != '"' && q != '\'') { continue; }
-        const char* vs = p + 1;
-        const char* ve = std::find(vs, end, q);
-        if (ve >= end) break;
-        return std::string(vs, ve);
-    }
-    return {};
-}
-
-// Extract text content between <tag> and </tag>. Returns empty if not found.
-static std::string xml_text(const char* xml, int len, const char* tag) {
-    char open[80], close[80];
-    std::snprintf(open,  sizeof(open),  "<%s>",  tag);
-    std::snprintf(close, sizeof(close), "</%s>", tag);
-    const char* end = xml + len;
-    const char* p = std::search(xml, end, open, open + strlen(open));
-    if (p >= end) return {};
-    p += strlen(open);
-    const char* q = std::search(p, end, close, close + strlen(close));
-    if (q >= end) return {};
-    return std::string(p, q);
-}
-
-// Check whether a tag <tagname ...> or <tagname/> exists (word-boundary safe).
-static bool xml_has(const char* xml, int len, const char* tag) {
-    std::string open("<");
-    open += tag;
-    const char* end = xml + len;
-    const char* p   = xml;
-    while (p < end) {
-        p = std::search(p, end, open.data(), open.data() + open.size());
-        if (p >= end) break;
-        const char* nx = p + open.size();
-        if (nx < end && (*nx == ' ' || *nx == '>' || *nx == '/' ||
-                         *nx == '\r' || *nx == '\n'))
-            return true;
-        p = nx;
-    }
-    return false;
 }
 
 // Extract a JSON string field value from a flat JSON object string.
@@ -653,46 +602,47 @@ static std::string parse_ammos(const uint8_t* frame, int frame_len) {
     return j.str();
 }
 
-// ---------------------------------------------------------------------------
-// parse_xml — converts an XML Request / Reply / Event frame to JSON
-// ---------------------------------------------------------------------------
-//
-// The CA120 XML protocol is capability-tree style: clients set/get nodes
-// inside named subsystem trees rather than invoking numbered commands.
-// The JSON output provides routing metadata + extracted signal parameters.
-// The full raw XML is also emitted so the Python bridge can do richer parsing
-// using its own XML library.
-//
-// Known root node names (§3.2 of understanding doc, §5.x of ICD):
-//   ResourceManager, Control, Tuner/tuner, FFT, DetectAndClassify,
-//   FrequencyHopping, Squelch, Classifier, AnalogDemodulator,
-//   DigitalDemodulator, BitstreamProcessing, HopperFilterSeparation
+// impl_parse_xml holds the real logic; parse_xml (below) wraps it in
+// try/catch so no C++ exception ever escapes toward parse_message's
+// extern "C" boundary, matching sdfc_abi.h rule 2. pugixml's load_buffer
+// itself does not throw (it returns a result object), but the JsonWriter/
+// std::string work here could theoretically raise std::bad_alloc, and
+// select_node's XPath evaluation can theoretically raise
+// pugi::xpath_exception if PUGIXML_NO_EXCEPTIONS is ever undefined and a
+// malformed expression is ever constructed -- not reachable today since
+// every tag name used here is a fixed literal, but the guard costs nothing
+// and matches the same try/catch idiom already used in
+// drs-bridge/parsers/utils/xml_to_json/xml_to_json.cpp.
+static std::string impl_parse_xml(const uint8_t* frame, int frame_len, int frame_type) {
+    pugi::xml_document doc;
+    pugi::xml_parse_result presult =
+        doc.load_buffer(frame, static_cast<size_t>(frame_len));
+    // Stricter than the old string-scanning code, which had no notion of
+    // well-formedness and would silently emit a sparse/partial JSON for
+    // malformed input. extract_frame already rejects most malformed input
+    // (it requires a matching close tag by name); this catches the
+    // remaining corner case where a well-closed-looking frame is malformed
+    // *inside*. Accepted, intentional behavior change -- see design spec §3.
+    if (!presult) return {};
 
-static std::string parse_xml(const uint8_t* frame, int frame_len, int frame_type) {
-    const char* xml = reinterpret_cast<const char*>(frame);
+    pugi::xml_node root = doc.first_child();
 
     JsonWriter j;
     j.key_str("hw",       "ca120");
     j.key_str("channel",  "xml");
 
-    // Determine outermost element kind
-    bool is_event = false;
-    if (frame_len > 6) {
-        if (memcmp(xml, "<Event", 6) == 0)  is_event = true;
-    }
+    bool is_event = (std::strcmp(root.name(), "Event") == 0);
     j.key_str("msg_kind", (frame_type == 1) ? "request"
                         : is_event          ? "event"
                                             : "reply");
 
-    // Root-level attributes
-    std::string type_attr = xml_attr(xml, frame_len, "type");
-    std::string id_attr   = xml_attr(xml, frame_len, "id");
-    std::string src_attr  = xml_attr(xml, frame_len, "source");
-    if (!type_attr.empty()) j.key_str("msg_type",  type_attr.c_str());
-    if (!id_attr.empty())   j.key_str("msg_id",    id_attr.c_str());
-    if (!src_attr.empty())  j.key_str("event_source", src_attr.c_str());
+    const char* type_attr = root.attribute("type").value();
+    const char* id_attr   = root.attribute("id").value();
+    const char* src_attr  = root.attribute("source").value();
+    if (*type_attr) j.key_str("msg_type",     type_attr);
+    if (*id_attr)   j.key_str("msg_id",       id_attr);
+    if (*src_attr)  j.key_str("event_source", src_attr);
 
-    // Collect all subsystem root-node names present in this message
     static const struct { const char* tag; const char* name; } kSubsystems[] = {
         { "ResourceManager",       "resource_manager"       },
         { "Control",               "control"                },
@@ -711,7 +661,7 @@ static std::string parse_xml(const uint8_t* frame, int frame_len, int frame_type
     std::string sub_json("[");
     bool first = true;
     for (auto& s : kSubsystems) {
-        if (xml_has(xml, frame_len, s.tag)) {
+        if (find_first(root, s.tag)) {
             if (!first) sub_json += ',';
             sub_json += '"';
             sub_json += s.name;
@@ -722,39 +672,44 @@ static std::string parse_xml(const uint8_t* frame, int frame_len, int frame_type
     sub_json += ']';
     j.key_raw("subsystems", sub_json);
 
-    // DataStream action/type and target endpoint (§5.5)
-    if (xml_has(xml, frame_len, "DataStream")) {
-        std::string action = xml_attr(xml, frame_len, "action");
-        std::string dtype  = xml_attr(xml, frame_len, "type");
-        if (!action.empty()) j.key_str("datastream_action", action.c_str());
-        if (!dtype.empty())  j.key_str("datastream_type",   dtype.c_str());
-        std::string ip   = xml_text(xml, frame_len, "IP");
-        std::string port = xml_text(xml, frame_len, "Port");
-        if (!ip.empty())   j.key_str("stream_ip",   ip.c_str());
-        if (!port.empty()) j.key_str("stream_port",  port.c_str());
+    pugi::xml_node ds = find_first(root, "DataStream");
+    if (ds) {
+        const char* action = ds.attribute("action").value();
+        const char* dtype  = ds.attribute("type").value();
+        if (*action) j.key_str("datastream_action", action);
+        if (*dtype)  j.key_str("datastream_type",   dtype);
+        const char* ip   = ds.child("IP").text().get();
+        const char* port = ds.child("Port").text().get();
+        if (*ip)   j.key_str("stream_ip",   ip);
+        if (*port) j.key_str("stream_port", port);
     }
 
-    // StartApplication GUID in reply (§9.1.1) — the application context GUID
-    if (xml_has(xml, frame_len, "StartApplication")) {
-        std::string guid = xml_attr(xml, frame_len, "guid");
-        if (!guid.empty()) j.key_str("app_guid", guid.c_str());
+    pugi::xml_node start_app = find_first(root, "StartApplication");
+    if (start_app) {
+        const char* guid = start_app.attribute("guid").value();
+        if (*guid) j.key_str("app_guid", guid);
     }
 
-    // Event detection parameters (§9.1.3 — direct children on <Event>)
-    std::string status = xml_text(xml, frame_len, "Status");
-    std::string freq   = xml_text(xml, frame_len, "Frequency");
-    std::string bw     = xml_text(xml, frame_len, "Bandwidth");
-    if (!status.empty()) j.key_str("status",       status.c_str());
-    if (!freq.empty())   j.key_str("frequency_hz",  freq.c_str());
-    if (!bw.empty())     j.key_str("bandwidth_hz",  bw.c_str());
+    const char* status = find_first(root, "Status").text().get();
+    const char* freq   = find_first(root, "Frequency").text().get();
+    const char* bw     = find_first(root, "Bandwidth").text().get();
+    if (*status) j.key_str("status",      status);
+    if (*freq)   j.key_str("frequency_hz", freq);
+    if (*bw)     j.key_str("bandwidth_hz", bw);
 
-    // Full raw XML for Python-side deep parsing
-    // Capped to avoid unbounded JSON for very large replies (e.g. AvailableDemodulators)
     static constexpr int RAW_XML_CAP = 16384;
     int raw_len = (frame_len < RAW_XML_CAP) ? frame_len : RAW_XML_CAP;
-    j.key_str("raw_xml", std::string(xml, (size_t)raw_len));
+    j.key_str("raw_xml", std::string(reinterpret_cast<const char*>(frame), (size_t)raw_len));
 
     return j.str();
+}
+
+static std::string parse_xml(const uint8_t* frame, int frame_len, int frame_type) {
+    try {
+        return impl_parse_xml(frame, frame_len, frame_type);
+    } catch (...) {
+        return {};
+    }
 }
 
 // ---------------------------------------------------------------------------
