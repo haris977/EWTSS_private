@@ -395,6 +395,7 @@ static void test_xml_multi_root_request() {
     int prc = parse_message(out, len, &json, &json_len);
     CHECK(prc == 0,                           "parse_message(multi-root Request) -> success");
     CHECK(json != nullptr,                    "parse_message(multi-root Request) -> non-null");
+    CHECK(contains(json, "request"), "multi-root msg_kind == request");
     CHECK(contains(json, "digital_demodulator"),  "multi-root subsystems has digital_demodulator");
     CHECK(contains(json, "bitstream_processing"), "multi-root subsystems has bitstream_processing");
     free_result(json);
@@ -464,6 +465,7 @@ static void test_xml_datastream_reply() {
     int prc = parse_message(out, len, &json, &json_len);
     CHECK(prc == 0,                     "parse_message(DataStream reply) -> success");
     CHECK(json != nullptr,              "parse_message(DataStream reply) -> non-null");
+    CHECK(contains(json, "reply"), "DataStream reply msg_kind == reply");
     CHECK(contains(json, "9200"),       "DataStream reply has port 9200");
     CHECK(contains(json, "192.168.1.1"),"DataStream reply has IP");
     free_result(json);
@@ -488,6 +490,14 @@ static void test_xml_leading_whitespace() {
     size_t len = 0;
     int rc = extract_frame(f.data(), f.size(), &out, &len);
     CHECK(rc == 0, "XML Reply with leading whitespace -> extracted successfully");
+
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0, "parse_message(XML Reply with leading whitespace) -> success");
+    CHECK(json != nullptr, "parse_message(XML Reply with leading whitespace) -> non-null");
+    CHECK(contains(json, "reply"), "XML Reply with leading whitespace msg_kind == reply");
+    free_result(json);
     free_result(out);
 }
 
