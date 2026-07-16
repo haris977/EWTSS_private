@@ -3,6 +3,12 @@
 // Unit tests for ddf550_parser.cpp — no external test framework.
 // Exercises extract_frame, parse_message, format_response, and free_result
 // across all three frame channels (EB200, wrapped XML, raw XML/DFData).
+//
+// ABI note: these tests call the real sdfc_abi.h contract (malloc'd
+// out-params, 0/-1 return codes, no frame_type argument — parse_message
+// infers type from magic bytes). Prior to 2026-07-07 this file called a
+// different, incompatible ABI shape (direct buffers, frame-type-as-return-
+// value) and did not compile against the current header.
 
 #include "sdfc_abi.h"
 
@@ -148,8 +154,42 @@ static std::vector<uint8_t> raw_bytes(const char* s) {
 }
 
 // Check that JSON string contains a substring
-static bool json_has(const char* json, const char* needle) {
-    return json && std::strstr(json, needle) != nullptr;
+static bool json_has(const std::string& json, const char* needle) {
+    return json.find(needle) != std::string::npos;
+}
+
+// ---------------------------------------------------------------------------
+// ABI-correct call wrappers (sdfc_abi.h: malloc'd out-params, 0/-1 return)
+// ---------------------------------------------------------------------------
+
+static bool try_extract(const uint8_t* buf, size_t len, std::vector<uint8_t>& out_frame) {
+    uint8_t* frame  = nullptr;
+    size_t   fLen   = 0;
+    int rc = extract_frame(buf, len, &frame, &fLen);
+    if (rc != 0) return false;
+    out_frame.assign(frame, frame + fLen);
+    free_result(frame);
+    return true;
+}
+
+static bool try_parse(const uint8_t* frame, size_t len, std::string& out_json) {
+    char*  json = nullptr;
+    size_t jLen = 0;
+    int rc = parse_message(frame, len, &json, &jLen);
+    if (rc != 0) return false;
+    out_json.assign(json, jLen);
+    free_result(json);
+    return true;
+}
+
+static bool try_format(const char* kind, const char* kwargs_json, std::vector<uint8_t>& out_wire) {
+    uint8_t* buf  = nullptr;
+    size_t   bLen = 0;
+    int rc = format_response(kind, kwargs_json, &buf, &bLen);
+    if (rc != 0) return false;
+    out_wire.assign(buf, buf + bLen);
+    free_result(buf);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,15 +226,12 @@ static void test_eb200_audio() {
     auto ta = make_conv_ta(/*n_items=*/2, 0x80000000u, opt_hdr, periodic);
     auto pkt = make_eb200(/*tag=*/401, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
+    CHECK(frame.size() == pkt.size());
 
-    CHECK(r == 3);
-    CHECK(frame_len == (int)pkt.size());
-
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"hw\":\"ddf550\""));
     CHECK(json_has(json, "\"stream\":\"eb200\""));
     CHECK(json_has(json, "\"trace_tag\":401"));
@@ -209,8 +246,6 @@ static void test_eb200_audio() {
     CHECK(json_has(json, "\"demod_name\":\"FM\""));
     CHECK(json_has(json, "\"signal_source\":0"));
     CHECK(json_has(json, "\"periodic_data_bytes\":4"));
-
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,19 +263,17 @@ static void test_eb200_ifpan() {
     auto ta  = make_conv_ta(3, 0x00000003u, {}, periodic);
     auto pkt = make_eb200(501, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len) == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"trace_tag\":501"));
     CHECK(json_has(json, "\"tag_name\":\"ifpan\""));
     CHECK(json_has(json, "\"n_items\":3"));
     CHECK(json_has(json, "\"sel_flags\":3"));
     CHECK(json_has(json, "\"opt_hdr_len\":0"));
     CHECK(json_has(json, "\"periodic_data_bytes\":18"));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,15 +286,13 @@ static void test_eb200_pscan() {
     auto ta  = make_conv_ta(1, 0x00000001u, {}, periodic);
     auto pkt = make_eb200(1201, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len) == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"tag_name\":\"pscan\""));
     CHECK(json_has(json, "\"trace_tag\":1201"));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,19 +310,16 @@ static void test_eb200_dfpscan_advanced() {
     auto ta  = make_adv_ta(3, 0x00001001u, 0u, {}, periodic);
     auto pkt = make_eb200(5301, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len);
-    CHECK(r == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"tag_name\":\"dfpscan\""));
     CHECK(json_has(json, "\"trace_tag\":5301"));
     CHECK(json_has(json, "\"n_items\":3"));
     CHECK(json_has(json, "\"sel_flags\":4097"));   // 0x1001 = 4097
     CHECK(json_has(json, "\"periodic_data_bytes\":12"));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,15 +330,13 @@ static void test_eb200_sigp_advanced() {
     auto ta  = make_adv_ta(0, 0u, 0u, {}, {});
     auto pkt = make_eb200(5501, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len) == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"tag_name\":\"sigp\""));
     CHECK(json_has(json, "\"trace_tag\":5501"));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,18 +349,16 @@ static void test_eb200_cw() {
     auto ta  = make_conv_ta(1, 0x00000001u, {}, periodic);
     auto pkt = make_eb200(801, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len) == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"tag_name\":\"cw\""));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
-// Test: EB200 truncated header → incomplete (0)
+// Test: EB200 truncated header → no complete frame (-1)
 // ---------------------------------------------------------------------------
 
 static void test_eb200_truncated_header() {
@@ -343,13 +367,12 @@ static void test_eb200_truncated_header() {
     be32(buf, 0x000EB200u);
     be16(buf, 1u); be16(buf, 2u); be16(buf, 1u);  // 10 bytes total
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(buf.data(), (int)buf.size(), frame.data(), &frame_len) == 0);
+    std::vector<uint8_t> frame;
+    CHECK(!try_extract(buf.data(), buf.size(), frame));
 }
 
 // ---------------------------------------------------------------------------
-// Test: EB200 DataSize too small → corrupt (-1)
+// Test: EB200 DataSize too small → no complete frame (-1)
 // ---------------------------------------------------------------------------
 
 static void test_eb200_bad_datasize() {
@@ -358,40 +381,42 @@ static void test_eb200_bad_datasize() {
     be16(buf, 1u); be16(buf, 2u); be16(buf, 1u); be16(buf, 0u);
     be32(buf, 4u);  // DataSize=4 — less than EB200_HDR_BYTES(16), corrupt
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(buf.data(), (int)buf.size(), frame.data(), &frame_len) == -1);
+    std::vector<uint8_t> frame;
+    CHECK(!try_extract(buf.data(), buf.size(), frame));
 }
 
 // ---------------------------------------------------------------------------
-// Test: EB200 valid header but data not yet arrived → incomplete (0)
+// Test: EB200 valid header but data not yet arrived → no complete frame (-1)
+//
+// Current sdfc_abi.h contract collapses "incomplete" and "corrupt" into a
+// single -1 return (see icd-open-questions.md D5 — EB200 does not yet
+// distinguish "wait for more bytes" from "corrupt"; out of scope for this
+// pass, tracked separately). This test asserts today's actual behavior.
 // ---------------------------------------------------------------------------
 
 static void test_eb200_data_incomplete() {
     auto ta  = make_conv_ta(1, 0u, {}, {0x00, 0x00});
     auto pkt = make_eb200(501, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
+    std::vector<uint8_t> frame;
     // Provide only first 20 bytes of a 38-byte packet
-    CHECK(extract_frame(pkt.data(), 20, frame.data(), &frame_len) == 0);
+    CHECK(!try_extract(pkt.data(), 20, frame));
 }
 
 // ---------------------------------------------------------------------------
-// Test: Non-EB200 magic, non-XML garbage → corrupt (-1)
+// Test: Non-EB200 magic, non-XML garbage → no complete frame (-1)
 // ---------------------------------------------------------------------------
 
 static void test_garbage_input() {
     uint8_t buf[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03,
                       0x55, 0x66, 0x77, 0x88 };
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
+    std::vector<uint8_t> frame;
     // buf[8]=0x55 (not '<') so neither EB200 nor wrapped XML path matches
-    CHECK(extract_frame(buf, (int)sizeof(buf), frame.data(), &frame_len) == -1);
+    CHECK(!try_extract(buf, sizeof(buf), frame));
 }
 
 // ---------------------------------------------------------------------------
-// Test: Wrapped XML <Request> → type 1
+// Test: Wrapped XML <Request> → command
 // ---------------------------------------------------------------------------
 
 static void test_wrapped_xml_request() {
@@ -402,26 +427,23 @@ static void test_wrapped_xml_request() {
         "</Command></Request>";
     auto frame_bytes = wrap_xml(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len);
-    CHECK(r == 1);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"hw\":\"ddf550\""));
     CHECK(json_has(json, "\"channel\":\"control\""));
     CHECK(json_has(json, "\"msg_kind\":\"request\""));
     CHECK(json_has(json, "\"msg_id\":\"42\""));
     CHECK(json_has(json, "\"msg_type\":\"set\""));
     CHECK(json_has(json, "\"command_name\":\"DfMode\""));
-    CHECK(json_has(json, "\"operation_mode\":\"DFMODE_FFM\""));
-    CHECK(json_has(json, "raw_xml"));
-    free_result(json);
+    CHECK(json_has(json, "\"params\":{"));
+    CHECK(json_has(json, "\"eOperationMode\":\"DFMODE_FFM\""));
 }
 
 // ---------------------------------------------------------------------------
-// Test: Wrapped XML <Reply> → type 2
+// Test: Wrapped XML <Reply> → response
 // ---------------------------------------------------------------------------
 
 static void test_wrapped_xml_reply() {
@@ -431,16 +453,54 @@ static void test_wrapped_xml_reply() {
         "</Command></Reply>";
     auto frame_bytes = wrap_xml(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len);
-    CHECK(r == 2);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
     CHECK(json_has(json, "\"command_name\":\"DfMode\""));
-    free_result(json);
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wrapped XML DfMode GET — request has no params, reply echoes mode
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_dfmode_get_request() {
+    const char* xml =
+        "<Request type=\"get\" id=\"50\">"
+        "<Command name=\"DfMode\">"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"msg_kind\":\"request\""));
+    CHECK(json_has(json, "\"msg_type\":\"get\""));
+    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
+    CHECK(json_has(json, "\"params\":{}"));
+}
+
+static void test_wrapped_xml_dfmode_get_reply() {
+    const char* xml =
+        "<Reply type=\"get\" id=\"50\">"
+        "<Command name=\"DfMode\">"
+        "<Param name=\"eOperationMode\">DFMODE_SCAN</Param>"
+        "</Command></Reply>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"msg_kind\":\"reply\""));
+    CHECK(json_has(json, "\"msg_type\":\"get\""));
+    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
+    CHECK(json_has(json, "\"eOperationMode\":\"DFMODE_SCAN\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -455,15 +515,55 @@ static void test_wrapped_xml_freq() {
         "</Command></Request>";
     auto frame_bytes = wrap_xml(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len) == 1);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 1);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"command_name\":\"MeasureSettingsFFM\""));
-    CHECK(json_has(json, "\"frequency_hz\":\"145000000\""));
-    free_result(json);
+    CHECK(json_has(json, "\"iFrequency\":145000000"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wrapped XML MeasureSettingsFFM GET — request has no params, reply
+// echoes the current measurement settings
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_measuresettingsffm_get_request() {
+    const char* xml =
+        "<Request type=\"get\" id=\"51\">"
+        "<Command name=\"MeasureSettingsFFM\">"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"msg_type\":\"get\""));
+    CHECK(json_has(json, "\"command_name\":\"MeasureSettingsFFM\""));
+    CHECK(json_has(json, "\"params\":{}"));
+}
+
+static void test_wrapped_xml_measuresettingsffm_get_reply() {
+    const char* xml =
+        "<Reply type=\"get\" id=\"51\">"
+        "<Command name=\"MeasureSettingsFFM\">"
+        "<Param name=\"iFrequency\">145000000</Param>"
+        "<Param name=\"iBandwidth\">12500</Param>"
+        "</Command></Reply>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"msg_kind\":\"reply\""));
+    CHECK(json_has(json, "\"command_name\":\"MeasureSettingsFFM\""));
+    CHECK(json_has(json, "\"iFrequency\":145000000"));
+    CHECK(json_has(json, "\"iBandwidth\":12500"));
 }
 
 // ---------------------------------------------------------------------------
@@ -478,15 +578,13 @@ static void test_wrapped_xml_audiomode() {
         "</Command></Request>";
     auto frame_bytes = wrap_xml(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len) == 1);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 1);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"command_name\":\"AudioMode\""));
-    CHECK(json_has(json, "AUDIO_MODE_32KHZ_16BIT_MONO"));
-    free_result(json);
+    CHECK(json_has(json, "\"eAudioMode\":\"AUDIO_MODE_32KHZ_16BIT_MONO\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -503,36 +601,192 @@ static void test_wrapped_xml_trace_enable() {
         "</Command></Request>";
     auto frame_bytes = wrap_xml(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len) == 1);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 1);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"command_name\":\"TraceEnable\""));
-    CHECK(json_has(json, "\"trace_tag_str\":\"TRACETAG_AUDIO\""));
-    CHECK(json_has(json, "\"trace_ip\":\"192.168.1.100\""));
-    CHECK(json_has(json, "\"trace_port\":\"9152\""));
-    free_result(json);
+    CHECK(json_has(json, "\"eTraceTag\":\"TRACETAG_AUDIO\""));
+    CHECK(json_has(json, "\"zIP\":\"192.168.1.100\""));
+    CHECK(json_has(json, "\"iPort\":9152"));
 }
 
 // ---------------------------------------------------------------------------
-// Test: Wrapped XML incomplete → 0
+// Test: Wrapped XML TraceDisable command
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_trace_disable() {
+    const char* xml =
+        "<Request type=\"set\" id=\"8\">"
+        "<Command name=\"TraceDisable\">"
+        "<Param name=\"eTraceTag\">TRACETAG_AUDIO</Param>"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"command_name\":\"TraceDisable\""));
+    CHECK(json_has(json, "\"eTraceTag\":\"TRACETAG_AUDIO\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wrapped XML TraceDelete command — tears down the whole trace
+// connection (identified by the same zIP/iPort pair TraceEnable set up)
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_trace_delete() {
+    const char* xml =
+        "<Request type=\"set\" id=\"9\">"
+        "<Command name=\"TraceDelete\">"
+        "<Param name=\"zIP\">192.168.1.100</Param>"
+        "<Param name=\"iPort\">9152</Param>"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"command_name\":\"TraceDelete\""));
+    CHECK(json_has(json, "\"zIP\":\"192.168.1.100\""));
+    CHECK(json_has(json, "\"iPort\":9152"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: DemodulationSettings — 13 params, only 1 (eDemodulation) was ever on
+// the old hardcoded whitelist. Proves generic capture + prefix-based typing.
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_demodulation_settings() {
+    const char* xml =
+        "<Request type=\"set\" id=\"123\">"
+        "<Command name=\"DemodulationSettings\">"
+        "<Param name=\"eDemodulation\">MOD_FM</Param>"
+        "<Param name=\"iBfoFrequency\">1</Param>"
+        "<Param name=\"iAfFrequency\">1</Param>"
+        "<Param name=\"eAfBandwidth\">BW_25</Param>"
+        "<Param name=\"iAfThreshold\">1</Param>"
+        "<Param name=\"bUseAfThreshold\">true</Param>"
+        "<Param name=\"iPassbandFrequency\">1</Param>"
+        "<Param name=\"eLevelIndicator\">LEVEL_INDICATOR_RMS</Param>"
+        "<Param name=\"bAfc\">true</Param>"
+        "<Param name=\"eGainSelect\">GAIN_AUTO</Param>"
+        "<Param name=\"iGainValue\">5</Param>"
+        "<Param name=\"eGainTiming\">GC_FAST</Param>"
+        "<Param name=\"bStereoDecoder\">false</Param>"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"command_name\":\"DemodulationSettings\""));
+    CHECK(json_has(json, "\"eDemodulation\":\"MOD_FM\""));
+    CHECK(json_has(json, "\"iBfoFrequency\":1"));
+    CHECK(json_has(json, "\"iAfFrequency\":1"));
+    CHECK(json_has(json, "\"eAfBandwidth\":\"BW_25\""));
+    CHECK(json_has(json, "\"iAfThreshold\":1"));
+    CHECK(json_has(json, "\"bUseAfThreshold\":true"));
+    CHECK(json_has(json, "\"iPassbandFrequency\":1"));
+    CHECK(json_has(json, "\"eLevelIndicator\":\"LEVEL_INDICATOR_RMS\""));
+    CHECK(json_has(json, "\"bAfc\":true"));
+    CHECK(json_has(json, "\"eGainSelect\":\"GAIN_AUTO\""));
+    CHECK(json_has(json, "\"iGainValue\":5"));
+    CHECK(json_has(json, "\"eGainTiming\":\"GC_FAST\""));
+    CHECK(json_has(json, "\"bStereoDecoder\":false"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wrapped XML ScanRangeAdd command
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_scanrange_add() {
+    const char* xml =
+        "<Request type=\"set\" id=\"20\">"
+        "<Command name=\"ScanRangeAdd\">"
+        "<Param name=\"iStartFrequency\">30000000</Param>"
+        "<Param name=\"iStopFrequency\">88000000</Param>"
+        "<Param name=\"iStepFrequency\">25000</Param>"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"command_name\":\"ScanRangeAdd\""));
+    CHECK(json_has(json, "\"iStartFrequency\":30000000"));
+    CHECK(json_has(json, "\"iStopFrequency\":88000000"));
+    CHECK(json_has(json, "\"iStepFrequency\":25000"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wrapped XML ScanRangeDeleteAll command — no params, clears every
+// previously added scan range
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_scanrange_delete_all() {
+    const char* xml =
+        "<Request type=\"set\" id=\"21\">"
+        "<Command name=\"ScanRangeDeleteAll\">"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"command_name\":\"ScanRangeDeleteAll\""));
+    CHECK(json_has(json, "\"params\":{}"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: a self-closing <Param name="X"/> must not swallow a later param's
+// closing tag (the gap flagged before implementing this fix).
+// ---------------------------------------------------------------------------
+
+static void test_xml_param_self_closing_does_not_corrupt_scan() {
+    const char* xml =
+        "<Request type=\"set\" id=\"1\">"
+        "<Command name=\"TestCmd\">"
+        "<Param name=\"iEmpty\"/>"
+        "<Param name=\"eNext\">RealValue</Param>"
+        "</Command></Request>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"eNext\":\"RealValue\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wrapped XML incomplete → no complete frame (-1)
 // ---------------------------------------------------------------------------
 
 static void test_wrapped_xml_incomplete() {
     const char* xml = "<Request type=\"set\" id=\"1\"><Command name=\"DfMode\"></Command></Request>";
     auto frame_bytes = wrap_xml(xml);
 
-    std::vector<uint8_t> frame_buf(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
+    std::vector<uint8_t> frame;
     // Provide only half the wrapped frame
-    int half = (int)frame_bytes.size() / 2;
-    CHECK(extract_frame(frame_bytes.data(), half, frame_buf.data(), &frame_len) == 0);
+    size_t half = frame_bytes.size() / 2;
+    CHECK(!try_extract(frame_bytes.data(), half, frame));
 }
 
 // ---------------------------------------------------------------------------
-// Test: Wrapped XML length says 100 bytes but packet ends — incomplete (0)
+// Test: Wrapped XML length says 100 bytes but packet ends — no complete frame (-1)
 // ---------------------------------------------------------------------------
 
 static void test_wrapped_xml_partial_body() {
@@ -542,13 +796,54 @@ static void test_wrapped_xml_partial_body() {
     // Only 5 XML bytes follow
     be8(v, '<'); be8(v, 'R'); be8(v, 'e'); be8(v, 'q'); be8(v, '>');
 
-    std::vector<uint8_t> frame_buf(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(v.data(), (int)v.size(), frame_buf.data(), &frame_len) == 0);
+    std::vector<uint8_t> frame;
+    CHECK(!try_extract(v.data(), v.size(), frame));
 }
 
 // ---------------------------------------------------------------------------
-// Test: DDFCLRequest (wrapped, preclassifier control) → type 1
+// Test: <Event> async notification frame (D6) → recognised, msg_kind=event
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_event() {
+    const char* xml =
+        "<Event type=\"notify\" id=\"1\">"
+        "<Command name=\"ScanComplete\">"
+        "</Command></Event>";
+    auto frame_bytes = wrap_xml(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"msg_kind\":\"event\""));
+    CHECK(json_has(json, "\"command_name\":\"ScanComplete\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: <DFSelect> preclassifier filter command (port 9153, per icd-ddf550.md
+// §4) → recognised, classified as a preclassifier request
+// ---------------------------------------------------------------------------
+
+static void test_raw_xml_dfselect() {
+    const char* xml =
+        "<DFSelect>"
+        "<EmitterClass>Hopper</EmitterClass>"
+        "<EmitterClass>Burst</EmitterClass>"
+        "</DFSelect>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"channel\":\"preclassifier\""));
+    CHECK(json_has(json, "\"msg_kind\":\"request\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: DDFCLRequest (wrapped, preclassifier control) → command
 // ---------------------------------------------------------------------------
 
 static void test_ddfcl_request_wrapped() {
@@ -559,22 +854,42 @@ static void test_ddfcl_request_wrapped() {
         "</DDFCLRequest>";
     auto frame_bytes = wrap_xml(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len);
-    CHECK(r == 1);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"channel\":\"preclassifier\""));
     CHECK(json_has(json, "\"msg_kind\":\"request\""));
     CHECK(json_has(json, "\"msg_id\":\"10\""));
     CHECK(json_has(json, "\"command_name\":\"AnalysisIntervalMs\""));
-    free_result(json);
+    // AnalysisIntervalMs's "50000" is a direct-text Command body, not a
+    // <Param> — must still reach a structured field, not just raw_xml.
+    CHECK(json_has(json, "\"command_value\":\"50000\""));
 }
 
 // ---------------------------------------------------------------------------
-// Test: DDFCLReply (raw, no wrapper) → type 2
+// Test: Reply with no <Command> child at all — command_name/command_value
+// must be absent, and decoding must not scan past the frame buffer looking
+// for a tag that isn't there (strstr-on-non-null-terminated-buffer risk).
+// ---------------------------------------------------------------------------
+
+static void test_raw_xml_reply_without_command_tag() {
+    const char* xml = "<Reply type=\"get\" id=\"1\"></Reply>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"msg_kind\":\"reply\""));
+    CHECK(!json_has(json, "\"command_name\""));
+    CHECK(!json_has(json, "\"command_value\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: DDFCLReply (raw, no wrapper) → response
 // ---------------------------------------------------------------------------
 
 static void test_ddfcl_reply_raw() {
@@ -584,21 +899,18 @@ static void test_ddfcl_reply_raw() {
         "</DDFCLReply>";
     auto frame_bytes = raw_bytes(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len);
-    CHECK(r == 2);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"channel\":\"preclassifier\""));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
     CHECK(json_has(json, "\"command_name\":\"AnalysisIntervalMs\""));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
-// Test: DFData FORMAT02 preclassifier output (raw, port 9154) → type 2
+// Test: DFData FORMAT02 preclassifier output (raw, port 9154) → dfdata
 // ---------------------------------------------------------------------------
 
 static void test_dfdata_format02() {
@@ -611,21 +923,23 @@ static void test_dfdata_format02() {
         "</DFData>";
     auto frame_bytes = raw_bytes(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len);
-    CHECK(r == 2);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"channel\":\"preclassifier_output\""));
     CHECK(json_has(json, "\"msg_kind\":\"dfdata\""));
     CHECK(json_has(json, "\"ddf_cl_id\":\"3\""));
-    CHECK(json_has(json, "\"emitter_class\":\"Burst\""));
-    CHECK(json_has(json, "\"center_freq_hz\":\"433920000\""));
-    CHECK(json_has(json, "\"bearing_avg_deg\":\"245.7\""));
-    CHECK(json_has(json, "\"level_avg_dbuv\":\"56.3\""));
-    free_result(json);
+    CHECK(json_has(json, "\"fields\":{"));
+    CHECK(json_has(json, "\"EmitterClass\":\"Burst\""));
+    CHECK(json_has(json, "\"CenterFrequency\":\"433920000\""));
+    CHECK(json_has(json, "\"BearingAvg\":\"245.7\""));
+    CHECK(json_has(json, "\"LevelAvg\":\"56.3\""));
+    CHECK(json_has(json, "\"units\":{"));
+    CHECK(json_has(json, "\"CenterFrequency\":\"Hz\""));
+    CHECK(json_has(json, "\"BearingAvg\":\"deg\""));
+    CHECK(json_has(json, "\"LevelAvg\":\"dBuV\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -642,18 +956,50 @@ static void test_dfdata_hopper() {
         "</DFData>";
     auto frame_bytes = raw_bytes(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len) == 2);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 2);
-    CHECK(json != nullptr);
-    CHECK(json_has(json, "\"emitter_class\":\"Hopper\""));
-    free_result(json);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"EmitterClass\":\"Hopper\""));
+    // Hopper's frequency RANGE (start/stop), missing before this fix (D7).
+    CHECK(json_has(json, "\"StartFrequency\":\"430000000\""));
+    CHECK(json_has(json, "\"StopFrequency\":\"440000000\""));
+    CHECK(json_has(json, "\"units\":{"));
+    CHECK(json_has(json, "\"StartFrequency\":\"Hz\""));
+    CHECK(json_has(json, "\"StopFrequency\":\"Hz\""));
 }
 
 // ---------------------------------------------------------------------------
-// Test: Raw XML with leading whitespace (Reply) → type 2
+// Test: DFData with Chirp emitter class (frequency-sweeping, like Hopper)
+// ---------------------------------------------------------------------------
+
+static void test_dfdata_chirp() {
+    const char* xml =
+        "<DFData DDF-CL-ID=\"6\">"
+        "<EmitterClass>Chirp</EmitterClass>"
+        "<StartFrequency Unit=\"Hz\">100000000</StartFrequency>"
+        "<StopFrequency Unit=\"Hz\">108000000</StopFrequency>"
+        "<BearingAvg Unit=\"deg\">180.0</BearingAvg>"
+        "</DFData>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"EmitterClass\":\"Chirp\""));
+    CHECK(json_has(json, "\"StartFrequency\":\"100000000\""));
+    CHECK(json_has(json, "\"StopFrequency\":\"108000000\""));
+    CHECK(json_has(json, "\"BearingAvg\":\"180.0\""));
+    CHECK(json_has(json, "\"units\":{"));
+    CHECK(json_has(json, "\"StartFrequency\":\"Hz\""));
+    CHECK(json_has(json, "\"StopFrequency\":\"Hz\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: Raw XML with leading whitespace (Reply) → response
 // ---------------------------------------------------------------------------
 
 static void test_raw_xml_leading_ws() {
@@ -662,40 +1008,35 @@ static void test_raw_xml_leading_ws() {
         "<Command name=\"ModuleInfo\"></Command></Reply>";
     auto frame_bytes = raw_bytes(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    int r = extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len);
-    CHECK(r == 2);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, r);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
     CHECK(json_has(json, "\"command_name\":\"ModuleInfo\""));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
-// Test: Raw XML without closing tag → incomplete (0)
+// Test: Raw XML without closing tag → no complete frame (-1)
 // ---------------------------------------------------------------------------
 
 static void test_raw_xml_no_close() {
     const char* xml = "<Reply type=\"set\" id=\"1\"><Command name=\"DfMode\">";
     auto frame_bytes = raw_bytes(xml);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(frame_bytes.data(), (int)frame_bytes.size(), frame.data(), &frame_len) == 0);
+    std::vector<uint8_t> frame;
+    CHECK(!try_extract(frame_bytes.data(), frame_bytes.size(), frame));
 }
 
 // ---------------------------------------------------------------------------
-// Test: buf_len < 4 → incomplete (0)
+// Test: buf_len < 4 → no complete frame (-1)
 // ---------------------------------------------------------------------------
 
 static void test_too_short() {
     uint8_t buf[] = {0x00, 0x0E};
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(buf, 2, frame.data(), &frame_len) == 0);
+    std::vector<uint8_t> frame;
+    CHECK(!try_extract(buf, 2, frame));
 }
 
 // ---------------------------------------------------------------------------
@@ -709,25 +1050,24 @@ static void test_format_response_control() {
         "\"command_name\":\"DfMode\","
         "\"xml_body\":\"<Param name=\\\"eOperationMode\\\">DFMODE_FFM</Param>\"}";
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int n = format_response(json_in, frame.data());
-    CHECK(n > 12);  // must have envelope + some XML
+    std::vector<uint8_t> wire;
+    CHECK(try_format("request", json_in, wire));
+    CHECK(wire.size() > 12);  // must have envelope + some XML
 
     // Check the binary envelope structure: [magic4][len4 BE][xml_bytes][magic4]
-    // len at offset 4 (BE) should equal n - 12
-    uint32_t len_field = ((uint32_t)frame[4] << 24) | ((uint32_t)frame[5] << 16) |
-                         ((uint32_t)frame[6] << 8)  |  (uint32_t)frame[7];
-    CHECK((int)len_field == n - 12);
+    // len at offset 4 (BE) should equal wire.size() - 12
+    uint32_t len_field = ((uint32_t)wire[4] << 24) | ((uint32_t)wire[5] << 16) |
+                         ((uint32_t)wire[6] << 8)  |  (uint32_t)wire[7];
+    CHECK((size_t)len_field == wire.size() - 12);
 
     // XML content is at offset 8
-    const char* xml = reinterpret_cast<const char*>(frame.data() + 8);
-    int xml_len = (int)len_field;
-    CHECK(std::string(xml, xml_len).find("<Request") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("type=\"set\"") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("id=\"42\"") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("<Command name=\"DfMode\">") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("DFMODE_FFM") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("</Request>") != std::string::npos);
+    std::string xml(reinterpret_cast<const char*>(wire.data() + 8), (size_t)len_field);
+    CHECK(xml.find("<Request") != std::string::npos);
+    CHECK(xml.find("type=\"set\"") != std::string::npos);
+    CHECK(xml.find("id=\"42\"") != std::string::npos);
+    CHECK(xml.find("<Command name=\"DfMode\">") != std::string::npos);
+    CHECK(xml.find("DFMODE_FFM") != std::string::npos);
+    CHECK(xml.find("</Request>") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -742,42 +1082,40 @@ static void test_format_response_preclassifier() {
         "\"channel\":\"preclassifier\","
         "\"xml_body\":\"50000\"}";
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int n = format_response(json_in, frame.data());
-    CHECK(n > 12);
+    std::vector<uint8_t> wire;
+    CHECK(try_format("request", json_in, wire));
 
-    uint32_t len_field = ((uint32_t)frame[4] << 24) | ((uint32_t)frame[5] << 16) |
-                         ((uint32_t)frame[6] << 8)  |  (uint32_t)frame[7];
-    CHECK((int)len_field == n - 12);
+    uint32_t len_field = ((uint32_t)wire[4] << 24) | ((uint32_t)wire[5] << 16) |
+                         ((uint32_t)wire[6] << 8)  |  (uint32_t)wire[7];
+    CHECK((size_t)len_field == wire.size() - 12);
 
-    const char* xml = reinterpret_cast<const char*>(frame.data() + 8);
-    int xml_len = (int)len_field;
-    CHECK(std::string(xml, xml_len).find("<DDFCLRequest") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("id=\"10\"") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("type=\"set\"") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("AnalysisIntervalMs") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("50000") != std::string::npos);
-    CHECK(std::string(xml, xml_len).find("</DDFCLRequest>") != std::string::npos);
+    std::string xml(reinterpret_cast<const char*>(wire.data() + 8), (size_t)len_field);
+    CHECK(xml.find("<DDFCLRequest") != std::string::npos);
+    CHECK(xml.find("id=\"10\"") != std::string::npos);
+    CHECK(xml.find("type=\"set\"") != std::string::npos);
+    CHECK(xml.find("AnalysisIntervalMs") != std::string::npos);
+    CHECK(xml.find("50000") != std::string::npos);
+    CHECK(xml.find("</DDFCLRequest>") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
-// Test: format_response — missing required field → -1
+// Test: format_response — missing required field → error
 // ---------------------------------------------------------------------------
 
 static void test_format_response_missing_field() {
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
+    std::vector<uint8_t> wire;
 
     // Missing "command_name"
     const char* bad = "{\"msg_type\":\"set\",\"id\":1,\"xml_body\":\"<P/>\"}";
-    CHECK(format_response(bad, frame.data()) == -1);
+    CHECK(!try_format("request", bad, wire));
 
     // Missing "id"
     const char* bad2 = "{\"msg_type\":\"set\",\"command_name\":\"DfMode\",\"xml_body\":\"\"}";
-    CHECK(format_response(bad2, frame.data()) == -1);
+    CHECK(!try_format("request", bad2, wire));
 
     // Missing "msg_type"
     const char* bad3 = "{\"id\":1,\"command_name\":\"DfMode\",\"xml_body\":\"\"}";
-    CHECK(format_response(bad3, frame.data()) == -1);
+    CHECK(!try_format("request", bad3, wire));
 }
 
 // ---------------------------------------------------------------------------
@@ -791,20 +1129,16 @@ static void test_format_response_roundtrip() {
         "\"command_name\":\"DeviceInfo\","
         "\"xml_body\":\"\"}";
 
-    std::vector<uint8_t> wire(MAX_FRAME_BUFFER_BYTES);
-    int wire_len = format_response(json_in, wire.data());
-    CHECK(wire_len > 0);
+    std::vector<uint8_t> wire;
+    CHECK(try_format("request", json_in, wire));
 
-    std::vector<uint8_t> out_frame(MAX_FRAME_BUFFER_BYTES);
-    int out_len = 0;
-    int r = extract_frame(wire.data(), wire_len, out_frame.data(), &out_len);
-    CHECK(r == 1);  // Request → type 1
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
 
-    const char* json_out = parse_message(out_frame.data(), out_len, r);
-    CHECK(json_out != nullptr);
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
     CHECK(json_has(json_out, "\"command_name\":\"DeviceInfo\""));
     CHECK(json_has(json_out, "\"msg_type\":\"get\""));
-    free_result(json_out);
 }
 
 // ---------------------------------------------------------------------------
@@ -824,25 +1158,25 @@ static void test_free_result_real() {
     auto ta  = make_conv_ta(1, 0u, {}, {0x00, 0x00});
     auto pkt = make_eb200(801, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len);
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
-    free_result(json);  // must not crash
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));  // free_result called inside try_parse
     CHECK(true);
 }
 
 // ---------------------------------------------------------------------------
-// Test: parse_message with nullptr/short frame → nullptr
+// Test: parse_message with nullptr/short frame → error
 // ---------------------------------------------------------------------------
 
 static void test_parse_message_null() {
-    CHECK(parse_message(nullptr, 0, 3)  == nullptr);
-    CHECK(parse_message(nullptr, 100, 1) == nullptr);
+    char* out_json = nullptr;
+    size_t out_len = 0;
+    CHECK(parse_message(nullptr, 0, &out_json, &out_len)   != 0);
+    CHECK(parse_message(nullptr, 100, &out_json, &out_len) != 0);
 
     uint8_t tiny[2] = {0x00, 0x01};
-    CHECK(parse_message(tiny, 2, 3) == nullptr);
+    CHECK(parse_message(tiny, 2, &out_json, &out_len) != 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -860,16 +1194,14 @@ static void test_eb200_audio_iq_demod() {
     auto ta  = make_conv_ta(1, 0x80000000u, opt_hdr, periodic);
     auto pkt = make_eb200(401, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len) == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"demod\":4"));
     CHECK(json_has(json, "\"demod_str\":\"IQ\""));
     CHECK(json_has(json, "\"frame_length\":4"));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -883,16 +1215,14 @@ static void test_eb200_audio_squelch() {
     auto ta  = make_conv_ta(0, 0x80000000u, opt_hdr, {});
     auto pkt = make_eb200(401, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len) == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"audio_mode\":0"));
     CHECK(json_has(json, "\"n_items\":0"));
     CHECK(json_has(json, "\"periodic_data_bytes\":0"));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -903,17 +1233,15 @@ static void test_eb200_unknown_tag() {
     auto ta  = make_conv_ta(5, 0x00000001u, {}, {0,1,2,3,4,5,6,7,8,9});
     auto pkt = make_eb200(101, ta);
 
-    std::vector<uint8_t> frame(MAX_FRAME_BUFFER_BYTES);
-    int frame_len = 0;
-    CHECK(extract_frame(pkt.data(), (int)pkt.size(), frame.data(), &frame_len) == 3);
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(pkt.data(), pkt.size(), frame));
 
-    const char* json = parse_message(frame.data(), frame_len, 3);
-    CHECK(json != nullptr);
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"trace_tag\":101"));
     // FScan is not explicitly named in our table → "unknown"
     // (or it could be named if added — just check tag number present)
     CHECK(json_has(json, "\"tag_name\""));
-    free_result(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -936,15 +1264,29 @@ int main() {
     test_garbage_input();
     test_wrapped_xml_request();
     test_wrapped_xml_reply();
+    test_wrapped_xml_dfmode_get_request();
+    test_wrapped_xml_dfmode_get_reply();
     test_wrapped_xml_freq();
+    test_wrapped_xml_measuresettingsffm_get_request();
+    test_wrapped_xml_measuresettingsffm_get_reply();
     test_wrapped_xml_audiomode();
     test_wrapped_xml_trace_enable();
+    test_wrapped_xml_trace_disable();
+    test_wrapped_xml_trace_delete();
+    test_wrapped_xml_demodulation_settings();
+    test_wrapped_xml_scanrange_add();
+    test_wrapped_xml_scanrange_delete_all();
+    test_xml_param_self_closing_does_not_corrupt_scan();
     test_wrapped_xml_incomplete();
     test_wrapped_xml_partial_body();
+    test_wrapped_xml_event();
+    test_raw_xml_dfselect();
     test_ddfcl_request_wrapped();
+    test_raw_xml_reply_without_command_tag();
     test_ddfcl_reply_raw();
     test_dfdata_format02();
     test_dfdata_hopper();
+    test_dfdata_chirp();
     test_raw_xml_leading_ws();
     test_raw_xml_no_close();
     test_too_short();

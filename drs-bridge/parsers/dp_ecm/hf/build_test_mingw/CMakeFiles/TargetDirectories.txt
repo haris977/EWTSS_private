@@ -1,0 +1,5 @@
+C:/Users/Admin/Downloads/ewtss-v2-design-main/drs-bridge/parsers/dp_ecm/hf/build_test_mingw/CMakeFiles/dp_ecm_hf.dir
+C:/Users/Admin/Downloads/ewtss-v2-design-main/drs-bridge/parsers/dp_ecm/hf/build_test_mingw/CMakeFiles/test_dp_ecm_hf.dir
+C:/Users/Admin/Downloads/ewtss-v2-design-main/drs-bridge/parsers/dp_ecm/hf/build_test_mingw/CMakeFiles/RUN_TESTS.dir
+C:/Users/Admin/Downloads/ewtss-v2-design-main/drs-bridge/parsers/dp_ecm/hf/build_test_mingw/CMakeFiles/ALL_BUILD.dir
+C:/Users/Admin/Downloads/ewtss-v2-design-main/drs-bridge/parsers/dp_ecm/hf/build_test_mingw/CMakeFiles/ZERO_CHECK.dir

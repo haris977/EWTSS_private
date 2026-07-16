@@ -9,10 +9,12 @@
 //   DDFCL control    (TCP 9153) — BE binary wrapper; bidirectional
 //   DDFCL output     (TCP 9154) — raw XML; DDF → SDFC  (FORMAT02 DFData)
 //
-// Frame type mapping (returned by extract_frame):
-//   1 = <Request> / <DDFCLRequest>   (SDFC → DDF command)
-//   2 = <Reply> / <DDFCLReply> / <DFData> (DDF → SDFC)
-//   3 = EB200 binary streaming frame (DDF → SDFC, port 9152)
+// extract_frame returns 0 on a complete frame, -1 otherwise (incomplete or
+// corrupt — sdfc_abi.h's contract does not distinguish the two). Frame type
+// is inferred separately, inside parse_message, from the frame's own bytes:
+//   <Request> / <DDFCLRequest> / <DFSelect>        (SDFC → DDF command)
+//   <Reply> / <DDFCLReply> / <DFData> / <Event>    (DDF → SDFC)
+//   EB200 binary streaming frame (port 9152)        (DDF → SDFC)
 //
 // NOTE: XML wrapper magic words (§3.3.1) are NOT specified in this ICD.
 // The constants XML_MAGIC_START / XML_MAGIC_END below are placeholders.
@@ -30,6 +32,8 @@
 #include <cstdio>
 #include <string>
 #include <algorithm>
+#include <vector>
+#include <utility>
 
 using namespace sdfc;
 
@@ -149,45 +153,89 @@ static std::string xml_attr(const char* xml, int len, const char* attr) {
     return {};
 }
 
-// Extract text between <tag> (with optional attributes) and </tag>.
-static std::string xml_text(const char* xml, int len, const char* tag) {
-    std::string open("<");
-    open += tag;
+// Scan xml[0..len) for every <Param name="X">Y</Param>, in document order.
+// Handles self-closing <Param name="X"/> (empty value) without letting the
+// scan run forward into a later param's closing tag.
+static std::vector<std::pair<std::string, std::string>>
+xml_all_params(const char* xml, int len) {
+    std::vector<std::pair<std::string, std::string>> out;
     const char* end = xml + len;
     const char* p   = xml;
+    static const char kOpen[] = "<Param name=\"";
+    const size_t kOpenLen = sizeof(kOpen) - 1;
     while (p < end) {
-        p = std::search(p, end, open.data(), open.data() + open.size());
+        p = std::search(p, end, kOpen, kOpen + kOpenLen);
         if (p >= end) break;
-        const char* nx = p + open.size();
-        if (nx >= end) break;
-        if (*nx != ' ' && *nx != '>' && *nx != '/' &&
-            *nx != '\r' && *nx != '\n') { p = nx; continue; }
-        // Advance to closing '>'
-        const char* gt = std::find(nx, end, '>');
+        p += kOpenLen;
+        const char* name_end = std::find(p, end, '"');
+        if (name_end >= end) break;
+        std::string name(p, name_end);
+        const char* gt = std::find(name_end + 1, end, '>');
         if (gt >= end) break;
-        if (gt > nx && *(gt - 1) == '/') return {};  // self-closing
-        const char* ts = gt + 1;
-        char close[80];
-        std::snprintf(close, sizeof(close), "</%s>", tag);
-        const char* te = std::search(ts, end, close, close + strlen(close));
-        if (te >= end) return {};
-        return std::string(ts, te);
+        if (gt > name_end + 1 && *(gt - 1) == '/') {
+            // Self-closing <Param name="X"/> — no value, no </Param> to find.
+            out.emplace_back(std::move(name), std::string());
+            p = gt + 1;
+            continue;
+        }
+        const char* ve = std::search(gt + 1, end, "</Param>", "</Param>" + 8);
+        if (ve >= end) break;
+        out.emplace_back(std::move(name), std::string(gt + 1, ve));
+        p = ve + 8;
     }
-    return {};
+    return out;
 }
 
-// Extract VALUE from <Param name="param_name">VALUE</Param>
-static std::string xml_param_value(const char* xml, int len, const char* param_name) {
-    std::string search(" name=\"");
-    search += param_name;
-    search += "\">";
+// Scan xml[0..len) for the direct child elements of a DFData-style record —
+// <Tag[ Unit="U"]>Value</Tag>, generic over Tag (no whitelist). Skips past
+// the root's own opening tag first, so it never picks up the root's own
+// attributes (e.g. DDF-CL-ID). Stops at the first closing tag it meets at
+// this level (</DFData> or similar), since DFData's fields are always a
+// flat, non-nested list per every example seen in this repo.
+struct DfDataField { std::string tag, value, unit; };
+static std::vector<DfDataField> xml_all_dfdata_fields(const char* xml, int len) {
+    std::vector<DfDataField> out;
     const char* end = xml + len;
-    const char* p = std::search(xml, end, search.data(), search.data() + search.size());
-    if (p >= end) return {};
-    const char* vs = p + search.size();
-    const char* ve = std::search(vs, end, "</Param>", "</Param>" + 8);
-    if (ve >= end) return {};
-    return std::string(vs, ve);
+    const char* root_gt = std::find(xml, end, '>');
+    if (root_gt >= end) return out;
+    const char* p = root_gt + 1;
+    while (p < end) {
+        p = std::find(p, end, '<');
+        if (p >= end || p + 1 >= end) break;
+        if (p[1] == '/') break;  // closing tag at this level — no more fields
+        const char* name_start = p + 1;
+        const char* name_end   = name_start;
+        while (name_end < end && *name_end != ' ' && *name_end != '>' && *name_end != '/') ++name_end;
+        if (name_end >= end) break;
+        std::string tag(name_start, name_end);
+        const char* gt = std::find(name_end, end, '>');
+        if (gt >= end) break;
+        std::string unit = xml_attr(name_start, (int)(gt - name_start), "Unit");
+        if (gt > name_end && *(gt - 1) == '/') { p = gt + 1; continue; }  // self-closing, no value
+        std::string close_tag = "</" + tag + ">";
+        const char* ve = std::search(gt + 1, end, close_tag.data(), close_tag.data() + close_tag.size());
+        if (ve >= end) break;
+        out.push_back(DfDataField{ tag, std::string(gt + 1, ve), unit });
+        p = ve + close_tag.size();
+    }
+    return out;
+}
+
+// Type by the ICD's own Hungarian-notation prefix (i=int, b=bool, else
+// string) rather than sniffing the value text — a param named with an 'i'
+// prefix is authoritatively an integer per the naming convention, whereas
+// guessing from "is this all digits" would mis-cast e.g. a zero-padded ID.
+static void write_typed_param(JsonWriter& j, const std::string& name, const std::string& val) {
+    char prefix = name.empty() ? '\0' : name[0];
+    if (prefix == 'i' && !val.empty()) {
+        char* endp = nullptr;
+        long long n = std::strtoll(val.c_str(), &endp, 10);
+        if (endp && *endp == '\0') { j.key_int(name.c_str(), n); return; }
+    } else if (prefix == 'b') {
+        if (val == "true")  { j.key_bool(name.c_str(), true);  return; }
+        if (val == "false") { j.key_bool(name.c_str(), false); return; }
+    }
+    j.key_str(name.c_str(), val);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +352,8 @@ static int classify_xml_root(const uint8_t* data, int data_len,
         { "Request",      1 },
         { "Reply",        2 },
         { "DFData",       2 },
+        { "Event",        2 },   // async status/alarm/scan-complete (D6): DDF -> SDFC
+        { "DFSelect",     1 },   // preclassifier filter command (icd-ddf550.md §4): SDFC -> DDF
     };
     int avail = (int)(end - p);
     for (auto& r : kRoots) {
@@ -461,6 +511,15 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
 // parse_xml_ddf550 — decodes one XML frame (control / DDFCL / DFData) to JSON
 // ---------------------------------------------------------------------------
 
+/*
+    "DDFCLRequest", 1
+    "DDFCLReply",   2 
+    "Request",      1 
+    "Reply",        2 
+    "DFData",       2 
+    "Event",        2
+    "DFSelect",     1 
+*/
 static std::string parse_xml_ddf550(const uint8_t* frame, int frame_len,
                                      int frame_type)
 {
@@ -481,12 +540,15 @@ static std::string parse_xml_ddf550(const uint8_t* frame, int frame_len,
     bool is_ddfcl_req = (xml_len > 12 && memcmp(xml, "<DDFCLReques", 12) == 0);
     bool is_ddfcl_rep = (xml_len > 11 && memcmp(xml, "<DDFCLReply",  11) == 0);
     bool is_dfdata    = (xml_len >  7 && memcmp(xml, "<DFData",       7) == 0);
+    bool is_event     = (xml_len >  6 && memcmp(xml, "<Event",        6) == 0);
+    bool is_dfselect  = (xml_len >  9 && memcmp(xml, "<DFSelect",     9) == 0);
 
     const char* channel  = is_dfdata           ? "preclassifier_output"
-                         : (is_ddfcl_req || is_ddfcl_rep) ? "preclassifier"
+                         : (is_ddfcl_req || is_ddfcl_rep || is_dfselect) ? "preclassifier"
                                                            : "control";
     const char* msg_kind = (frame_type == 1)   ? "request"
                          : is_dfdata           ? "dfdata"
+                         : is_event            ? "event"
                                                : "reply";
 
     JsonWriter j;
@@ -500,69 +562,64 @@ static std::string parse_xml_ddf550(const uint8_t* frame, int frame_len,
     if (!id_attr.empty())   j.key_str("msg_id",   id_attr.c_str());
     if (!type_attr.empty()) j.key_str("msg_type", type_attr.c_str());
 
-    // Command name — attribute of <Command name="...">
-    {
-        const char* tag_start = std::strstr(xml, "<Command");
-        if (tag_start && (tag_start - xml) < xml_len) {
-            int avail = xml_len - (int)(tag_start - xml);
-            std::string cmd = xml_attr(tag_start, avail, "name");
-            if (!cmd.empty()) j.key_str("command_name", cmd.c_str());
+    // Command name — attribute of <Command name="...">. Bounded search
+    // (not strstr): xml/xml_len is a malloc'd frame buffer with no
+    // guaranteed trailing NUL, so an unbounded C-string scan can run past
+    // the allocation on a frame that has no <Command> at all.
+    const char* xml_end = xml + xml_len;
+    const char* cmd_tag_start = std::search(xml, xml_end, "<Command", "<Command" + 8);
+    if (cmd_tag_start < xml_end) {
+        int avail = (int)(xml_end - cmd_tag_start);
+        std::string cmd = xml_attr(cmd_tag_start, avail, "name");
+        if (!cmd.empty()) j.key_str("command_name", cmd.c_str());
+
+        // Direct-text Command body (e.g. AnalysisIntervalMs's "50000") — no
+        // <Param> wrapper at all. Only meaningful when no params were found;
+        // otherwise this is just inter-tag whitespace.
+        const char* open_gt = std::find(cmd_tag_start, xml_end, '>');
+        if (open_gt < xml_end && !(open_gt > cmd_tag_start && *(open_gt - 1) == '/')) {
+            const char* close = std::search(open_gt + 1, xml_end, "</Command>", "</Command>" + 10);
+            if (close < xml_end) {
+                const char* vs = open_gt + 1;
+                const char* ve = close;
+                while (vs < ve && static_cast<unsigned char>(*vs) <= 0x20u) ++vs;
+                while (ve > vs && static_cast<unsigned char>(*(ve - 1)) <= 0x20u) --ve;
+                if (vs < ve && *vs != '<') {
+                    j.key_str("command_value", std::string(vs, ve));
+                }
+            }
         }
     }
 
-    // Key parameters — try both <Param name="...">VALUE</Param> and
-    // direct <TagName>VALUE</TagName> forms.
+    // Generic param capture — every <Param name="X">Y</Param> under
+    // <Command>, typed by the ICD's Hungarian-notation prefix (i/b/e/z).
+    // Replaces the old per-command whitelist: DemodulationSettings alone
+    // has 13 params, and only eDemodulation was ever hardcoded here — every
+    // other command's params were silently invisible outside raw_xml.
     {
-        std::string freq = xml_param_value(xml, xml_len, "iFrequency");
-        if (freq.empty()) freq = xml_param_value(xml, xml_len, "iFreqBegin");
-        if (freq.empty()) freq = xml_text(xml, xml_len, "iFrequency");
-        if (!freq.empty()) j.key_str("frequency_hz", freq.c_str());
-    }
-    {
-        std::string v = xml_param_value(xml, xml_len, "eOperationMode");
-        if (v.empty()) v = xml_text(xml, xml_len, "eOperationMode");
-        if (!v.empty()) j.key_str("operation_mode", v.c_str());
-    }
-    {
-        std::string v = xml_param_value(xml, xml_len, "eAudioMode");
-        if (v.empty()) v = xml_text(xml, xml_len, "eAudioMode");
-        if (!v.empty()) j.key_str("audio_mode_str", v.c_str());
-    }
-    {
-        std::string v = xml_param_value(xml, xml_len, "eDemodulation");
-        if (v.empty()) v = xml_text(xml, xml_len, "eDemodulation");
-        if (!v.empty()) j.key_str("demodulation", v.c_str());
+        JsonWriter params;
+        for (auto& kv : xml_all_params(xml, xml_len)) {
+            write_typed_param(params, kv.first, kv.second);
+        }
+        j.key_raw("params", params.str());
     }
 
-    // TraceEnable / TraceDisable / TraceDelete params
-    {
-        std::string tt = xml_param_value(xml, xml_len, "eTraceTag");
-        std::string ip = xml_param_value(xml, xml_len, "zIP");
-        std::string pt = xml_param_value(xml, xml_len, "iPort");
-        if (!tt.empty()) j.key_str("trace_tag_str", tt.c_str());
-        if (!ip.empty()) j.key_str("trace_ip",      ip.c_str());
-        if (!pt.empty()) j.key_str("trace_port",    pt.c_str());
-    }
-
-    // DFData preclassifier output fields  (FORMAT02, §6.7.3)
+    // DFData preclassifier output fields  (FORMAT02, §6.7.3) — generic over
+    // field name, so StartFrequency/StopFrequency (Hopper-class) and any
+    // future field all reach JSON without a per-name whitelist.
     if (is_dfdata) {
-        std::string cl_id  = xml_attr(xml, xml_len, "DDF-CL-ID");
-        std::string eclass = xml_text(xml, xml_len, "EmitterClass");
-        std::string cfreq  = xml_text(xml, xml_len, "CenterFrequency");
-        std::string bear   = xml_text(xml, xml_len, "BearingAvg");
-        std::string lvl    = xml_text(xml, xml_len, "LevelAvg");
-        if (!cl_id.empty())  j.key_str("ddf_cl_id",       cl_id.c_str());
-        if (!eclass.empty()) j.key_str("emitter_class",    eclass.c_str());
-        if (!cfreq.empty())  j.key_str("center_freq_hz",   cfreq.c_str());
-        if (!bear.empty())   j.key_str("bearing_avg_deg",  bear.c_str());
-        if (!lvl.empty())    j.key_str("level_avg_dbuv",   lvl.c_str());
-    }
+        std::string cl_id = xml_attr(xml, xml_len, "DDF-CL-ID");
+        if (!cl_id.empty()) j.key_str("ddf_cl_id", cl_id.c_str());
 
-    // Raw XML (capped) for Python-side deep parsing
-    static constexpr int RAW_XML_CAP = 16384;
-    const char* orig_xml = reinterpret_cast<const char*>(frame);
-    int raw_len = (frame_len < RAW_XML_CAP) ? frame_len : RAW_XML_CAP;
-    j.key_str("raw_xml", std::string(orig_xml, (size_t)raw_len));
+        JsonWriter fields, units;
+        bool has_units = false;
+        for (auto& f : xml_all_dfdata_fields(xml, xml_len)) {
+            fields.key_str(f.tag.c_str(), f.value);
+            if (!f.unit.empty()) { units.key_str(f.tag.c_str(), f.unit); has_units = true; }
+        }
+        j.key_raw("fields", fields.str());
+        if (has_units) j.key_raw("units", units.str());
+    }
 
     return j.str();
 }

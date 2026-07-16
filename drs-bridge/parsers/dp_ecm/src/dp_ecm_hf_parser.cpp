@@ -2646,7 +2646,9 @@ static int encode_fh_detection(const char* json, uint8_t* buf, int max_len) {
 }
 
 // Serialize FF Detection response payload for Group 101 / Unit 70.
-// Wire: S_RES_WIDEBAND_FFT_DATA (6408B, zeroed) + ff_count (u32) + S_DETECTED_FIXED_FREQUENCY × N (36B each).
+// Wire: S_RES_WIDEBAND_FFT_DATA (6408B) + ff_count (u32) + S_DETECTED_FIXED_FREQUENCY × N (36B each).
+// S_RES_WIDEBAND_FFT_DATA: @0 fft_bin_count (u32) @4 wideband_power_dbm[1600] (f32) @6404 scan_speed (u32).
+// Source JSON nests these three under "wideband": {"fft_bin_count", "scan_speed", "wideband_power_dbm": [...]}.
 // S_DETECTED_FIXED_FREQUENCY (36B):
 //   @0  freq (f32,MHz)  @4  current_power_dbm (f32)  @8  active_count (u32)
 //   @12 min_power_dbm (f32)  @16 max_power_dbm (f32)
@@ -2663,6 +2665,33 @@ static int encode_ff_detection(const char* json, uint8_t* buf, int max_len) {
     if (FFT_BLOCK + 4 + fc * FF_ELEM > max_len) return -1;
 
     std::memset(buf, 0, static_cast<size_t>(FFT_BLOCK));
+
+    long long bin_count_ll = 0, scan_speed_ll = 0;
+    json_find_int(json, "fft_bin_count", bin_count_ll);
+    json_find_int(json, "scan_speed",    scan_speed_ll);
+    int bin_count = static_cast<int>(bin_count_ll);
+    if (bin_count < 0)    bin_count = 0;
+    if (bin_count > 1600) bin_count = 1600;
+    store_u32be(buf + 0,             static_cast<uint32_t>(bin_count));
+    store_u32be(buf + 4 + 1600 * 4,  static_cast<uint32_t>(scan_speed_ll));
+
+    const char* wb = std::strstr(json, "\"wideband_power_dbm\"");
+    const char* wa = wb ? std::strchr(wb, '[') : nullptr;
+    if (wa) {
+        const char* c = wa + 1;
+        int i = 0;
+        while (i < bin_count) {
+            while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r' || *c == ',') ++c;
+            if (*c == ']' || *c == '\0') break;
+            char* end = nullptr;
+            double v = std::strtod(c, &end);
+            if (end == c) break;
+            store_f32be(buf + 4 + i * 4, static_cast<float>(v));
+            c = end;
+            ++i;
+        }
+    }
+
     store_u32be(buf + FFT_BLOCK, static_cast<uint32_t>(fc));
 
     if (fc == 0) return FFT_BLOCK + 4;
@@ -2957,9 +2986,30 @@ static int encode_cbit_status(const char* j, uint8_t* buf, int max_len) {
 static int encode_wideband_fft(const char* j, uint8_t* buf, int max_len) {
     if (max_len < 6408) return -1;
     std::memset(buf, 0, 6408);
-    long long bin_count = 0, scan_speed = 0;
-    json_find_int(j, "fft_bin_count", bin_count); json_find_int(j, "scan_speed", scan_speed);
+    long long bin_count_ll = 0, scan_speed = 0;
+    json_find_int(j, "fft_bin_count", bin_count_ll); json_find_int(j, "scan_speed", scan_speed);
+    int bin_count = (int)bin_count_ll;
+    if (bin_count < 0)    bin_count = 0;
+    if (bin_count > 1600) bin_count = 1600;
     store_u32be(buf + 0, (uint32_t)bin_count); store_u32be(buf + 6404, (uint32_t)scan_speed);
+
+    // S_RES_WIDEBAND_FFT_DATA power array — same "wideband_power_dbm" key as encode_ff_detection's embedded copy.
+    const char* wb = std::strstr(j, "\"wideband_power_dbm\"");
+    const char* wa = wb ? std::strchr(wb, '[') : nullptr;
+    if (wa) {
+        const char* c = wa + 1;
+        int i = 0;
+        while (i < bin_count) {
+            while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r' || *c == ',') ++c;
+            if (*c == ']' || *c == '\0') break;
+            char* end = nullptr;
+            double v = std::strtod(c, &end);
+            if (end == c) break;
+            store_f32be(buf + 4 + i * 4, (float)v);
+            c = end;
+            ++i;
+        }
+    }
     return 6408;
 }
 

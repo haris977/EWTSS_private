@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Admin\Downloads\ewtss-v2-design-main\drs-bridge\parsers\dp_ecm\tests\test_frames.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Admin\Downloads\ewtss-v2-design-main\drs-bridge\parsers\dp_ecm\src\sdfc_frame.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Admin\Downloads\ewtss-v2-design-main\drs-bridge\parsers\dp_ecm\src\dp_ecm_hf_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Admin\Downloads\ewtss-v2-design-main\drs-bridge\parsers\dp_ecm\hf\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{6266F4D2-19B4-3A0C-BC5C-29B5ECD18B0D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

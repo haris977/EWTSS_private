@@ -3187,11 +3187,32 @@ static int encode_fh_detection(const char* j, uint8_t* buf, int max_len) {
 static int encode_wideband_fft(const char* j, uint8_t* buf, int max_len) {
     if (max_len < 6408) return -1;
     std::memset(buf, 0, 6408);
-    long long bin_count = 0, scan_speed = 0;
-    json_find_int(j, "fft_bin_count", bin_count);
+    long long bin_count_ll = 0, scan_speed = 0;
+    json_find_int(j, "fft_bin_count", bin_count_ll);
     json_find_int(j, "scan_speed",    scan_speed);
+    int bin_count = (int)bin_count_ll;
+    if (bin_count < 0)    bin_count = 0;
+    if (bin_count > 1600) bin_count = 1600;
     store_u32be(buf + 0,    (uint32_t)bin_count);
     store_u32be(buf + 6404, (uint32_t)scan_speed);
+
+    // S_RES_WIDEBAND_FFT_DATA power array — same "wideband_power_dbm" key as encode_ff_detection's embedded copy.
+    const char* wb = std::strstr(j, "\"wideband_power_dbm\"");
+    const char* wa = wb ? std::strchr(wb, '[') : nullptr;
+    if (wa) {
+        const char* c = wa + 1;
+        int i = 0;
+        while (i < bin_count) {
+            while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r' || *c == ',') ++c;
+            if (*c == ']' || *c == '\0') break;
+            char* end = nullptr;
+            double v = std::strtod(c, &end);
+            if (end == c) break;
+            store_f32be(buf + 4 + i * 4, (float)v);
+            c = end;
+            ++i;
+        }
+    }
     return 6408;
 }
 
@@ -3205,11 +3226,33 @@ static int encode_ff_detection(const char* j, uint8_t* buf, int max_len) {
     int fc = (int)fc_ll;
     if (FFT_BLOCK + 4 + fc * FF_ELEM > max_len) return -1;
     std::memset(buf, 0, (size_t)FFT_BLOCK);
-    long long bin_count = 0, scan_speed = 0;
-    json_find_int(j, "fft_bin_count", bin_count);
+    long long bin_count_ll = 0, scan_speed = 0;
+    json_find_int(j, "fft_bin_count", bin_count_ll);
     json_find_int(j, "scan_speed",    scan_speed);
+    int bin_count = (int)bin_count_ll;
+    if (bin_count < 0)    bin_count = 0;
+    if (bin_count > 1600) bin_count = 1600;
     store_u32be(buf + 0,    (uint32_t)bin_count);
     store_u32be(buf + 6404, (uint32_t)scan_speed);
+
+    // S_RES_WIDEBAND_FFT_DATA power array — same "wideband_power_dbm" key as HF's shared server schema.
+    const char* wb = std::strstr(j, "\"wideband_power_dbm\"");
+    const char* wa = wb ? std::strchr(wb, '[') : nullptr;
+    if (wa) {
+        const char* c = wa + 1;
+        int i = 0;
+        while (i < bin_count) {
+            while (*c == ' ' || *c == '\t' || *c == '\n' || *c == '\r' || *c == ',') ++c;
+            if (*c == ']' || *c == '\0') break;
+            char* end = nullptr;
+            double v = std::strtod(c, &end);
+            if (end == c) break;
+            store_f32be(buf + 4 + i * 4, (float)v);
+            c = end;
+            ++i;
+        }
+    }
+
     store_u32be(buf + FFT_BLOCK, (uint32_t)fc);
     if (fc == 0) return FFT_BLOCK + 4;
     const char* det = std::strstr(j, "\"fixed_frequencies\""); if (!det) return FFT_BLOCK + 4;
