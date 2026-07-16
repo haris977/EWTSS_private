@@ -80,38 +80,6 @@ static constexpr uint32_t XML_MAGIC_START = 0x00000000u;
 static constexpr uint32_t XML_MAGIC_END   = 0x00000000u;
 
 // ---------------------------------------------------------------------------
-// Big-endian read helpers  (DDF-1GTX is entirely big-endian)
-// ---------------------------------------------------------------------------
-
-static uint16_t load_u16be(const uint8_t* p) {
-    return (static_cast<uint16_t>(p[0]) << 8) |
-            static_cast<uint16_t>(p[1]);
-}
-
-static int16_t load_i16be(const uint8_t* p) {
-    return static_cast<int16_t>(load_u16be(p));
-}
-
-static uint32_t load_u32be(const uint8_t* p) {
-    return (static_cast<uint32_t>(p[0]) << 24) |
-           (static_cast<uint32_t>(p[1]) << 16) |
-           (static_cast<uint32_t>(p[2]) <<  8) |
-            static_cast<uint32_t>(p[3]);
-}
-
-static uint64_t load_u64be(const uint8_t* p) {
-    return (static_cast<uint64_t>(load_u32be(p)) << 32) |
-            static_cast<uint64_t>(load_u32be(p + 4));
-}
-
-static void store_u32be(uint8_t* p, uint32_t v) {
-    p[0] = static_cast<uint8_t>((v >> 24) & 0xFFu);
-    p[1] = static_cast<uint8_t>((v >> 16) & 0xFFu);
-    p[2] = static_cast<uint8_t>((v >>  8) & 0xFFu);
-    p[3] = static_cast<uint8_t>( v        & 0xFFu);
-}
-
-// ---------------------------------------------------------------------------
 // Helpers: XML scanning  (no LGPL)
 // ---------------------------------------------------------------------------
 
