@@ -122,6 +122,16 @@ void test_node_count_guard() {
           "node_count_guard: expected a truncated marker in output");
 }
 
+void test_whitespace_only_text_is_empty_object() {
+    XmlNode node;
+    node.name = "Lock";
+    node.text = "   \n  ";
+
+    MirrorBudget budget;
+    std::string json = node_to_json(node, 0, budget);
+    check(json == "{}", "whitespace_only_text_is_empty_object: got " + json);
+}
+
 }  // namespace
 
 int main() {
@@ -133,6 +143,7 @@ int main() {
     test_empty_element();
     test_depth_guard();
     test_node_count_guard();
+    test_whitespace_only_text_is_empty_object();
 
     if (failures == 0) {
         std::printf("ALL TESTS PASSED\n");

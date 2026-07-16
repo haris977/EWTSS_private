@@ -159,6 +159,13 @@ XmlParseResult parse_xml(const char* xml, size_t len) {
     XmlParseResult result;
     result.ok = true;
 
+    if (xml == nullptr) {
+        result.ok = false;
+        result.error = "null xml buffer";
+        result.error_offset = 0;
+        return result;
+    }
+
     Cursor c{xml, len, 0};
     skip_whitespace(c);
     if (c.eof()) {

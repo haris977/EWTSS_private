@@ -119,6 +119,23 @@ void test_depth_guard_no_crash() {
     check(!r.error.empty(), "depth_guard_no_crash: expected a non-empty error message");
 }
 
+void test_null_xml_does_not_crash() {
+    XmlParseResult r = parse_xml(nullptr, 5);
+    check(!r.ok, "null_xml_does_not_crash: expected failure, not a crash");
+}
+
+void test_interstitial_whitespace_discarded() {
+    std::string xml = "<Root>\n  <Child>1</Child>\n  <Child>2</Child>\n</Root>";
+    XmlParseResult r = parse_xml(xml.c_str(), xml.size());
+    check(r.ok, "interstitial_whitespace_discarded: expected ok");
+    check(r.root.text.empty(), "interstitial_whitespace_discarded: root text should stay empty (it has children)");
+    check(r.root.children.size() == 2, "interstitial_whitespace_discarded: expected 2 children");
+    if (r.root.children.size() == 2) {
+        check(r.root.children[0].text == "1", "interstitial_whitespace_discarded: first child text");
+        check(r.root.children[1].text == "2", "interstitial_whitespace_discarded: second child text");
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -131,6 +148,8 @@ int main() {
     test_malformed_mismatched_tag();
     test_text_preserved_verbatim();
     test_depth_guard_no_crash();
+    test_null_xml_does_not_crash();
+    test_interstitial_whitespace_discarded();
 
     if (failures == 0) {
         std::printf("ALL TESTS PASSED\n");

@@ -14,12 +14,14 @@
 
 namespace {
 
-std::string impl_parse_xml_to_json(const char* xml, size_t len, const char* frame_kind_hint) {
+std::string impl_parse_xml_to_json(const char* xml, size_t len, const char* frame_kind_hint, const char* hw) {
+    std::string hw_str = hw ? hw : "unknown";
+
     XmlParseResult presult = parse_xml(xml, len);
 
     if (!presult.ok) {
         std::string out = "{";
-        out += "\"hw\":\"ca120\",\"channel\":\"xml\",\"msg_kind\":\"malformed\",";
+        out += "\"hw\":" + json_quote(hw_str) + ",\"channel\":\"xml\",\"msg_kind\":\"malformed\",";
         out += "\"parse_error\":" + json_quote(presult.error) + ",";
         out += "\"parse_offset\":" + std::to_string(presult.error_offset);
         out += "}";
@@ -36,7 +38,7 @@ std::string impl_parse_xml_to_json(const char* xml, size_t len, const char* fram
     std::string body_value = node_to_json(root, 0, budget);
 
     std::string out = "{";
-    out += "\"hw\":\"ca120\",\"channel\":\"xml\",\"msg_kind\":" + json_quote(msg_kind) + ",";
+    out += "\"hw\":" + json_quote(hw_str) + ",\"channel\":\"xml\",\"msg_kind\":" + json_quote(msg_kind) + ",";
     out += "\"body\":{" + json_quote(to_snake_case(root.name)) + ":" + body_value + "}";
     out += "}";
     return out;
@@ -44,11 +46,12 @@ std::string impl_parse_xml_to_json(const char* xml, size_t len, const char* fram
 
 }  // namespace
 
-std::string parse_xml_to_json(const char* xml, size_t len, const char* frame_kind_hint) {
+std::string parse_xml_to_json(const char* xml, size_t len, const char* frame_kind_hint, const char* hw) {
     try {
-        return impl_parse_xml_to_json(xml, len, frame_kind_hint);
+        return impl_parse_xml_to_json(xml, len, frame_kind_hint, hw);
     } catch (...) {
-        return "{\"hw\":\"ca120\",\"channel\":\"xml\",\"msg_kind\":\"internal_error\","
+        std::string hw_str = hw ? hw : "unknown";
+        return "{\"hw\":" + json_quote(hw_str) + ",\"channel\":\"xml\",\"msg_kind\":\"internal_error\","
                "\"note\":\"exception caught at xml_to_json boundary\"}";
     }
 }

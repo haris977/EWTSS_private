@@ -22,7 +22,7 @@ void test_request_get_fault_reference_list() {
         "<Request type=\"get\" id=\"8\" time=\"6000000\">"
           "<ResourceManager><FaultReferenceList></FaultReferenceList></ResourceManager>"
         "</Request>";
-    std::string json = parse_xml_to_json(xml.c_str(), xml.size(), "request");
+    std::string json = parse_xml_to_json(xml.c_str(), xml.size(), "request", "ca120");
     std::string expected =
         "{\"hw\":\"ca120\",\"channel\":\"xml\",\"msg_kind\":\"request\","
         "\"body\":{\"request\":{\"type\":\"get\",\"id\":\"8\",\"time\":\"6000000\","
@@ -32,7 +32,7 @@ void test_request_get_fault_reference_list() {
 
 void test_malformed_envelope() {
     std::string xml = "<Request type=\"set\" id=\"1\"><Tuner></Request>";
-    std::string json = parse_xml_to_json(xml.c_str(), xml.size(), "request");
+    std::string json = parse_xml_to_json(xml.c_str(), xml.size(), "request", "ca120");
     check(json.find("\"msg_kind\":\"malformed\"") != std::string::npos,
           "malformed_envelope: expected malformed msg_kind, got " + json);
     check(json.find("\"parse_error\":") != std::string::npos,
@@ -77,6 +77,23 @@ void test_ddf550_dfselect_not_ca120_specific() {
     check(body == "{\"emitter_class\":[\"Hopper\",\"Burst\"]}", "ddf550_dfselect: got " + body);
 }
 
+void test_hw_is_caller_supplied_not_hardcoded() {
+    // Same DDF-550 sample as test_ddf550_dfselect_not_ca120_specific, but
+    // this time through the full public envelope entry point with a
+    // non-ca120 hw value, proving the envelope itself is device-agnostic
+    // now (not just the underlying parser+mirror).
+    //
+    // Note: to_snake_case("DFSelect") -> "df_select" (verified against the
+    // real algorithm in json_mirror.cpp), not "d_f_select" as an earlier
+    // draft of this test assumed.
+    std::string xml = "<DFSelect><EmitterClass>Hopper</EmitterClass><EmitterClass>Burst</EmitterClass></DFSelect>";
+    std::string json = parse_xml_to_json(xml.c_str(), xml.size(), "request", "ddf550");
+    std::string expected =
+        "{\"hw\":\"ddf550\",\"channel\":\"xml\",\"msg_kind\":\"request\","
+        "\"body\":{\"df_select\":{\"emitter_class\":[\"Hopper\",\"Burst\"]}}}";
+    check(json == expected, "hw_is_caller_supplied_not_hardcoded: got " + json);
+}
+
 }  // namespace
 
 int main() {
@@ -84,6 +101,7 @@ int main() {
     test_malformed_envelope();
     test_ddf550_trace_enable_not_ca120_specific();
     test_ddf550_dfselect_not_ca120_specific();
+    test_hw_is_caller_supplied_not_hardcoded();
 
     if (failures == 0) {
         std::printf("ALL TESTS PASSED\n");
