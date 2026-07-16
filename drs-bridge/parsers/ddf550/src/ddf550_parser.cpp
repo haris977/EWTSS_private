@@ -511,7 +511,8 @@ static std::string impl_parse_xml_ddf550(const uint8_t* frame, int frame_len,
     }
 
     // DFData preclassifier output fields -- every direct child of the
-    // root, generic over field name.
+    // root, generic over field name. Only iterate element nodes, skipping
+    // whitespace and text nodes between elements.
     if (is_dfdata) {
         const char* cl_id = root.attribute("DDF-CL-ID").value();
         if (*cl_id) j.key_str("ddf_cl_id", cl_id);
@@ -519,6 +520,7 @@ static std::string impl_parse_xml_ddf550(const uint8_t* frame, int frame_len,
         JsonWriter fields, units;
         bool has_units = false;
         for (pugi::xml_node field : root.children()) {
+            if (field.type() != pugi::node_element) continue;
             const char* tag = field.name();
             fields.key_str(tag, field.text().get());
             const char* unit = field.attribute("Unit").value();

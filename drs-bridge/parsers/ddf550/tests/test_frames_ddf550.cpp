@@ -999,6 +999,38 @@ static void test_dfdata_chirp() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: DFData with whitespace between elements (regression: skip non-element nodes)
+// ---------------------------------------------------------------------------
+
+static void test_dfdata_with_whitespace() {
+    // Pretty-printed XML with newlines and indentation between child elements.
+    // Before the fix, the whitespace/text nodes would be treated as "field" elements,
+    // injecting spurious empty-string keys ("": "") into the fields JSON object.
+    const char* xml =
+        "<DFData DDF-CL-ID=\"7\">\n"
+        "  <EmitterClass>Burst</EmitterClass>\n"
+        "  <CenterFrequency Unit=\"Hz\">450000000</CenterFrequency>\n"
+        "  <BearingAvg Unit=\"deg\">120.5</BearingAvg>\n"
+        "</DFData>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"ddf_cl_id\":\"7\""));
+    CHECK(json_has(json, "\"EmitterClass\":\"Burst\""));
+    CHECK(json_has(json, "\"CenterFrequency\":\"450000000\""));
+    CHECK(json_has(json, "\"BearingAvg\":\"120.5\""));
+    CHECK(json_has(json, "\"CenterFrequency\":\"Hz\""));
+    CHECK(json_has(json, "\"BearingAvg\":\"deg\""));
+    // Most importantly: the fields object should NOT contain an empty-string key
+    // that would result from parsing whitespace/text nodes.
+    CHECK(!json_has(json, "\"\":\""));
+}
+
+// ---------------------------------------------------------------------------
 // Test: Raw XML with leading whitespace (Reply) → response
 // ---------------------------------------------------------------------------
 
@@ -1287,6 +1319,7 @@ int main() {
     test_dfdata_format02();
     test_dfdata_hopper();
     test_dfdata_chirp();
+    test_dfdata_with_whitespace();
     test_raw_xml_leading_ws();
     test_raw_xml_no_close();
     test_too_short();
