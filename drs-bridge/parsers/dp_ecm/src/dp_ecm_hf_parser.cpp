@@ -3884,14 +3884,15 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         }
     }
 
-    if (fn) {
+    // status != 0: error response — no payload per ICD, skip encoding entirely.
+    if (status == 0 && fn) {
         plen = fn(kwargs_json, payload, MAX_PAYLOAD);
         if (plen < 0) { std::free(payload); return -1; }
     }
 
     // Only fall through to payload_hex for truly unknown group/unit combinations
     // (e.g. raw stream responses). Known ACK responses skip this path.
-    if (!is_ack && plen == 0) {
+    if (status == 0 && !is_ack && plen == 0) {
         const char* ph = std::strstr(kwargs_json, "\"payload_hex\"");
         if (ph) {
             const char* q = std::strchr(ph, ':');

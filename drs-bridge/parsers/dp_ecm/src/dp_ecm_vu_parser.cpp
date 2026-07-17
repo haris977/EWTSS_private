@@ -4189,10 +4189,11 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         }
     }
 
-    if (fn) {
+    // status != 0: error response — no payload per ICD, skip encoding entirely.
+    if (status == 0 && fn) {
         plen = fn(kwargs_json, payload, MAX_PAYLOAD);
         if (plen < 0) { std::free(payload); return -1; }
-    } else if (!is_ack) {
+    } else if (status == 0 && !is_ack) {
         const char* ph = std::strstr(kwargs_json, "\"payload_hex\"");
         if (ph) {
             const char* q = std::strchr(ph, ':');
