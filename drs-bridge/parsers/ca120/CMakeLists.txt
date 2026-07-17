@@ -8,6 +8,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 # ---- CA120 parser DLL ----
 add_library(ca120 SHARED
     src/ca120_parser.cpp
+    ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
 )
 target_include_directories(ca120 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)
@@ -26,6 +27,7 @@ enable_testing()
 add_executable(test_ca120
     tests/test_frames_ca120.cpp
     src/ca120_parser.cpp
+    ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
 )
 target_include_directories(test_ca120 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)

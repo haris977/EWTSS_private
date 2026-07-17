@@ -27,7 +27,7 @@
 #include "sdfc_endian.h"
 #include "json_writer.h"
 #include "pugixml.hpp"
-#include "pugixml_helpers.h"
+#include "pugixml_generic_mirror.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -133,23 +133,6 @@ static int xml_closing_end(const uint8_t* xml, int len, const char* tag) {
             return i + clen;
     }
     return -1;
-}
-
-// Type by the ICD's own Hungarian-notation prefix (i=int, b=bool, else
-// string) rather than sniffing the value text — a param named with an 'i'
-// prefix is authoritatively an integer per the naming convention, whereas
-// guessing from "is this all digits" would mis-cast e.g. a zero-padded ID.
-static void write_typed_param(JsonWriter& j, const std::string& name, const std::string& val) {
-    char prefix = name.empty() ? '\0' : name[0];
-    if (prefix == 'i' && !val.empty()) {
-        char* endp = nullptr;
-        long long n = std::strtoll(val.c_str(), &endp, 10);
-        if (endp && *endp == '\0') { j.key_int(name.c_str(), n); return; }
-    } else if (prefix == 'b') {
-        if (val == "true")  { j.key_bool(name.c_str(), true);  return; }
-        if (val == "false") { j.key_bool(name.c_str(), false); return; }
-    }
-    j.key_str(name.c_str(), val);
 }
 
 // ---------------------------------------------------------------------------
@@ -438,9 +421,33 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
 // wraps it in try/catch so no C++ exception escapes toward parse_message's
 // extern "C" boundary (sdfc_abi.h rule 2) -- same rationale and idiom as
 // ca120_parser.cpp's impl_parse_xml/parse_xml split.
+//
+// channel/msg_kind are DDF-550-specific (this ICD's root-tag vocabulary and
+// channel taxonomy differ from CA120/DDF-1GTX's), derived from `root_tag`
+// -- the same string classify_xml_root() already found by byte-scanning in
+// parse_message, before we know whether pugixml will succeed. That lets
+// channel/msg_kind stay correct even on the malformed path, where there may
+// be no reliable parsed root node to read a tag name back off of.
+// The actual tree->JSON mirroring (the part that must be byte-for-byte
+// identical across CA120/DDF-550/DDF-1GTX) is shared via
+// pugixml_generic_mirror.h.
 static std::string impl_parse_xml_ddf550(const uint8_t* frame, int frame_len,
-                                          int frame_type)
+                                          int frame_type, const char* root_tag)
 {
+    bool is_ddfcl_req = (std::strcmp(root_tag, "DDFCLRequest") == 0);
+    bool is_ddfcl_rep = (std::strcmp(root_tag, "DDFCLReply")   == 0);
+    bool is_dfdata    = (std::strcmp(root_tag, "DFData")       == 0);
+    bool is_event     = (std::strcmp(root_tag, "Event")        == 0);
+    bool is_dfselect  = (std::strcmp(root_tag, "DFSelect")     == 0);
+
+    const char* channel  = is_dfdata                                     ? "preclassifier_output"
+                         : (is_ddfcl_req || is_ddfcl_rep || is_dfselect) ? "preclassifier"
+                                                                          : "control";
+    const char* msg_kind = (frame_type == 1) ? "request"
+                         : is_dfdata         ? "dfdata"
+                         : is_event          ? "event"
+                                             : "reply";
+
     pugi::xml_document doc;
     pugi::xml_parse_result presult =
         doc.load_buffer(frame, static_cast<size_t>(frame_len));
@@ -452,103 +459,15 @@ static std::string impl_parse_xml_ddf550(const uint8_t* frame, int frame_len,
     // scanning never did any of this (returned raw bytes verbatim). Accepted,
     // disclosed deviation from strict byte-identical output -- see design
     // spec §3.2. Low practical impact: no real ICD sample uses entities.
-    if (!presult) return {};
+    if (!presult) return build_malformed_envelope("ddf550", channel, presult);
 
-    pugi::xml_node root = doc.first_child();
-    const char* root_name = root.name();
-
-    bool is_ddfcl_req = (std::strcmp(root_name, "DDFCLRequest") == 0);
-    bool is_ddfcl_rep = (std::strcmp(root_name, "DDFCLReply")   == 0);
-    bool is_dfdata    = (std::strcmp(root_name, "DFData")       == 0);
-    bool is_event     = (std::strcmp(root_name, "Event")        == 0);
-    bool is_dfselect  = (std::strcmp(root_name, "DFSelect")     == 0);
-
-    const char* channel  = is_dfdata                                     ? "preclassifier_output"
-                         : (is_ddfcl_req || is_ddfcl_rep || is_dfselect) ? "preclassifier"
-                                                                          : "control";
-    const char* msg_kind = (frame_type == 1) ? "request"
-                         : is_dfdata         ? "dfdata"
-                         : is_event          ? "event"
-                                             : "reply";
-
-    JsonWriter j;
-    j.key_str("hw",       "ddf550");
-    j.key_str("channel",  channel);
-    j.key_str("msg_kind", msg_kind);
-
-    const char* id_attr   = root.attribute("id").value();
-    const char* type_attr = root.attribute("type").value();
-    if (*id_attr)   j.key_str("msg_id",   id_attr);
-    if (*type_attr) j.key_str("msg_type", type_attr);
-
-    // Command name -- first <Command> anywhere in the document.
-    pugi::xml_node cmd = find_first(root, "Command");
-    if (cmd) {
-        const char* cmd_name = cmd.attribute("name").value();
-        if (*cmd_name) j.key_str("command_name", cmd_name);
-
-        // Direct-text Command body (e.g. AnalysisIntervalMs's "50000") --
-        // only meaningful when Command has no element children (otherwise
-        // this would just be inter-tag whitespace around <Param> children).
-        bool has_element_child = false;
-        for (pugi::xml_node c : cmd.children())
-            if (c.type() == pugi::node_element) { has_element_child = true; break; }
-        if (!has_element_child) {
-            std::string val = cmd.text().get();
-            size_t a = val.find_first_not_of(" \t\r\n");
-            if (a != std::string::npos) {
-                size_t b = val.find_last_not_of(" \t\r\n");
-                j.key_str("command_value", val.substr(a, b - a + 1));
-            }
-        }
-    }
-
-    // Generic param capture -- every <Param name="X">Y</Param> anywhere in
-    // the document, typed by the ICD's Hungarian-notation prefix.
-    {
-        JsonWriter params;
-        for (pugi::xpath_node xn : root.select_nodes(".//Param")) {
-            pugi::xml_node p = xn.node();
-            std::string name  = p.attribute("name").value();
-            std::string value = p.text().get();
-            write_typed_param(params, name, value);
-        }
-        j.key_raw("params", params.str());
-    }
-
-    // DFData preclassifier output fields -- every direct child of the
-    // root, generic over field name. Only iterate element nodes, skipping
-    // whitespace and text nodes between elements.
-    //
-    // Narrower disclosed difference (design spec §3.2): a self-closing
-    // <Tag/> direct child now emits an empty-string field ("Tag":"") via
-    // this node_element filter, whereas the old xml_all_dfdata_fields
-    // explicitly skipped self-closing children (no field added at all).
-    // No current DFData fixture uses a self-closing field, so this is
-    // unexercised in practice.
-    if (is_dfdata) {
-        const char* cl_id = root.attribute("DDF-CL-ID").value();
-        if (*cl_id) j.key_str("ddf_cl_id", cl_id);
-
-        JsonWriter fields, units;
-        bool has_units = false;
-        for (pugi::xml_node field : root.children()) {
-            if (field.type() != pugi::node_element) continue;
-            const char* tag = field.name();
-            fields.key_str(tag, field.text().get());
-            const char* unit = field.attribute("Unit").value();
-            if (*unit) { units.key_str(tag, unit); has_units = true; }
-        }
-        j.key_raw("fields", fields.str());
-        if (has_units) j.key_raw("units", units.str());
-    }
-
-    return j.str();
+    return build_mirror_envelope("ddf550", channel, msg_kind, doc.first_child());
 }
 
-static std::string parse_xml_ddf550(const uint8_t* frame, int frame_len, int frame_type) {
+static std::string parse_xml_ddf550(const uint8_t* frame, int frame_len, int frame_type,
+                                     const char* root_tag) {
     try {
-        return impl_parse_xml_ddf550(frame, frame_len, frame_type);
+        return impl_parse_xml_ddf550(frame, frame_len, frame_type, root_tag);
     } catch (...) {
         return {};
     }
@@ -662,7 +581,7 @@ SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
         const char* root_tag = nullptr;
         int ftype = classify_xml_root(frame, iframe, &root_tag);
         if (root_tag && ftype > 0)
-            result = parse_xml_ddf550(frame, iframe, ftype);
+            result = parse_xml_ddf550(frame, iframe, ftype, root_tag);
     }
 
     if (result.empty()) return -1;

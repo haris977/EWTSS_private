@@ -369,9 +369,11 @@ static void test_xml_request() {
     int prc = parse_message(out, len, &json, &json_len);
     CHECK(prc == 0,                 "parse_message(XML Request) -> success");
     CHECK(json != nullptr,           "parse_message(XML Request) -> non-null");
-    CHECK(contains(json, "request"), "XML Request json msg_kind == request");
-    CHECK(contains(json, "tuner"),   "XML Request json subsystems includes tuner");
-    CHECK(contains(json, "\"set\""), "XML Request json msg_type == set");
+    CHECK(contains(json, "\"msg_kind\":\"request\""), "XML Request json msg_kind == request");
+    CHECK(contains(json, "\"body\":{\"request\":{\"type\":\"set\",\"id\":\"1\""),
+          "XML Request json body.request.type/id preserved");
+    CHECK(contains(json, "\"tuner\":{\"frequency\":\"100000000\"}"),
+          "XML Request json body.request.tuner.frequency nested and preserved (not dropped)");
     free_result(json);
     free_result(out);
 }
@@ -395,9 +397,11 @@ static void test_xml_multi_root_request() {
     int prc = parse_message(out, len, &json, &json_len);
     CHECK(prc == 0,                           "parse_message(multi-root Request) -> success");
     CHECK(json != nullptr,                    "parse_message(multi-root Request) -> non-null");
-    CHECK(contains(json, "request"), "multi-root msg_kind == request");
-    CHECK(contains(json, "digital_demodulator"),  "multi-root subsystems has digital_demodulator");
-    CHECK(contains(json, "bitstream_processing"), "multi-root subsystems has bitstream_processing");
+    CHECK(contains(json, "\"msg_kind\":\"request\""), "multi-root msg_kind == request");
+    CHECK(contains(json, "\"digital_demodulator\":{\"symbol_rate\":\"9600\"}"),
+          "multi-root body.request.digital_demodulator.symbol_rate == 9600");
+    CHECK(contains(json, "\"bitstream_processing\":{\"mode\":\"Raw\"}"),
+          "multi-root body.request.bitstream_processing.mode == Raw");
     free_result(json);
     free_result(out);
 }
@@ -417,7 +421,9 @@ static void test_xml_reply() {
     int prc = parse_message(out, len, &json, &json_len);
     CHECK(prc == 0,               "parse_message(XML Reply) -> success");
     CHECK(json != nullptr,        "parse_message(XML Reply) -> non-null");
-    CHECK(contains(json, "reply"),"XML Reply json msg_kind == reply");
+    CHECK(contains(json, "\"msg_kind\":\"reply\""), "XML Reply json msg_kind == reply");
+    CHECK(contains(json, "\"tuner\":{\"processing_status\":{}}"),
+          "XML Reply json body.reply.tuner.processing_status == {} (empty self-closing element)");
     free_result(json);
     free_result(out);
 }
@@ -440,13 +446,20 @@ static void test_xml_event() {
     int prc = parse_message(out, len, &json, &json_len);
     CHECK(prc == 0,                "parse_message(XML Event) -> success");
     CHECK(json != nullptr,         "parse_message(XML Event) -> non-null");
-    CHECK(contains(json, "event"), "XML Event json msg_kind == event");
-    CHECK(contains(json, "detected"), "XML Event json status == detected");
+    CHECK(contains(json, "\"msg_kind\":\"event\""), "XML Event json msg_kind == event");
+    CHECK(contains(json, "\"status\":\"detected\""), "XML Event json body.event.status == detected");
+    CHECK(contains(json, "\"frequency\":\"100000000\""),
+          "XML Event json body.event.frequency preserved (old curated extraction only kept this under a hardcoded field name)");
     free_result(json);
     free_result(out);
 }
 
 static void test_xml_datastream_reply() {
+    // Root Reply's own type="get" and DataStream's own type="IFData" must
+    // stay independently scoped. The generic tree mirror nests each node's
+    // attributes under that node by construction, so this can no longer
+    // collide the way the old curated extraction did (which searched the
+    // whole buffer for the first type="..." and returned the root's).
     const char* msg =
         "<Reply type=\"get\" id=\"10\">"
           "<DataStream type=\"IFData\">"
@@ -463,12 +476,13 @@ static void test_xml_datastream_reply() {
     char* json = nullptr;
     size_t json_len = 0;
     int prc = parse_message(out, len, &json, &json_len);
-    CHECK(prc == 0,                     "parse_message(DataStream reply) -> success");
-    CHECK(json != nullptr,              "parse_message(DataStream reply) -> non-null");
-    CHECK(contains(json, "reply"), "DataStream reply msg_kind == reply");
-    CHECK(contains(json, "9200"),       "DataStream reply has port 9200");
-    CHECK(contains(json, "192.168.1.1"),"DataStream reply has IP");
-    CHECK(contains(json, "IFData"), "DataStream reply datastream_type == IFData (not the root's own type=get)");
+    CHECK(prc == 0,        "parse_message(DataStream reply) -> success");
+    CHECK(json != nullptr, "parse_message(DataStream reply) -> non-null");
+    CHECK(contains(json, "\"msg_kind\":\"reply\""), "DataStream reply msg_kind == reply");
+    CHECK(contains(json, "\"reply\":{\"type\":\"get\",\"id\":\"10\""),
+          "DataStream reply: root Reply's own type == get, scoped at the reply level");
+    CHECK(contains(json, "\"data_stream\":{\"type\":\"IFData\",\"ip\":\"192.168.1.1\",\"port\":\"9200\"}"),
+          "DataStream reply: DataStream's own type == IFData, nested under data_stream (not confused with the root's type)");
     free_result(json);
     free_result(out);
 }
@@ -481,6 +495,32 @@ static void test_xml_incomplete() {
     size_t len = 0;
     int rc = extract_frame(f.data(), f.size(), &out, &len);
     CHECK(rc == -1, "XML without closing </Request> -> incomplete (-1)");
+}
+
+// extract_frame's outer </Request> search is satisfied (it isn't looking
+// for well-formedness), so this reaches parse_message, which must still
+// succeed (rc == 0) with an error-shaped JSON record instead of failing the
+// call -- a message is never silently dropped just because it's malformed.
+static void test_xml_malformed_still_succeeds() {
+    const char* msg = "<Request type=\"set\" id=\"1\"><Tuner></Request>";
+    auto f = xml_bytes(msg);
+
+    uint8_t* out = nullptr;
+    size_t len = 0;
+    int rc = extract_frame(f.data(), f.size(), &out, &len);
+    CHECK(rc == 0, "malformed-inside XML -> extract_frame still finds the outer </Request>");
+
+    char* json = nullptr;
+    size_t json_len = 0;
+    int prc = parse_message(out, len, &json, &json_len);
+    CHECK(prc == 0,        "parse_message(malformed XML) -> still succeeds (rc == 0)");
+    CHECK(json != nullptr, "parse_message(malformed XML) -> non-null");
+    CHECK(contains(json, "\"msg_kind\":\"malformed\""), "malformed XML json msg_kind == malformed");
+    CHECK(contains(json, "\"parse_error\":"),           "malformed XML json has parse_error");
+    CHECK(contains(json, "\"parse_offset\":"),          "malformed XML json has parse_offset");
+    CHECK(!contains(json, "\"body\":"),                 "malformed XML json has no body (parse never completed)");
+    free_result(json);
+    free_result(out);
 }
 
 static void test_xml_leading_whitespace() {
@@ -497,7 +537,9 @@ static void test_xml_leading_whitespace() {
     int prc = parse_message(out, len, &json, &json_len);
     CHECK(prc == 0, "parse_message(XML Reply with leading whitespace) -> success");
     CHECK(json != nullptr, "parse_message(XML Reply with leading whitespace) -> non-null");
-    CHECK(contains(json, "reply"), "XML Reply with leading whitespace msg_kind == reply");
+    CHECK(contains(json, "\"msg_kind\":\"reply\""), "XML Reply with leading whitespace msg_kind == reply");
+    CHECK(contains(json, "\"control\":{}"),
+          "XML Reply with leading whitespace body.reply.control == {} (empty self-closing element)");
     free_result(json);
     free_result(out);
 }
@@ -571,8 +613,9 @@ static void test_format_response_roundtrip() {
     int prc = parse_message(out, out_len, &result, &result_len);
     CHECK(prc == 0,                      "roundtrip: parse_message -> success");
     CHECK(result != nullptr,             "roundtrip: parse_message -> non-null");
-    CHECK(contains(result, "request"),   "roundtrip: msg_kind == request");
-    CHECK(contains(result, "200000000"), "roundtrip: frequency value preserved");
+    CHECK(contains(result, "\"msg_kind\":\"request\""), "roundtrip: msg_kind == request");
+    CHECK(contains(result, "\"frequency\":\"200000000\""),
+          "roundtrip: frequency value preserved (nested under body.request.tuner)");
     free_result(result);
     free_result(out);
     free_result(wire);
@@ -624,6 +667,7 @@ int main() {
     test_xml_event();
     test_xml_datastream_reply();
     test_xml_incomplete();
+    test_xml_malformed_still_succeeds();
     test_xml_leading_whitespace();
 
     test_format_response_basic();

@@ -435,11 +435,12 @@ static void test_wrapped_xml_request() {
     CHECK(json_has(json, "\"hw\":\"ddf550\""));
     CHECK(json_has(json, "\"channel\":\"control\""));
     CHECK(json_has(json, "\"msg_kind\":\"request\""));
-    CHECK(json_has(json, "\"msg_id\":\"42\""));
-    CHECK(json_has(json, "\"msg_type\":\"set\""));
-    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
-    CHECK(json_has(json, "\"params\":{"));
-    CHECK(json_has(json, "\"eOperationMode\":\"DFMODE_FFM\""));
+    // Generic mirror: id/type are attributes of <Request>, nested under
+    // body.request; command name and the single Param are nested further
+    // under body.request.command / .command.param.
+    CHECK(json_has(json, "\"body\":{\"request\":{\"type\":\"set\",\"id\":\"42\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"DfMode\""));
+    CHECK(json_has(json, "\"param\":{\"name\":\"eOperationMode\",\"#text\":\"DFMODE_FFM\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +460,9 @@ static void test_wrapped_xml_reply() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
+    // Command has an attribute (name) but no Param children and no direct
+    // text, so it mirrors to just {"name":"DfMode"} — no "param" key at all.
+    CHECK(json_has(json, "\"command\":{\"name\":\"DfMode\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -479,9 +482,12 @@ static void test_wrapped_xml_dfmode_get_request() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"request\""));
-    CHECK(json_has(json, "\"msg_type\":\"get\""));
-    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
-    CHECK(json_has(json, "\"params\":{}"));
+    CHECK(json_has(json, "\"type\":\"get\""));
+    // No Param children/text under Command → mirrors to just {"name":...},
+    // i.e. no "param" key present at all (the new shape's equivalent of the
+    // old curated "params":{}).
+    CHECK(json_has(json, "\"command\":{\"name\":\"DfMode\"}"));
+    CHECK(!json_has(json, "\"param\""));
 }
 
 static void test_wrapped_xml_dfmode_get_reply() {
@@ -498,9 +504,9 @@ static void test_wrapped_xml_dfmode_get_reply() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(json_has(json, "\"msg_type\":\"get\""));
-    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
-    CHECK(json_has(json, "\"eOperationMode\":\"DFMODE_SCAN\""));
+    CHECK(json_has(json, "\"type\":\"get\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"DfMode\""));
+    CHECK(json_has(json, "\"param\":{\"name\":\"eOperationMode\",\"#text\":\"DFMODE_SCAN\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -520,8 +526,9 @@ static void test_wrapped_xml_freq() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"MeasureSettingsFFM\""));
-    CHECK(json_has(json, "\"iFrequency\":145000000"));
+    CHECK(json_has(json, "\"command\":{\"name\":\"MeasureSettingsFFM\""));
+    // All values are now strings under the generic mirror — no int coercion.
+    CHECK(json_has(json, "\"param\":{\"name\":\"iFrequency\",\"#text\":\"145000000\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -541,9 +548,9 @@ static void test_wrapped_xml_measuresettingsffm_get_request() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"msg_type\":\"get\""));
-    CHECK(json_has(json, "\"command_name\":\"MeasureSettingsFFM\""));
-    CHECK(json_has(json, "\"params\":{}"));
+    CHECK(json_has(json, "\"type\":\"get\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"MeasureSettingsFFM\"}"));
+    CHECK(!json_has(json, "\"param\""));
 }
 
 static void test_wrapped_xml_measuresettingsffm_get_reply() {
@@ -561,9 +568,12 @@ static void test_wrapped_xml_measuresettingsffm_get_reply() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(json_has(json, "\"command_name\":\"MeasureSettingsFFM\""));
-    CHECK(json_has(json, "\"iFrequency\":145000000"));
-    CHECK(json_has(json, "\"iBandwidth\":12500"));
+    CHECK(json_has(json, "\"command\":{\"name\":\"MeasureSettingsFFM\""));
+    // Two sibling Params under the same Command → a "param" JSON array
+    // containing both mirrored values.
+    CHECK(json_has(json, "\"param\":["));
+    CHECK(json_has(json, "\"name\":\"iFrequency\",\"#text\":\"145000000\""));
+    CHECK(json_has(json, "\"name\":\"iBandwidth\",\"#text\":\"12500\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -583,8 +593,8 @@ static void test_wrapped_xml_audiomode() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"AudioMode\""));
-    CHECK(json_has(json, "\"eAudioMode\":\"AUDIO_MODE_32KHZ_16BIT_MONO\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"AudioMode\""));
+    CHECK(json_has(json, "\"name\":\"eAudioMode\",\"#text\":\"AUDIO_MODE_32KHZ_16BIT_MONO\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -606,10 +616,12 @@ static void test_wrapped_xml_trace_enable() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"TraceEnable\""));
-    CHECK(json_has(json, "\"eTraceTag\":\"TRACETAG_AUDIO\""));
-    CHECK(json_has(json, "\"zIP\":\"192.168.1.100\""));
-    CHECK(json_has(json, "\"iPort\":9152"));
+    CHECK(json_has(json, "\"command\":{\"name\":\"TraceEnable\""));
+    CHECK(json_has(json, "\"param\":["));
+    CHECK(json_has(json, "\"name\":\"eTraceTag\",\"#text\":\"TRACETAG_AUDIO\""));
+    CHECK(json_has(json, "\"name\":\"zIP\",\"#text\":\"192.168.1.100\""));
+    // iPort's numeric-looking value stays a JSON string under the mirror.
+    CHECK(json_has(json, "\"name\":\"iPort\",\"#text\":\"9152\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -629,8 +641,9 @@ static void test_wrapped_xml_trace_disable() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"TraceDisable\""));
-    CHECK(json_has(json, "\"eTraceTag\":\"TRACETAG_AUDIO\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"TraceDisable\""));
+    // Single Param → a "param" object (not an array).
+    CHECK(json_has(json, "\"param\":{\"name\":\"eTraceTag\",\"#text\":\"TRACETAG_AUDIO\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -652,14 +665,20 @@ static void test_wrapped_xml_trace_delete() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"TraceDelete\""));
-    CHECK(json_has(json, "\"zIP\":\"192.168.1.100\""));
-    CHECK(json_has(json, "\"iPort\":9152"));
+    CHECK(json_has(json, "\"command\":{\"name\":\"TraceDelete\""));
+    CHECK(json_has(json, "\"param\":["));
+    CHECK(json_has(json, "\"name\":\"zIP\",\"#text\":\"192.168.1.100\""));
+    CHECK(json_has(json, "\"name\":\"iPort\",\"#text\":\"9152\""));
 }
 
 // ---------------------------------------------------------------------------
 // Test: DemodulationSettings — 13 params, only 1 (eDemodulation) was ever on
-// the old hardcoded whitelist. Proves generic capture + prefix-based typing.
+// the old hardcoded whitelist. Proves generic capture: all 13 sibling Params
+// end up as a "param" array nested under body.request.command, each mirrored
+// to {"name":...,"#text":...}. Under the generic mirror ALL values are JSON
+// strings (no int/bool coercion) — this also pins that the former
+// int/bool-typed old-shape params (iBfoFrequency, bAfc, etc.) are now plain
+// strings like everything else.
 // ---------------------------------------------------------------------------
 
 static void test_wrapped_xml_demodulation_settings() {
@@ -687,20 +706,21 @@ static void test_wrapped_xml_demodulation_settings() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"DemodulationSettings\""));
-    CHECK(json_has(json, "\"eDemodulation\":\"MOD_FM\""));
-    CHECK(json_has(json, "\"iBfoFrequency\":1"));
-    CHECK(json_has(json, "\"iAfFrequency\":1"));
-    CHECK(json_has(json, "\"eAfBandwidth\":\"BW_25\""));
-    CHECK(json_has(json, "\"iAfThreshold\":1"));
-    CHECK(json_has(json, "\"bUseAfThreshold\":true"));
-    CHECK(json_has(json, "\"iPassbandFrequency\":1"));
-    CHECK(json_has(json, "\"eLevelIndicator\":\"LEVEL_INDICATOR_RMS\""));
-    CHECK(json_has(json, "\"bAfc\":true"));
-    CHECK(json_has(json, "\"eGainSelect\":\"GAIN_AUTO\""));
-    CHECK(json_has(json, "\"iGainValue\":5"));
-    CHECK(json_has(json, "\"eGainTiming\":\"GC_FAST\""));
-    CHECK(json_has(json, "\"bStereoDecoder\":false"));
+    CHECK(json_has(json, "\"command\":{\"name\":\"DemodulationSettings\""));
+    CHECK(json_has(json, "\"param\":["));
+    CHECK(json_has(json, "\"name\":\"eDemodulation\",\"#text\":\"MOD_FM\""));
+    CHECK(json_has(json, "\"name\":\"iBfoFrequency\",\"#text\":\"1\""));
+    CHECK(json_has(json, "\"name\":\"iAfFrequency\",\"#text\":\"1\""));
+    CHECK(json_has(json, "\"name\":\"eAfBandwidth\",\"#text\":\"BW_25\""));
+    CHECK(json_has(json, "\"name\":\"iAfThreshold\",\"#text\":\"1\""));
+    CHECK(json_has(json, "\"name\":\"bUseAfThreshold\",\"#text\":\"true\""));
+    CHECK(json_has(json, "\"name\":\"iPassbandFrequency\",\"#text\":\"1\""));
+    CHECK(json_has(json, "\"name\":\"eLevelIndicator\",\"#text\":\"LEVEL_INDICATOR_RMS\""));
+    CHECK(json_has(json, "\"name\":\"bAfc\",\"#text\":\"true\""));
+    CHECK(json_has(json, "\"name\":\"eGainSelect\",\"#text\":\"GAIN_AUTO\""));
+    CHECK(json_has(json, "\"name\":\"iGainValue\",\"#text\":\"5\""));
+    CHECK(json_has(json, "\"name\":\"eGainTiming\",\"#text\":\"GC_FAST\""));
+    CHECK(json_has(json, "\"name\":\"bStereoDecoder\",\"#text\":\"false\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -734,7 +754,8 @@ static void test_param_value_entity_decoded() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     // Decoded value: pugixml turned the "&amp;" entity into a literal "&".
-    CHECK(json_has(json, "\"zNote\":\"A & B\""));
+    // Nested under body.request.command.param, mirrored to {"name":...,"#text":...}.
+    CHECK(json_has(json, "\"param\":{\"name\":\"zNote\",\"#text\":\"A & B\"}"));
     // Discriminating: the raw, undecoded entity text must NOT survive into
     // the JSON -- that would mean entity decoding silently regressed back to
     // the old hand-rolled scanner's raw-bytes-verbatim behavior.
@@ -760,10 +781,11 @@ static void test_wrapped_xml_scanrange_add() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"ScanRangeAdd\""));
-    CHECK(json_has(json, "\"iStartFrequency\":30000000"));
-    CHECK(json_has(json, "\"iStopFrequency\":88000000"));
-    CHECK(json_has(json, "\"iStepFrequency\":25000"));
+    CHECK(json_has(json, "\"command\":{\"name\":\"ScanRangeAdd\""));
+    CHECK(json_has(json, "\"param\":["));
+    CHECK(json_has(json, "\"name\":\"iStartFrequency\",\"#text\":\"30000000\""));
+    CHECK(json_has(json, "\"name\":\"iStopFrequency\",\"#text\":\"88000000\""));
+    CHECK(json_has(json, "\"name\":\"iStepFrequency\",\"#text\":\"25000\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -783,8 +805,10 @@ static void test_wrapped_xml_scanrange_delete_all() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"command_name\":\"ScanRangeDeleteAll\""));
-    CHECK(json_has(json, "\"params\":{}"));
+    // No Param children/text under Command → mirrors to just {"name":...},
+    // i.e. no "param" key present at all.
+    CHECK(json_has(json, "\"command\":{\"name\":\"ScanRangeDeleteAll\"}"));
+    CHECK(!json_has(json, "\"param\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -806,7 +830,12 @@ static void test_xml_param_self_closing_does_not_corrupt_scan() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"eNext\":\"RealValue\""));
+    // Both Params must appear in the "param" array in order: the self-closing
+    // <Param name="iEmpty"/> (no #text, since it has no text) followed by
+    // <Param name="eNext">RealValue</Param>. If the self-closing tag had
+    // corrupted the scan, eNext's value would be missing or mangled.
+    CHECK(json_has(json, "\"param\":[{\"name\":\"iEmpty\"}"));
+    CHECK(json_has(json, "\"name\":\"eNext\",\"#text\":\"RealValue\""));
 }
 
 // ---------------------------------------------------------------------------
@@ -855,7 +884,7 @@ static void test_wrapped_xml_event() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"event\""));
-    CHECK(json_has(json, "\"command_name\":\"ScanComplete\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"ScanComplete\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -899,17 +928,19 @@ static void test_ddfcl_request_wrapped() {
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"channel\":\"preclassifier\""));
     CHECK(json_has(json, "\"msg_kind\":\"request\""));
-    CHECK(json_has(json, "\"msg_id\":\"10\""));
-    CHECK(json_has(json, "\"command_name\":\"AnalysisIntervalMs\""));
+    CHECK(json_has(json, "\"body\":{\"ddfcl_request\":{\"id\":\"10\""));
     // AnalysisIntervalMs's "50000" is a direct-text Command body, not a
-    // <Param> — must still reach a structured field, not just raw_xml.
-    CHECK(json_has(json, "\"command_value\":\"50000\""));
+    // <Param> — Command has an attribute (name) AND text but no element
+    // children, so it mirrors to {"name":...,"#text":...}, same shape as a
+    // Param leaf — must still reach a structured field, not just raw_xml.
+    CHECK(json_has(json, "\"command\":{\"name\":\"AnalysisIntervalMs\",\"#text\":\"50000\"}"));
 }
 
 // ---------------------------------------------------------------------------
-// Test: Reply with no <Command> child at all — command_name/command_value
-// must be absent, and decoding must not scan past the frame buffer looking
-// for a tag that isn't there (strstr-on-non-null-terminated-buffer risk).
+// Test: Reply with no <Command> child at all — no "command" key must be
+// emitted under body.reply, and decoding must not scan past the frame buffer
+// looking for a tag that isn't there (strstr-on-non-null-terminated-buffer
+// risk).
 // ---------------------------------------------------------------------------
 
 static void test_raw_xml_reply_without_command_tag() {
@@ -922,8 +953,13 @@ static void test_raw_xml_reply_without_command_tag() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(!json_has(json, "\"command_name\""));
-    CHECK(!json_has(json, "\"command_value\""));
+    CHECK(json_has(json, "\"body\":{\"reply\":{\"type\":\"get\",\"id\":\"1\"}}"));
+    // Under the generic mirror, the old curated keys "command_name"/
+    // "command_value" never exist in ANY shape, so checking their absence no
+    // longer discriminates real Command-decoding behavior. The real
+    // equivalent: with no <Command> child element at all, no "command" key
+    // is emitted under body.reply.
+    CHECK(!json_has(json, "\"command\":"));
 }
 
 // ---------------------------------------------------------------------------
@@ -944,7 +980,7 @@ static void test_ddfcl_reply_raw() {
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"channel\":\"preclassifier\""));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(json_has(json, "\"command_name\":\"AnalysisIntervalMs\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"AnalysisIntervalMs\",\"#text\":\"50000\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -968,16 +1004,20 @@ static void test_dfdata_format02() {
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"channel\":\"preclassifier_output\""));
     CHECK(json_has(json, "\"msg_kind\":\"dfdata\""));
-    CHECK(json_has(json, "\"ddf_cl_id\":\"3\""));
-    CHECK(json_has(json, "\"fields\":{"));
-    CHECK(json_has(json, "\"EmitterClass\":\"Burst\""));
-    CHECK(json_has(json, "\"CenterFrequency\":\"433920000\""));
-    CHECK(json_has(json, "\"BearingAvg\":\"245.7\""));
-    CHECK(json_has(json, "\"LevelAvg\":\"56.3\""));
-    CHECK(json_has(json, "\"units\":{"));
-    CHECK(json_has(json, "\"CenterFrequency\":\"Hz\""));
-    CHECK(json_has(json, "\"BearingAvg\":\"deg\""));
-    CHECK(json_has(json, "\"LevelAvg\":\"dBuV\""));
+    // DDF-CL-ID's hyphens are preserved literally (not folded to underscore)
+    // per the mirror's snake_case rule — only "DDF-CL-ID" -> lowercase
+    // "ddf-cl-id", hyphens kept as-is.
+    CHECK(json_has(json, "\"body\":{\"df_data\":{\"ddf-cl-id\":\"3\""));
+    // EmitterClass has no attributes and only text, and appears once here →
+    // a plain JSON string, not an object.
+    CHECK(json_has(json, "\"emitter_class\":\"Burst\""));
+    // Fields with a Unit attribute AND text (CenterFrequency/BearingAvg/
+    // LevelAvg) mirror to {"unit":...,"#text":...} — this replaces the old
+    // curated separate "fields"/"units" objects with one flat per-field
+    // object each.
+    CHECK(json_has(json, "\"center_frequency\":{\"unit\":\"Hz\",\"#text\":\"433920000\"}"));
+    CHECK(json_has(json, "\"bearing_avg\":{\"unit\":\"deg\",\"#text\":\"245.7\"}"));
+    CHECK(json_has(json, "\"level_avg\":{\"unit\":\"dBuV\",\"#text\":\"56.3\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -999,13 +1039,10 @@ static void test_dfdata_hopper() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"EmitterClass\":\"Hopper\""));
+    CHECK(json_has(json, "\"emitter_class\":\"Hopper\""));
     // Hopper's frequency RANGE (start/stop), missing before this fix (D7).
-    CHECK(json_has(json, "\"StartFrequency\":\"430000000\""));
-    CHECK(json_has(json, "\"StopFrequency\":\"440000000\""));
-    CHECK(json_has(json, "\"units\":{"));
-    CHECK(json_has(json, "\"StartFrequency\":\"Hz\""));
-    CHECK(json_has(json, "\"StopFrequency\":\"Hz\""));
+    CHECK(json_has(json, "\"start_frequency\":{\"unit\":\"Hz\",\"#text\":\"430000000\"}"));
+    CHECK(json_has(json, "\"stop_frequency\":{\"unit\":\"Hz\",\"#text\":\"440000000\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1027,13 +1064,10 @@ static void test_dfdata_chirp() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"EmitterClass\":\"Chirp\""));
-    CHECK(json_has(json, "\"StartFrequency\":\"100000000\""));
-    CHECK(json_has(json, "\"StopFrequency\":\"108000000\""));
-    CHECK(json_has(json, "\"BearingAvg\":\"180.0\""));
-    CHECK(json_has(json, "\"units\":{"));
-    CHECK(json_has(json, "\"StartFrequency\":\"Hz\""));
-    CHECK(json_has(json, "\"StopFrequency\":\"Hz\""));
+    CHECK(json_has(json, "\"emitter_class\":\"Chirp\""));
+    CHECK(json_has(json, "\"start_frequency\":{\"unit\":\"Hz\",\"#text\":\"100000000\"}"));
+    CHECK(json_has(json, "\"stop_frequency\":{\"unit\":\"Hz\",\"#text\":\"108000000\"}"));
+    CHECK(json_has(json, "\"bearing_avg\":{\"unit\":\"deg\",\"#text\":\"180.0\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1062,12 +1096,10 @@ static void test_dfdata_with_whitespace() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"ddf_cl_id\":\"7\""));
-    CHECK(json_has(json, "\"EmitterClass\":\"Burst\""));
-    CHECK(json_has(json, "\"CenterFrequency\":\"450000000\""));
-    CHECK(json_has(json, "\"BearingAvg\":\"120.5\""));
-    CHECK(json_has(json, "\"CenterFrequency\":\"Hz\""));
-    CHECK(json_has(json, "\"BearingAvg\":\"deg\""));
+    CHECK(json_has(json, "\"ddf-cl-id\":\"7\""));
+    CHECK(json_has(json, "\"emitter_class\":\"Burst\""));
+    CHECK(json_has(json, "\"center_frequency\":{\"unit\":\"Hz\",\"#text\":\"450000000\"}"));
+    CHECK(json_has(json, "\"bearing_avg\":{\"unit\":\"deg\",\"#text\":\"120.5\"}"));
     // Also confirm no empty-string key sneaks in here either -- though under
     // pugi::parse_default this was never actually at risk for whitespace nodes
     // (see comment above); the genuine proof of the node_element filter is
@@ -1101,10 +1133,9 @@ static void test_dfdata_with_cdata() {
 
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
-    CHECK(json_has(json, "\"ddf_cl_id\":\"8\""));
-    CHECK(json_has(json, "\"EmitterClass\":\"Hopper\""));
-    CHECK(json_has(json, "\"BearingAvg\":\"45.0\""));
-    CHECK(json_has(json, "\"BearingAvg\":\"deg\""));
+    CHECK(json_has(json, "\"ddf-cl-id\":\"8\""));
+    CHECK(json_has(json, "\"emitter_class\":\"Hopper\""));
+    CHECK(json_has(json, "\"bearing_avg\":{\"unit\":\"deg\",\"#text\":\"45.0\"}"));
     // The real proof: no spurious empty-string key from the CDATA node.
     CHECK(!json_has(json, "\"\":\""));
 }
@@ -1125,7 +1156,7 @@ static void test_raw_xml_leading_ws() {
     std::string json;
     CHECK(try_parse(frame.data(), frame.size(), json));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(json_has(json, "\"command_name\":\"ModuleInfo\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"ModuleInfo\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1248,8 +1279,8 @@ static void test_format_response_roundtrip() {
 
     std::string json_out;
     CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
-    CHECK(json_has(json_out, "\"command_name\":\"DeviceInfo\""));
-    CHECK(json_has(json_out, "\"msg_type\":\"get\""));
+    CHECK(json_has(json_out, "\"command\":{\"name\":\"DeviceInfo\"}"));
+    CHECK(json_has(json_out, "\"type\":\"get\""));
 }
 
 // ---------------------------------------------------------------------------

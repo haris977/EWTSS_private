@@ -8,6 +8,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 # ---- DDF-1GTX parser DLL ----
 add_library(ddf1gtx SHARED
     src/ddf1gtx_parser.cpp
+    ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
 )
 target_include_directories(ddf1gtx PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)
@@ -26,6 +27,7 @@ enable_testing()
 add_executable(test_ddf1gtx
     tests/test_frames_ddf1gtx.cpp
     src/ddf1gtx_parser.cpp
+    ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
 )
 target_include_directories(test_ddf1gtx PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)

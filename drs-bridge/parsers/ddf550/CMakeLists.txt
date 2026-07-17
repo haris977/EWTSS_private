@@ -8,6 +8,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 # ---- DDF-550 parser DLL ----
 add_library(ddf550 SHARED
     src/ddf550_parser.cpp
+    ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
 )
 target_include_directories(ddf550 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)
@@ -31,6 +32,7 @@ enable_testing()
 add_executable(test_ddf550
     tests/test_frames_ddf550.cpp
     src/ddf550_parser.cpp
+    ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
 )
 target_include_directories(test_ddf550 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)

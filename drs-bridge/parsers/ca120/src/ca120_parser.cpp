@@ -16,7 +16,7 @@
 #include "sdfc_endian.h"
 #include "json_writer.h"
 #include "pugixml.hpp"
-#include "pugixml_helpers.h"
+#include "pugixml_generic_mirror.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -605,120 +605,30 @@ static std::string parse_ammos(const uint8_t* frame, int frame_len) {
 // impl_parse_xml holds the real logic; parse_xml (below) wraps it in
 // try/catch so no C++ exception ever escapes toward parse_message's
 // extern "C" boundary, matching sdfc_abi.h rule 2. pugixml's load_buffer
-// itself does not throw (it returns a result object), but the JsonWriter/
-// std::string work here could theoretically raise std::bad_alloc, and
-// select_node's XPath evaluation can theoretically raise
-// pugi::xpath_exception if PUGIXML_NO_EXCEPTIONS is ever undefined and a
-// malformed expression is ever constructed -- not reachable today since
-// every tag name used here is a fixed literal, but the guard costs nothing
-// and matches the same try/catch idiom already used in
+// itself does not throw (it returns a result object), but the std::string
+// work here could theoretically raise std::bad_alloc -- the guard costs
+// nothing and matches the same try/catch idiom already used in
 // drs-bridge/parsers/utils/xml_to_json/xml_to_json.cpp.
+//
+// The actual tree->JSON mirroring is shared with ddf550_parser.cpp and
+// ddf1gtx_parser.cpp via pugixml_generic_mirror.h, so all three RDFS-family
+// parsers emit the same {hw, channel, msg_kind, body: {...}} structure --
+// CA120's channel is always "xml" (its ICD has only one XML channel), which
+// is the only thing specific to this file.
 static std::string impl_parse_xml(const uint8_t* frame, int frame_len, int frame_type) {
     pugi::xml_document doc;
     pugi::xml_parse_result presult =
         doc.load_buffer(frame, static_cast<size_t>(frame_len));
-    // Stricter than the old string-scanning code, which had no notion of
-    // well-formedness and would silently emit a sparse/partial JSON for
-    // malformed input. extract_frame already rejects most malformed input
-    // (it requires a matching close tag by name); this catches the
-    // remaining corner case where a well-closed-looking frame is malformed
-    // *inside*. Accepted, intentional behavior change -- see design spec §3.
-    //
-    // Also: pugixml's default parse flags decode XML entities (&amp; -> &),
-    // normalize EOL, and normalize attribute whitespace -- the old hand-rolled
-    // scanning never did any of this (returned raw bytes verbatim). Accepted,
-    // disclosed deviation from strict byte-identical output -- see design
-    // spec §3.2. Low practical impact: no real ICD sample uses entities.
-    if (!presult) return {};
+
+    if (!presult) return build_malformed_envelope("ca120", "xml", presult);
 
     pugi::xml_node root = doc.first_child();
-
-    JsonWriter j;
-    j.key_str("hw",       "ca120");
-    j.key_str("channel",  "xml");
-
     bool is_event = (std::strcmp(root.name(), "Event") == 0);
-    j.key_str("msg_kind", (frame_type == 1) ? "request"
-                        : is_event          ? "event"
-                                            : "reply");
+    const char* msg_kind = is_event ? "event"
+                         : (frame_type == 1) ? "request"
+                                             : "reply";
 
-    const char* type_attr = root.attribute("type").value();
-    const char* id_attr   = root.attribute("id").value();
-    const char* src_attr  = root.attribute("source").value();
-    if (*type_attr) j.key_str("msg_type",     type_attr);
-    if (*id_attr)   j.key_str("msg_id",       id_attr);
-    if (*src_attr)  j.key_str("event_source", src_attr);
-
-    static const struct { const char* tag; const char* name; } kSubsystems[] = {
-        { "ResourceManager",       "resource_manager"       },
-        { "Control",               "control"                },
-        { "Tuner",                 "tuner"                  },
-        { "tuner",                 "tuner"                  },
-        { "FFT",                   "fft"                    },
-        { "DetectAndClassify",     "detect_and_classify"    },
-        { "FrequencyHopping",      "frequency_hopping"      },
-        { "Squelch",               "squelch"                },
-        { "Classifier",            "classifier"             },
-        { "AnalogDemodulator",     "analog_demodulator"     },
-        { "DigitalDemodulator",    "digital_demodulator"    },
-        { "BitstreamProcessing",   "bitstream_processing"   },
-        { "HopperFilterSeparation","hopper_filter_separation"},
-    };
-    std::string sub_json("[");
-    bool first = true;
-    for (auto& s : kSubsystems) {
-        if (find_first(root, s.tag)) {
-            if (!first) sub_json += ',';
-            sub_json += '"';
-            sub_json += s.name;
-            sub_json += '"';
-            first = false;
-        }
-    }
-    sub_json += ']';
-    j.key_raw("subsystems", sub_json);
-
-    pugi::xml_node ds = find_first(root, "DataStream");
-    if (ds) {
-        const char* action = ds.attribute("action").value();
-        // Deliberate behavior change from old hand-rolled xml_attr scanning:
-        // the old code searched the entire buffer and incorrectly returned the
-        // root message's type attribute (e.g. "get"/"set") instead of DataStream's
-        // own type attribute. pugixml's node-scoped .attribute() now correctly
-        // returns DataStream's type (e.g. "IFData").
-        const char* dtype  = ds.attribute("type").value();
-        if (*action) j.key_str("datastream_action", action);
-        if (*dtype)  j.key_str("datastream_type",   dtype);
-        // Narrower disclosed difference (design spec §3.2): IP/Port lookup
-        // narrowed from the old xml_text(xml, frame_len, "IP") whole-buffer
-        // search to this direct-child-of-DataStream scoping via
-        // ds.child(...) -- more correct, matches every current fixture, but
-        // would differ from the old behavior if a future message ever
-        // nested IP/Port deeper than a direct child of DataStream.
-        const char* ip   = ds.child("IP").text().get();
-        const char* port = ds.child("Port").text().get();
-        if (*ip)   j.key_str("stream_ip",   ip);
-        if (*port) j.key_str("stream_port", port);
-    }
-
-    pugi::xml_node start_app = find_first(root, "StartApplication");
-    if (start_app) {
-        const char* guid = start_app.attribute("guid").value();
-        if (*guid) j.key_str("app_guid", guid);
-    }
-
-    const char* status = find_first(root, "Status").text().get();
-    const char* freq   = find_first(root, "Frequency").text().get();
-    const char* bw     = find_first(root, "Bandwidth").text().get();
-    if (*status) j.key_str("status",      status);
-    if (*freq)   j.key_str("frequency_hz", freq);
-    if (*bw)     j.key_str("bandwidth_hz", bw);
-
-    static constexpr int RAW_XML_CAP = 16384;
-    int raw_len = (frame_len < RAW_XML_CAP) ? frame_len : RAW_XML_CAP;
-    j.key_str("raw_xml", std::string(reinterpret_cast<const char*>(frame), (size_t)raw_len));
-
-    return j.str();
+    return build_mirror_envelope("ca120", "xml", msg_kind, root);
 }
 
 static std::string parse_xml(const uint8_t* frame, int frame_len, int frame_type) {

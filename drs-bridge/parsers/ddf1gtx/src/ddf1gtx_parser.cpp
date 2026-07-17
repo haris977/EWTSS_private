@@ -26,7 +26,7 @@
 #include "sdfc_endian.h"
 #include "json_writer.h"
 #include "pugixml.hpp"
-#include "pugixml_helpers.h"
+#include "pugixml_generic_mirror.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -104,26 +104,6 @@ static int xml_closing_end(const uint8_t* xml, int len, const char* tag) {
 // pattern) -- content parsing only; xml_closing_end above is
 // frame-boundary detection and still byte-scanning, see extract_frame.
 // ---------------------------------------------------------------------------
-
-// Returns the value of the first <Param name="param_name">VALUE</Param>
-// anywhere in the document, or "" if not found. (The old xml_param_value
-// this replaces was already bounded/safe -- see the Command-name lookup
-// below for the actual pre-existing bug this migration fixes.)
-static std::string param_value(pugi::xml_node root, const char* name) {
-    for (pugi::xpath_node xn : root.select_nodes(".//Param")) {
-        pugi::xml_node p = xn.node();
-        if (std::strcmp(p.attribute("name").value(), name) == 0) return p.text().get();
-    }
-    return {};
-}
-
-// Tries <Param name="X">, falls back to a direct <X> tag -- matches the
-// repeated "if (v.empty()) v = xml_text(...)" pattern in the original.
-static std::string tag_or_param(pugi::xml_node root, const char* name) {
-    std::string v = param_value(root, name);
-    if (!v.empty()) return v;
-    return find_first(root, name).text().get();
-}
 
 // ---------------------------------------------------------------------------
 // JSON field helpers  (used by format_response)
@@ -396,9 +376,28 @@ static std::string parse_eb200(const uint8_t* pkt, int pkt_len) {
 // wraps it in try/catch so no C++ exception escapes toward parse_message's
 // extern "C" boundary (sdfc_abi.h rule 2) -- same rationale and idiom as
 // ca120_parser.cpp's impl_parse_xml/parse_xml split.
+//
+// channel/msg_kind are DDF-1GTX-specific (root-tag vocabulary/channel
+// taxonomy differ per ICD), derived from `root_tag` -- the same string
+// classify_xml_root() already found by byte-scanning in parse_message,
+// before we know whether pugixml will succeed, so channel/msg_kind stay
+// correct even on the malformed path. The tree->JSON mirroring itself (the
+// part that must be byte-for-byte identical across CA120/DDF-550/DDF-1GTX)
+// is shared via pugixml_generic_mirror.h.
 static std::string impl_parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
-                                           int frame_type)
+                                           int frame_type, const char* root_tag)
 {
+    bool is_ddfcl_req = (std::strcmp(root_tag, "DDFCLRequest") == 0);
+    bool is_ddfcl_rep = (std::strcmp(root_tag, "DDFCLReply")   == 0);
+    bool is_dfdata    = (std::strcmp(root_tag, "DFData")       == 0);
+
+    const char* channel  = is_dfdata                       ? "preclassifier_output"
+                         : (is_ddfcl_req || is_ddfcl_rep)   ? "preclassifier"
+                                                             : "control";
+    const char* msg_kind = (frame_type == 1) ? "request"
+                         : is_dfdata         ? "dfdata"
+                                             : "reply";
+
     pugi::xml_document doc;
     pugi::xml_parse_result presult =
         doc.load_buffer(frame, static_cast<size_t>(frame_len));
@@ -410,126 +409,15 @@ static std::string impl_parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
     // scanning never did any of this (returned raw bytes verbatim). Accepted,
     // disclosed deviation from strict byte-identical output -- see design
     // spec §3.2. Low practical impact: no real ICD sample uses entities.
-    if (!presult) return {};
+    if (!presult) return build_malformed_envelope("ddf1gtx", channel, presult);
 
-    pugi::xml_node root = doc.first_child();
-    const char* root_name = root.name();
-
-    bool is_ddfcl_req = (std::strcmp(root_name, "DDFCLRequest") == 0);
-    bool is_ddfcl_rep = (std::strcmp(root_name, "DDFCLReply")   == 0);
-    bool is_dfdata    = (std::strcmp(root_name, "DFData")       == 0);
-
-    const char* channel  = is_dfdata                       ? "preclassifier_output"
-                         : (is_ddfcl_req || is_ddfcl_rep)   ? "preclassifier"
-                                                             : "control";
-    const char* msg_kind = (frame_type == 1) ? "request"
-                         : is_dfdata         ? "dfdata"
-                                             : "reply";
-
-    JsonWriter j;
-    j.key_str("hw",       "ddf1gtx");
-    j.key_str("channel",  channel);
-    j.key_str("msg_kind", msg_kind);
-
-    const char* id_attr   = root.attribute("id").value();
-    const char* type_attr = root.attribute("type").value();
-    if (*id_attr)   j.key_str("msg_id",   id_attr);
-    if (*type_attr) j.key_str("msg_type", type_attr);
-
-    // Command name -- first <Command> anywhere in the document.
-    // Deliberate bug fix from the old hand-rolled scanning: the old code used
-    // std::strstr(xml, "<Command") -- strstr scans for a NUL terminator with
-    // no length bound, but `xml` here is a malloc'd frame buffer with no
-    // guaranteed trailing NUL (memcpy'd to exactly its content length in
-    // extract_frame). This was a genuine heap-over-read risk (undefined
-    // behavior, not reliably reproducible as a deterministic test failure --
-    // see test_command_absent_no_overrun() for a correctness check on the
-    // new, structurally-safe path instead). pugixml's find_first operates on
-    // the parsed tree, which is inherently length-bounded, so this risk is
-    // gone.
-    {
-        pugi::xml_node cmd = find_first(root, "Command");
-        const char* cmd_name = cmd.attribute("name").value();
-        if (*cmd_name) j.key_str("command_name", cmd_name);
-    }
-
-    // --- DfMode (§4.1): eOperationMode ---
-    {
-        std::string v = tag_or_param(root, "eOperationMode");
-        if (!v.empty()) j.key_str("operation_mode", v.c_str());
-    }
-    // --- MeasureSettingsFFM (§4.2): iFrequency, iFreqBegin, iFreqEnd, eAttSelect ---
-    {
-        std::string v = tag_or_param(root, "iFrequency");
-        if (!v.empty()) j.key_str("frequency_hz", v.c_str());
-    }
-    {
-        std::string v = tag_or_param(root, "iFreqBegin");
-        if (!v.empty()) j.key_str("freq_begin_hz", v.c_str());
-    }
-    {
-        std::string v = tag_or_param(root, "iFreqEnd");
-        if (!v.empty()) j.key_str("freq_end_hz", v.c_str());
-    }
-    {
-        std::string v = tag_or_param(root, "eAttSelect");
-        if (!v.empty()) j.key_str("att_select", v.c_str());
-    }
-    // --- DemodulationSettings (§4.3): eDemodulation, eAFBandwidth ---
-    {
-        std::string v = tag_or_param(root, "eDemodulation");
-        if (!v.empty()) j.key_str("demodulation", v.c_str());
-    }
-    {
-        std::string v = tag_or_param(root, "eAFBandwidth");
-        if (!v.empty()) j.key_str("af_bandwidth", v.c_str());
-    }
-    // --- AudioMode (§4.4): eAudioMode ---
-    {
-        std::string v = tag_or_param(root, "eAudioMode");
-        if (!v.empty()) j.key_str("audio_mode_str", v.c_str());
-    }
-    // --- ScanRangeAdd (§4.8): eDFPanStep ---
-    {
-        std::string v = tag_or_param(root, "eDFPanStep");
-        if (!v.empty()) j.key_str("df_pan_step", v.c_str());
-    }
-    // --- TraceEnable/TraceDisable/TraceDelete (§4.10-4.12): eTraceTag, zIP, iPort ---
-    {
-        std::string tt = param_value(root, "eTraceTag");
-        std::string ip = param_value(root, "zIP");
-        std::string pt = param_value(root, "iPort");
-        if (!tt.empty()) j.key_str("trace_tag_str", tt.c_str());
-        if (!ip.empty()) j.key_str("trace_ip",      ip.c_str());
-        if (!pt.empty()) j.key_str("trace_port",    pt.c_str());
-    }
-
-    // --- DFData preclassifier output (FORMAT02, §6.7.3) ---
-    if (is_dfdata) {
-        const char* cl_id  = root.attribute("DDF-CL-ID").value();
-        std::string eclass = find_first(root, "EmitterClass").text().get();
-        std::string cfreq  = find_first(root, "CenterFrequency").text().get();
-        std::string bear   = find_first(root, "BearingAvg").text().get();
-        std::string lvl    = find_first(root, "LevelAvg").text().get();
-        if (*cl_id)           j.key_str("ddf_cl_id",      cl_id);
-        if (!eclass.empty())  j.key_str("emitter_class",   eclass.c_str());
-        if (!cfreq.empty())   j.key_str("center_freq_hz",  cfreq.c_str());
-        if (!bear.empty())    j.key_str("bearing_avg_deg", bear.c_str());
-        if (!lvl.empty())     j.key_str("level_avg_dbuv",  lvl.c_str());
-    }
-
-    // Raw XML (capped) for Python-side deep parsing
-    static constexpr int RAW_XML_CAP = 16384;
-    const char* orig_xml = reinterpret_cast<const char*>(frame);
-    int raw_len = (frame_len < RAW_XML_CAP) ? frame_len : RAW_XML_CAP;
-    j.key_str("raw_xml", std::string(orig_xml, (size_t)raw_len));
-
-    return j.str();
+    return build_mirror_envelope("ddf1gtx", channel, msg_kind, doc.first_child());
 }
 
-static std::string parse_xml_ddf1gtx(const uint8_t* frame, int frame_len, int frame_type) {
+static std::string parse_xml_ddf1gtx(const uint8_t* frame, int frame_len, int frame_type,
+                                      const char* root_tag) {
     try {
-        return impl_parse_xml_ddf1gtx(frame, frame_len, frame_type);
+        return impl_parse_xml_ddf1gtx(frame, frame_len, frame_type, root_tag);
     } catch (...) {
         return {};
     }
@@ -643,7 +531,7 @@ SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
         const char* root_tag = nullptr;
         int ftype = classify_xml_root(frame, iframe, &root_tag);
         if (root_tag && ftype > 0)
-            result = parse_xml_ddf1gtx(frame, iframe, ftype);
+            result = parse_xml_ddf1gtx(frame, iframe, ftype, root_tag);
     }
 
     if (result.empty()) return -1;

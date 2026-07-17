@@ -422,11 +422,12 @@ static void test_wrapped_xml_dfmode() {
     CHECK(json_has(json, "\"hw\":\"ddf1gtx\""));
     CHECK(json_has(json, "\"channel\":\"control\""));
     CHECK(json_has(json, "\"msg_kind\":\"request\""));
-    CHECK(json_has(json, "\"msg_id\":\"42\""));
-    CHECK(json_has(json, "\"msg_type\":\"set\""));
-    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
-    CHECK(json_has(json, "\"operation_mode\":\"DFMODE_FFM\""));
-    CHECK(json_has(json, "raw_xml"));
+    // id/type now live nested under body.request instead of top-level msg_id/msg_type
+    CHECK(json_has(json, "\"body\":{\"request\":{\"type\":\"set\",\"id\":\"42\""));
+    // command_name/operation_mode replaced by the generic mirror's
+    // command.param structure (raw_xml is gone entirely -- this nested
+    // structure is the replacement source of truth for the request body)
+    CHECK(json_has(json, "\"command\":{\"name\":\"DfMode\",\"param\":{\"name\":\"eOperationMode\",\"#text\":\"DFMODE_FFM\"}}"));
     free_result(json);
     free_result(frame);
 }
@@ -452,9 +453,10 @@ static void test_wrapped_xml_measure_settings_ffm() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"MeasureSettingsFFM\""));
-    CHECK(json_has(json, "\"frequency_hz\":\"145000000\""));
-    CHECK(json_has(json, "\"att_select\":\"ATT_AUTO\""));
+    CHECK(json_has(json, "\"name\":\"MeasureSettingsFFM\""));
+    // frequency_hz/att_select replaced by mirrored param array entries
+    CHECK(json_has(json, "{\"name\":\"iFrequency\",\"#text\":\"145000000\"}"));
+    CHECK(json_has(json, "{\"name\":\"eAttSelect\",\"#text\":\"ATT_AUTO\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -481,9 +483,10 @@ static void test_wrapped_xml_measure_settings_scan() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"freq_begin_hz\":\"100000000\""));
-    CHECK(json_has(json, "\"freq_end_hz\":\"200000000\""));
-    CHECK(json_has(json, "\"att_select\":\"ATT_0DB\""));
+    // freq_begin_hz/freq_end_hz/att_select replaced by mirrored param array entries
+    CHECK(json_has(json, "{\"name\":\"iFreqBegin\",\"#text\":\"100000000\"}"));
+    CHECK(json_has(json, "{\"name\":\"iFreqEnd\",\"#text\":\"200000000\"}"));
+    CHECK(json_has(json, "{\"name\":\"eAttSelect\",\"#text\":\"ATT_0DB\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -509,9 +512,10 @@ static void test_wrapped_xml_demod_settings() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"DemodulationSettings\""));
-    CHECK(json_has(json, "\"demodulation\":\"DEMOD_FM\""));
-    CHECK(json_has(json, "\"af_bandwidth\":\"AFBW_300KHZ\""));
+    CHECK(json_has(json, "\"name\":\"DemodulationSettings\""));
+    // demodulation/af_bandwidth replaced by mirrored param array entries
+    CHECK(json_has(json, "{\"name\":\"eDemodulation\",\"#text\":\"DEMOD_FM\"}"));
+    CHECK(json_has(json, "{\"name\":\"eAFBandwidth\",\"#text\":\"AFBW_300KHZ\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -536,8 +540,8 @@ static void test_wrapped_xml_audiomode() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"AudioMode\""));
-    CHECK(json_has(json, "AUDIO_MODE_32KHZ_16BIT_MONO"));
+    CHECK(json_has(json, "\"name\":\"AudioMode\""));
+    CHECK(json_has(json, "\"#text\":\"AUDIO_MODE_32KHZ_16BIT_MONO\""));
     free_result(json);
     free_result(frame);
 }
@@ -566,10 +570,11 @@ static void test_wrapped_xml_scan_range_add() {
     int prc = parse_message(frame, frame_len, &json, &json_len);
     CHECK(prc == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"ScanRangeAdd\""));
-    CHECK(json_has(json, "\"freq_begin_hz\":\"87500000\""));
-    CHECK(json_has(json, "\"freq_end_hz\":\"108000000\""));
-    CHECK(json_has(json, "\"df_pan_step\":\"DFPANSTEP_25KHZ\""));
+    CHECK(json_has(json, "\"name\":\"ScanRangeAdd\""));
+    // freq_begin_hz/freq_end_hz/df_pan_step replaced by mirrored param array entries
+    CHECK(json_has(json, "{\"name\":\"iFreqBegin\",\"#text\":\"87500000\"}"));
+    CHECK(json_has(json, "{\"name\":\"iFreqEnd\",\"#text\":\"108000000\"}"));
+    CHECK(json_has(json, "{\"name\":\"eDFPanStep\",\"#text\":\"DFPANSTEP_25KHZ\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -593,7 +598,8 @@ static void test_wrapped_xml_scan_range_delete_all() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"ScanRangeDeleteAll\""));
+    // Bare command with no Param children -> {"name":"ScanRangeDeleteAll"}, no #text
+    CHECK(json_has(json, "\"command\":{\"name\":\"ScanRangeDeleteAll\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -620,10 +626,11 @@ static void test_wrapped_xml_trace_enable() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"TraceEnable\""));
-    CHECK(json_has(json, "\"trace_tag_str\":\"TRACETAG_AUDIO\""));
-    CHECK(json_has(json, "\"trace_ip\":\"192.168.1.100\""));
-    CHECK(json_has(json, "\"trace_port\":\"9152\""));
+    CHECK(json_has(json, "\"name\":\"TraceEnable\""));
+    // trace_tag_str/trace_ip/trace_port replaced by mirrored param array entries
+    CHECK(json_has(json, "{\"name\":\"eTraceTag\",\"#text\":\"TRACETAG_AUDIO\"}"));
+    CHECK(json_has(json, "{\"name\":\"zIP\",\"#text\":\"192.168.1.100\"}"));
+    CHECK(json_has(json, "{\"name\":\"iPort\",\"#text\":\"9152\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -650,8 +657,8 @@ static void test_wrapped_xml_trace_disable() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"TraceDisable\""));
-    CHECK(json_has(json, "\"trace_tag_str\":\"TRACETAG_DFPSCAN\""));
+    CHECK(json_has(json, "\"name\":\"TraceDisable\""));
+    CHECK(json_has(json, "{\"name\":\"eTraceTag\",\"#text\":\"TRACETAG_DFPSCAN\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -679,7 +686,7 @@ static void test_wrapped_xml_reply() {
     CHECK(json != nullptr);
     CHECK(json_has(json, "\"hw\":\"ddf1gtx\""));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(json_has(json, "\"command_name\":\"DfMode\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"DfMode\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -703,7 +710,7 @@ static void test_wrapped_xml_device_info_reply() {
     size_t json_len = 0;
     CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
     CHECK(json != nullptr);
-    CHECK(json_has(json, "\"command_name\":\"DeviceInfo\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"DeviceInfo\"}"));
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
     free_result(json);
     free_result(frame);
@@ -762,7 +769,9 @@ static void test_ddfcl_request_wrapped() {
     CHECK(json != nullptr);
     CHECK(json_has(json, "\"channel\":\"preclassifier\""));
     CHECK(json_has(json, "\"msg_kind\":\"request\""));
-    CHECK(json_has(json, "\"msg_id\":\"10\""));
+    // msg_id now lives nested under body.ddfcl_request.id
+    CHECK(json_has(json, "\"body\":{\"ddfcl_request\":{\"id\":\"10\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"AnalysisIntervalMs\",\"#text\":\"50000\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -821,11 +830,15 @@ static void test_dfdata_format02() {
     CHECK(json_has(json, "\"hw\":\"ddf1gtx\""));
     CHECK(json_has(json, "\"channel\":\"preclassifier_output\""));
     CHECK(json_has(json, "\"msg_kind\":\"dfdata\""));
-    CHECK(json_has(json, "\"ddf_cl_id\":\"3\""));
+    // ddf_cl_id/center_freq_hz/bearing_avg_deg/level_avg_dbuv are gone; the
+    // mirror preserves the attribute name verbatim (hyphens included, e.g.
+    // "DDF-CL-ID" -> "ddf-cl-id" -- only case changes, hyphens are kept) and
+    // nests each Unit-bearing element as {"unit":..., "#text":...}.
+    CHECK(json_has(json, "\"ddf-cl-id\":\"3\""));
     CHECK(json_has(json, "\"emitter_class\":\"Burst\""));
-    CHECK(json_has(json, "\"center_freq_hz\":\"433920000\""));
-    CHECK(json_has(json, "\"bearing_avg_deg\":\"245.7\""));
-    CHECK(json_has(json, "\"level_avg_dbuv\":\"56.3\""));
+    CHECK(json_has(json, "\"center_frequency\":{\"unit\":\"Hz\",\"#text\":\"433920000\"}"));
+    CHECK(json_has(json, "\"bearing_avg\":{\"unit\":\"deg\",\"#text\":\"245.7\"}"));
+    CHECK(json_has(json, "\"level_avg\":{\"unit\":\"dBuV\",\"#text\":\"56.3\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -876,7 +889,7 @@ static void test_raw_xml_leading_ws() {
     CHECK(prc == 0);
     CHECK(json != nullptr);
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(json_has(json, "\"command_name\":\"ModuleInfo\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"ModuleInfo\"}"));
     free_result(json);
     free_result(frame);
 }
@@ -1047,8 +1060,8 @@ static void test_format_response_roundtrip() {
     CHECK(prc == 0);
     CHECK(json_out != nullptr);
     CHECK(json_has(json_out, "\"hw\":\"ddf1gtx\""));
-    CHECK(json_has(json_out, "\"command_name\":\"DeviceInfo\""));
-    CHECK(json_has(json_out, "\"msg_type\":\"get\""));
+    CHECK(json_has(json_out, "\"command\":{\"name\":\"DeviceInfo\"}"));
+    CHECK(json_has(json_out, "\"type\":\"get\""));
     free_result(json_out);
     free_result(out_frame);
     free_result(wire);
@@ -1107,27 +1120,28 @@ static void test_eb200_audio_iq_demod() {
 }
 
 // ---------------------------------------------------------------------------
-// Test: Command-absent safety check on the Command-name lookup
+// Test: Command-absent safety check on the Command-tag lookup
 //
-// This is a correctness/safety test for the CURRENT (pugixml-based)
-// find_first(root, "Command") path -- it is NOT a "fails on old code,
-// passes on new code" regression test. The old hand-rolled lookup used
-// std::strstr(xml, "<Command") directly on the raw frame buffer. That
-// buffer is malloc'd by extract_frame and memcpy'd to exactly its content
-// length (see the raw-XML path below, and wrap_xml/raw_bytes above) --
-// there is no guaranteed trailing NUL. If no "<Command" substring exists
-// anywhere in the frame, strstr has no length bound and would keep
-// scanning past the buffer looking for a NUL terminator: a genuine
-// heap-over-read (undefined behavior -- not reliably reproducible as a
-// deterministic pass/fail, since whether/when it crashes depends on heap
-// layout). The new code (find_first over the parsed pugixml tree, which
-// is inherently length-bounded) has no equivalent risk.
+// This is a correctness/safety test for the CURRENT (pugixml-based) tree
+// walk -- it is NOT a "fails on old code, passes on new code" regression
+// test. The old hand-rolled lookup used std::strstr(xml, "<Command")
+// directly on the raw frame buffer. That buffer is malloc'd by
+// extract_frame and memcpy'd to exactly its content length (see the
+// raw-XML path below, and wrap_xml/raw_bytes above) -- there is no
+// guaranteed trailing NUL. If no "<Command" substring exists anywhere in
+// the frame, strstr has no length bound and would keep scanning past the
+// buffer looking for a NUL terminator: a genuine heap-over-read (undefined
+// behavior -- not reliably reproducible as a deterministic pass/fail,
+// since whether/when it crashes depends on heap layout). The new code
+// (mirroring the parsed pugixml tree, which is inherently length-bounded)
+// has no equivalent risk.
 //
 // What this test actually proves: given a valid, tightly-sized frame
 // (buffer length == XML byte length, no padding/NUL) with no <Command>
-// element anywhere, parsing still succeeds and simply omits
-// "command_name" from the JSON -- i.e. the fixed code path handles the
-// Command-absent case safely and correctly.
+// element anywhere, parsing still succeeds and the mirrored body simply
+// has no "command" key at all (there's no child element to mirror) --
+// i.e. the fixed code path handles the Command-absent case safely and
+// correctly.
 // ---------------------------------------------------------------------------
 
 static void test_command_absent_no_overrun() {
@@ -1146,7 +1160,7 @@ static void test_command_absent_no_overrun() {
     CHECK(prc == 0);
     CHECK(json != nullptr);
     CHECK(json_has(json, "\"msg_kind\":\"reply\""));
-    CHECK(!json_has(json, "\"command_name\""));  // no <Command> present -> key omitted
+    CHECK(!json_has(json, "\"command\":"));  // no <Command> present -> key omitted entirely
 
     free_result(json);
     free_result(frame);
