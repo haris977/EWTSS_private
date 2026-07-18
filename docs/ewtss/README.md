@@ -62,6 +62,14 @@ The audience-targeted docs above distil the load-bearing decisions; the underlyi
 - [ICD codegen tool design](specs/icd-codegen-tool-design.md) — the Excel-ICD-to-C++/YAML/TypeScript skeleton generator that accelerates new hardware-variant onboarding.
 - [Metadata-driven entity editor (evaluated, deferred)](specs/metadata-driven-entity-editor-evaluation.md) — the rejected option referenced from [ADR-007](decision-record.md), with explicit revisit triggers.
 
+### RDFS XML→JSON parsing (CA120 / DDF-550 / DDF-1GTX) — design evolution
+
+Three specs, read in this order, each superseding part of the one before it — kept as a chain rather than edited in place so the rationale for each pivot stays visible:
+
+- [From-scratch XML→JSON parser — design](specs/xml-to-json-parser-design.md) + [implementation plan](plans/xml-to-json-parser-plan.md) — original decision to hand-roll a dependency-free XML→JSON module (`drs-bridge/parsers/utils/xml_to_json/`) instead of taking a pugixml dependency, reproducing the JSON mirror shape already validated in `proto_ca120_generic_mirror.cpp`. **Superseded** for the three production parsers below; module remains committed and tested but unused in production.
+- [Pugixml migration — design](specs/xml-parsing-pugixml-migration-design.md) + [implementation plan](plans/xml-parsing-pugixml-migration-plan.md) — reverses that call: CA120/DDF-550/DDF-1GTX's `parse_message` content-parsing is rewritten onto pugixml DOM navigation instead of hand-rolled byte scanning, output kept byte-for-byte identical at the time.
+- [RDFS-family JSON contract — the generic XML→JSON mirror](specs/rdfs-generic-mirror-json-contract.md) — supersedes the "keep each parser's curated JSON output unchanged" clause above: all three parsers were subsequently unified onto the generic-mirror JSON shape for family-wide structural consistency. The pugixml-as-parsing-engine decision itself is unaffected.
+
 ## v2 subsystem specs + implementation plans (B1.x work)
 
 Sub-system specs that the [Design Backlog](design-backlog.md) tracks under B1.x live alongside this README in [`specs/`](specs/) (design) and [`plans/`](plans/) (implementation). Each plan that has been executed against the repo carries an adjacent `*-corrigenda.md` capturing the spec-validation findings — read the corrigenda first when picking up a B1.x item; it identifies the blockers that have already been fixed in the plan and the ones still open.
