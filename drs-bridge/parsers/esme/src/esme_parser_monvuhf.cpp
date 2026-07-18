@@ -27,6 +27,7 @@
 
 #include "sdfc_abi.h"
 #include "json_writer.h"
+#include "json_kwargs.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -719,31 +720,9 @@ static std::string parse_scpi(const uint8_t* frame, int frame_len, int frame_typ
 // JSON field helper for format_response
 // ---------------------------------------------------------------------------
 
-static std::string json_str_field(const char* json, const char* key) {
-    std::string k("\""); k += key; k += "\"";
-    const char* p = std::strstr(json, k.c_str());
-    if (!p) return {};
-    p += k.size();
-    while (*p == ' ' || *p == ':') ++p;
-    if (*p != '"') return {};
-    ++p;
-    std::string val;
-    while (*p && *p != '"') {
-        if (*p == '\\' && *(p + 1)) {
-            switch (*(p + 1)) {
-                case '"':  val += '"';  p += 2; break;
-                case '\\': val += '\\'; p += 2; break;
-                case 'n':  val += '\n'; p += 2; break;
-                case 'r':  val += '\r'; p += 2; break;
-                case 't':  val += '\t'; p += 2; break;
-                default:   val += *p++; break;
-            }
-        } else {
-            val += *p++;
-        }
-    }
-    return val;
-}
+// json_str_field now lives in drs-bridge/parsers/utils/json_kwargs.h
+// (shared across the whole SDFC family; this also picks up the '\/'
+// escape case this file's local copy was missing).
 
 // ---------------------------------------------------------------------------
 // extract_frame  (ABI entry point)

@@ -10,6 +10,8 @@ add_library(ddf550 SHARED
     src/ddf550_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
+    ../utils/json_kwargs.cpp
+    ../utils/eb200_shared.cpp
 )
 target_include_directories(ddf550 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)
 
@@ -34,6 +36,8 @@ add_executable(test_ddf550
     src/ddf550_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
+    ../utils/json_kwargs.cpp
+    ../utils/eb200_shared.cpp
 )
 target_include_directories(test_ddf550 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)
 if(NOT MSVC)

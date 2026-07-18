@@ -10,6 +10,7 @@ add_library(ca120 SHARED
     src/ca120_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
+    ../utils/json_kwargs.cpp
 )
 target_include_directories(ca120 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)
 
@@ -29,6 +30,7 @@ add_executable(test_ca120
     src/ca120_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
+    ../utils/json_kwargs.cpp
 )
 target_include_directories(test_ca120 PRIVATE ../dp_ecm/include ../utils/pugixml-1.16 ../utils)
 if(NOT MSVC)

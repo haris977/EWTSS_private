@@ -15,6 +15,7 @@
 #include "sdfc_abi.h"
 #include "sdfc_endian.h"
 #include "json_writer.h"
+#include "json_kwargs.h"
 #include "pugixml.hpp"
 #include "pugixml_generic_mirror.h"
 
@@ -89,64 +90,9 @@ static uint64_t freq64(const uint8_t* lo, const uint8_t* hi) {
 // and still byte-scanning, see extract_frame.
 // ---------------------------------------------------------------------------
 
-// Find the byte offset PAST the first occurrence of "</tag>" in xml[0..len).
-// Returns -1 if not found.
-static int xml_closing_end(const uint8_t* xml, int len, const char* tag) {
-    char close[80];
-    std::snprintf(close, sizeof(close), "</%s>", tag);
-    int clen = (int)strlen(close);
-    const char* data = reinterpret_cast<const char*>(xml);
-    for (int i = 0; i <= len - clen; ++i) {
-        if (memcmp(data + i, close, (size_t)clen) == 0)
-            return i + clen;
-    }
-    return -1;
-}
-
-// Extract a JSON string field value from a flat JSON object string.
-// Stops at the first unescaped closing quote — suitable for field values
-// that do not contain escaped Unicode sequences beyond the basics.
-static std::string json_str_field(const char* json, const char* key) {
-    std::string k("\"");
-    k += key;
-    k += "\"";
-    const char* p = std::strstr(json, k.c_str());
-    if (!p) return {};
-    p += k.size();
-    while (*p == ' ' || *p == ':') ++p;
-    if (*p != '"') return {};
-    ++p;
-    std::string val;
-    while (*p && *p != '"') {
-        if (*p == '\\' && *(p + 1)) {
-            switch (*(p + 1)) {
-                case '"':  val += '"';  p += 2; break;
-                case '\\': val += '\\'; p += 2; break;
-                case '/':  val += '/';  p += 2; break;
-                case 'n':  val += '\n'; p += 2; break;
-                case 'r':  val += '\r'; p += 2; break;
-                case 't':  val += '\t'; p += 2; break;
-                default:   val += *p++; break;
-            }
-        } else {
-            val += *p++;
-        }
-    }
-    return val;
-}
-
-static long long json_int_field(const char* json, const char* key) {
-    std::string k("\"");
-    k += key;
-    k += "\"";
-    const char* p = std::strstr(json, k.c_str());
-    if (!p) return -1LL;
-    p += k.size();
-    while (*p == ' ' || *p == ':') ++p;
-    if (*p == '-' || (*p >= '0' && *p <= '9'))
-        return std::strtoll(p, nullptr, 10);
-    return -1LL;
-}
+// xml_closing_end / json_str_field / json_int_field now live in
+// drs-bridge/parsers/utils/json_kwargs.h (shared across the whole SDFC
+// family so escape handling stays identical everywhere).
 
 // ---------------------------------------------------------------------------
 // Enum-to-string helpers (§6.12, §7.x)

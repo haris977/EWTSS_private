@@ -8,8 +8,9 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 # ---- ESME MONUV (HF/VU) parser DLL ----
 add_library(esme_monvuhf SHARED
     src/esme_parser_monvuhf.cpp
+    ../utils/json_kwargs.cpp
 )
-target_include_directories(esme_monvuhf PRIVATE ../dp_ecm/include)
+target_include_directories(esme_monvuhf PRIVATE ../dp_ecm/include ../utils)
 
 if(MSVC)
     target_compile_options(esme_monvuhf PRIVATE /W4 /permissive-)
@@ -25,8 +26,9 @@ enable_testing()
 add_executable(test_esme_monvuhf
     tests/test_frames_esme.cpp
     src/esme_parser_monvuhf.cpp
+    ../utils/json_kwargs.cpp
 )
-target_include_directories(test_esme_monvuhf PRIVATE ../dp_ecm/include)
+target_include_directories(test_esme_monvuhf PRIVATE ../dp_ecm/include ../utils)
 if(NOT MSVC)
     target_compile_options(test_esme_monvuhf PRIVATE -Wall -Wextra)
 endif()
