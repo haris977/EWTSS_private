@@ -1,0 +1,31 @@
+%% Figure 5 — Telemetry data flow (the cumulative-leak-sensitive hot path)
+%% Source: architecture-overview.md §2.4, §4.9, §8.2; command-flows §5.1
+flowchart LR
+    HW["DRS hardware /<br/>Entity Controllers<br/>(or C++ random generator<br/>in Random mode)"]
+    BRIDGE["<b>drs-bridge</b> (WS2)<br/>asyncio TCP read<br/>=> C++ parser .dll<br/>=> structured JSON"]
+    KAFKA[("Kafka<br/>hw.&lt;variant&gt;.&lt;kind&gt;")]
+    SERVER["<b>drs-server</b> (WS2)<br/>consumer; validate;<br/><b>batched write (100 msg / 500 ms)</b>;<br/>offset commit AFTER db write"]
+    DB[("TimescaleDB<br/>hypertables<br/>(chunk exclusion +<br/>composite index)")]
+    WSHUB["WebSocket hub<br/>(subscription filter)"]
+    SGAPP["<b>Sg.App</b> telemetry panels (WS1)<br/>FF / FH / Burst / Health"]
+    WEBAPP["<b>DRS webapp</b> monitor-scan (WS2)"]
+
+    HW -->|"TCP/UDP binary<br/>per-variant"| BRIDGE
+    BRIDGE -->|"publish JSON<br/>(single shared producer)"| KAFKA
+    KAFKA -->|"consume"| SERVER
+    SERVER -->|"INSERT (batched)"| DB
+    SERVER --> WSHUB
+    WSHUB -->|"live push (LAN)"| SGAPP
+    WSHUB -->|"live push (local)"| WEBAPP
+
+    SGAPP -. "computed link-analysis writes (planning, low volume, cross-LAN)" .-> DB
+
+    NOTE["Throughput target: ~2,000 msg/s sustained, 100 DRS instances, indefinite.<br/>Batched async writes (100 msg / 500 ms); Kafka offset committed only after the DB write."]
+    SERVER -.-> NOTE
+
+    classDef store fill:#eef2ff,stroke:#3344aa,color:#000
+    classDef proc fill:#e7f6e7,stroke:#2a7a2a,color:#000
+    classDef note fill:#fffbe6,stroke:#b59a00,color:#000
+    class KAFKA,DB store
+    class BRIDGE,SERVER,WSHUB proc
+    class NOTE note

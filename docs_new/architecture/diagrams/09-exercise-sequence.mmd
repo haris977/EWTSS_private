@@ -1,0 +1,34 @@
+%% Figure 9 — Integrated + Scenario exercise execution (runtime sequence)
+%% Reused verbatim from docs/ewtss/command-flows.md §3.3 (the primary mission-execution mode).
+sequenceDiagram
+    actor Op as SG Operator
+    participant Sg.App
+    participant DB
+    participant Kafka
+    participant drs-bridge
+    participant drs-server
+    participant EC as Entity Controller Apps
+
+    Op->>Sg.App: Start Exercise (Scenario + Integrated)
+    Sg.App->>Kafka: Publish drs.session.control { mode=Integrated+Scenario, exerciseId=X }
+    Kafka->>drs-bridge: routes to scenario publisher + hardware relay
+    loop For each tick T
+        Sg.App->>Kafka: Publish scenario.execution { tick=T }
+        Kafka->>drs-bridge: Consume tick
+        drs-bridge->>Sg.App: GET /exercises/X/responses
+        Sg.App->>DB: query computed link-analysis
+        DB-->>Sg.App: Per-pair values
+        Sg.App-->>drs-bridge: Pre-computed response
+        drs-bridge->>drs-bridge: C++ format_response to IRS bytes
+        drs-bridge->>EC: TCP/UDP send (IRS-compliant frames)
+        EC-->>drs-bridge: Entity response (IRS-compliant)
+        drs-bridge->>Kafka: Publish entity.X.response
+        Kafka->>drs-server: Consume entity-response
+        drs-server->>DB: INSERT entity_responses
+        drs-server->>Sg.App: WebSocket broadcast (entity-response log)
+        drs-bridge->>Kafka: Also publish hw.X.[kind] (telemetry mirror)
+        Kafka->>drs-server: Consume telemetry
+        drs-server->>DB: INSERT telemetry
+        drs-server->>Sg.App: WebSocket broadcast (telemetry panels)
+        Sg.App-->>Op: Telemetry panels update, globe animates
+    end

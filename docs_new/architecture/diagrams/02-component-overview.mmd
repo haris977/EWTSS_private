@@ -1,0 +1,43 @@
+%% Figure 2 — Component / deployment-component overview
+%% Reused (adapted for PNG render + client deliverable) from
+%% docs/ewtss/architecture-diagram.md §1 — the repo's canonical high-level architecture diagram.
+%% The internal-only future browser frontend is omitted from this client-facing view.
+graph TB
+    CC["Control Center (CC)<br/><i>client-owned workstation</i><br/>EWTSS exposes integration APIs<br/>(surface TBD per CC requirements)"]
+    EC["Entity Controller Applications<br/><i>client-owned, per-variant</i><br/>JHF, JV/UHF, RDFS, SJRR,<br/>JLB, JMB, JHB x4, AUS, PADS<br/>IRS over LAN TCP/UDP from DRS"]
+
+    subgraph WS1["WS1 — Scenario Generator (SG)"]
+        direction TB
+        SGOP[/"SG Operator"/]
+        SGAPP["<b>Sg.App.exe</b><br/>Scenario Generator desktop application<br/>C# WPF + STK ActiveX (in-process COM)"]
+        STK[("STK 12 Engine<br/>1 licence seat per deployment")]
+        SGOP --> SGAPP
+        SGAPP --> STK
+    end
+
+    subgraph WS2["WS2 — DRS (Device Replacement Software)"]
+        direction TB
+        DRSENG[/"DRS Engineer"/]
+        WEBAPP["<b>DRS Webapp</b><br/>browser on WS2<br/>served by drs-server<br/><b>React</b> (Vite + JS) per ADR-018"]
+        SERVER["<b>drs-server</b><br/>Python FastAPI async<br/>Kafka consumers, WebSocket hub to WS1,<br/>REST API, serves DRS webapp"]
+        BRIDGE["<b>drs-bridge</b><br/>Python + C++ parser libs<br/>asyncio TCP per variant<br/>response router (Random/Scenario/Integrated)"]
+        KAFKA[("Kafka 3.x KRaft<br/>single broker<br/>hw.&lt;variant&gt;.&lt;kind&gt; topics")]
+        DB[("PostgreSQL 16 + TimescaleDB 2.x<br/>hypertables: telemetry<br/>regular tables: users/RBAC<br/>computed link-analysis from WS1")]
+        DRSENG --> WEBAPP
+        WEBAPP --> SERVER
+        BRIDGE --> KAFKA
+        KAFKA --> SERVER
+        SERVER --> DB
+    end
+
+    SGAPP -->|"PostgreSQL writes<br/>(computed link-analysis over LAN)"| DB
+    SERVER -->|"live telemetry<br/>WebSocket"| SGAPP
+
+    CC -.->|"integration APIs<br/>TBD per CC requirements"| WS1
+    CC -.->|"integration APIs<br/>TBD per CC requirements"| WS2
+    BRIDGE <-->|"IRS over TCP/UDP<br/>Integrated mode"| EC
+
+    classDef external fill:#fff4e6,stroke:#cc6600,stroke-width:2px,stroke-dasharray:5 5,color:#000
+    classDef persona fill:#f0f0ff,stroke:#3344aa,color:#000
+    class CC,EC external
+    class SGOP,DRSENG persona

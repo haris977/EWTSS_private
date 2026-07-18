@@ -1,0 +1,36 @@
+%% Figure 8 — Deployment / runtime view (nodes, artifacts, ports, licences)
+%% Source: deployment-guide.md §1-§3; architecture-overview.md §6; ADR-012
+graph TB
+    subgraph WS1["WS1 — SG  (Windows 11, dedicated GPU, 1 STK seat)"]
+        direction TB
+        A1["Sg.App.exe — Scenario Generator desktop application<br/>(C# WPF, .NET 8 Desktop Runtime)"]
+        A2["STK 12 Engine + PIAs (in-process COM)"]
+        A3["NTP: Stratum-1 / LOCAL ref clock (Meinberg)"]
+    end
+
+    subgraph WS2["WS2 — DRS  (Windows 11, no GPU, 0 STK seats)"]
+        direction TB
+        B1["drs-server (Python 3.12 FastAPI) — Windows Service"]
+        B2["drs-bridge (Python + compiled C++ .dll parsers) — Windows Service"]
+        B3[("Kafka 3.x KRaft single broker — loopback :9092")]
+        B4[("PostgreSQL 16 + TimescaleDB 2.x")]
+        B5["DRS webapp static assets (served by drs-server)"]
+        B6["NTP: client to WS1 (UDP 123, < 10 ms gate)"]
+    end
+
+    EXT["Client-owned LAN nodes (out of scope):<br/>Control Center · per-variant Entity Controllers"]
+
+    WS1 -->|"PostgreSQL :5432 (WS1 -> WS2, restricted to WS1)"| WS2
+    WS2 -->|"drs-server REST/WebSocket :8000 (WS2 -> WS1)"| WS1
+    WS1 <-->|"NTP :123 (UDP)"| WS2
+    WS2 <-->|"TCP/UDP per IRS / hardware spec"| EXT
+
+    NOTE["Delivery: DVD with vendored dependencies + source code<br/>(air-gapped LAN, no runtime internet)."]
+    WS1 -.-> NOTE
+
+    classDef node fill:#eef2ff,stroke:#3344aa,color:#000
+    classDef ext fill:#fff4e6,stroke:#cc6600,stroke-width:2px,stroke-dasharray:5 5,color:#000
+    classDef note fill:#fffbe6,stroke:#b59a00,color:#000
+    class A1,A2,A3,B1,B2,B3,B4,B5,B6 node
+    class EXT ext
+    class NOTE note

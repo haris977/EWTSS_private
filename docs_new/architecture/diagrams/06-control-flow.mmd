@@ -1,0 +1,42 @@
+%% Figure 6 — Control / command flow (how commands propagate)
+%% Source: architecture-overview.md §4.1-§4.8; command-flows §3, §4.3, §4.5, §5.4
+flowchart TB
+    subgraph WS1G["WS1"]
+        OP[/"SG Operator"/]
+        SGAPP["<b>Sg.App</b><br/>exercise control:<br/>start / pause / resume / stop"]
+        PUB["scenario publisher endpoint<br/>(reads computed link-analysis)"]
+    end
+
+    subgraph WS2G["WS2"]
+        DRSE[/"DRS Engineer"/]
+        WEBAPP["<b>DRS webapp</b><br/>IP config, restart parser/TCP server"]
+        SERVER["<b>drs-server</b><br/>REST + control producer + SyncStateEngine"]
+        BRIDGE["<b>drs-bridge</b><br/>Response router:<br/>Random gen | Scenario client | Hardware relay"]
+    end
+
+    KAFKA[("Kafka control plane<br/>drs.session.control · scenario.execution · drs.admin<br/>drs.control (bridge→server) · drs.roster · system.timesync")]
+    EC["Entity Controllers<br/>(Integrated mode)"]
+
+    OP --> SGAPP
+    SGAPP -->|"publish session/exec control"| KAFKA
+    KAFKA -->|"consume control"| BRIDGE
+
+    BRIDGE -->|"Scenario mode:<br/>GET /exercises/X/responses (per tick, hot path)"| PUB
+    PUB -->|"pre-computed values"| BRIDGE
+    BRIDGE -->|"C++ format_response => IRS bytes"| EC
+    EC -->|"IRS responses"| BRIDGE
+
+    DRSE --> WEBAPP
+    WEBAPP -->|"PUT config / POST control"| SERVER
+    SERVER -->|"roster hot-reload (drs.roster); parser/server restart (drs.admin)"| KAFKA
+
+    SERVER -->|"state transitions"| KAFKA
+    KAFKA -.->|"SYNC_LOST event"| SGAPP
+    SGAPP -.->|"auto-pause running exercise"| SGAPP
+
+    classDef store fill:#eef2ff,stroke:#3344aa,color:#000
+    classDef ext fill:#fff4e6,stroke:#cc6600,stroke-width:2px,stroke-dasharray:5 5,color:#000
+    classDef persona fill:#f0f0ff,stroke:#3344aa,color:#000
+    class KAFKA store
+    class EC ext
+    class OP,DRSE persona

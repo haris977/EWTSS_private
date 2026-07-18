@@ -1,0 +1,30 @@
+%% Figure 4 — End-to-end operator workflow (operational cycle)
+%% Source: operator-playbook.md §2 (10-step cycle), §7 (compute), §8 (modes), §9 (DRS Engineer)
+%% Colour = build status: green=shipped (MVP4.5), amber=planned/design-gap (v2 hardening)
+flowchart TB
+    start([SG Operator logs in at WS1]) --> sync["Verify time-sync status<br/>(SG is Time Server)"]
+    sync --> lib["Manage EW Library<br/>(emitters, apriori own/enemy)"]
+    lib --> author["Author scenario on GIS map<br/>(gaming area, AOP/FEBA, Blue/Red Line,<br/>emitter params, time-dynamic motion)"]
+    author --> save["Save to scenario library (DB-backed)<br/>edit to compute-inputs => STALE"]
+    save --> compute{"Compute state?"}
+    compute -->|"NOT_COMPUTED / STALE"| run_compute["Run STK link analysis<br/>(range, az, el, doppler, signal,<br/>offsets, attenuation) => computed link-analysis"]
+    run_compute --> ready
+    compute -->|"COMPUTED"| ready["Scenario ready to execute"]
+
+    ready --> mode["Select exercise mode<br/>Random | Scenario  x  Standalone | Integrated"]
+    mode --> exec["Start execution; monitor live on globe<br/>(platforms animate, coverage colouring,<br/>telemetry streams in)"]
+
+    exec -. "parallel persona" .-> drseng["DRS Engineer (WS2 webapp):<br/>monitor hardware health, per-variant<br/>monitor-scan, message rates, logs;<br/>configure IP/network"]
+
+    exec --> control["Control playback<br/>(start / pause / resume / stop / replay)"]
+    control --> report["Generate template-based PDF report;<br/>review recordings"]
+    report --> done([Exercise complete])
+
+    admin["Admin (out of band, RBAC-gated):<br/>user mgmt, log filter/sort,<br/>DB backup / restore / purge"]
+
+    classDef shipped fill:#e7f6e7,stroke:#2a7a2a,color:#000
+    classDef planned fill:#fdf3e3,stroke:#cc8800,color:#000
+    classDef persona fill:#eef2ff,stroke:#3344aa,color:#000
+    class start,sync,author,save,ready shipped
+    class lib,run_compute,mode,exec,control,report,admin planned
+    class drseng persona

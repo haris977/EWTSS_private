@@ -1,0 +1,21 @@
+%% Figure 3 — Seven-layer system model
+%% Source: architecture-overview.md §2.5 (L0..L6 + the L3 split point + layer rules)
+graph TB
+    L6["<b>L6 Presentation</b><br/>SG-side: Sg.App (C# WPF + STK ActiveX) on WS1<br/>DRS-side: DRS webapp (React, served by drs-server) on WS2"]
+    L5["<b>L5 API gateway / in-process boundary</b><br/>SG-side: scenario-backend interface in DI + scenario publisher endpoint<br/>DRS-side: drs-server FastAPI (REST + WebSocket + auth)"]
+    L4["<b>L4 Business logic + scenario domain</b><br/>Shared domain core (scenario lifecycle, STK adapter)<br/>drs-server services (query, broadcast, RBAC, reports)"]
+    L3["<b>L3 Message bus + persistence</b><br/>Kafka KRaft (single broker) | TimescaleDB (PostgreSQL 16)"]
+    L2["<b>L2 Protocol bridge</b><br/>drs-bridge: asyncio TCP server + C++ parser libs + response router"]
+    L1["<b>L1 Transport</b><br/>TCP/IP LAN (1 Gbps), PostgreSQL 5432, drs-server REST/WS"]
+    L0["<b>L0 Hardware / external systems</b><br/>DRS hardware | Entity Controllers | STK 12 Engine (COM, WS1)"]
+
+    L6 --> L5 --> L4 --> L3 --> L2 --> L1 --> L0
+
+    SPLIT["<b>Split point = L3.</b><br/>L4-L6 run on WS1; L0-L3 run on WS2.<br/>Cross-LAN traffic only: L4(WS1) to L3(WS2) and L5(WS2) to L6(WS1).<br/>Each layer talks only to its immediate neighbour (no level-skipping)."]
+
+    L3 -.-> SPLIT
+
+    classDef layer fill:#eef2ff,stroke:#3344aa,color:#000
+    classDef note fill:#fffbe6,stroke:#b59a00,color:#000
+    class L6,L5,L4,L3,L2,L1,L0 layer
+    class SPLIT note

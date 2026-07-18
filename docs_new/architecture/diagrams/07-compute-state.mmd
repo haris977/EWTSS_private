@@ -1,0 +1,18 @@
+%% Figure 7 — Scenario compute lifecycle (state machine + 3-transaction write-back)
+%% Source: scenario-management-design (via architecture-overview §4.4-§4.5, command-flows §2.4/§2.6/§2.8)
+stateDiagram-v2
+    direction LR
+    [*] --> NOT_COMPUTED: New / Import / Duplicate
+    NOT_COMPUTED --> COMPUTED: Compute (T1 snapshot, STK loop, T3 flip)
+    COMPUTED --> STALE: Save edit to compute-inputs<br/>(invalidates the computed link-analysis)
+    COMPUTED --> COMPUTED: Save metadata-only edit<br/>(name/tags/notes — no invalidation)
+    STALE --> COMPUTED: Compute (REPLACE semantics)
+    COMPUTED --> [*]: Execute (Scenario mode)
+
+    note right of COMPUTED
+      Compute = three transactions (no multi-minute lock held):
+      T1  write an immutable compute snapshot (history)
+      loop  batched insert of computed link-analysis (100 ticks / txn)
+      T3  mark the scenario COMPUTED
+      Idempotent at every failure point: operator re-runs Compute.
+    end note
