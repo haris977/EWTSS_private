@@ -125,6 +125,18 @@ std::string build_dfjob_xml(const nlohmann::json& df_job) {
     return print_node(root);
 }
 
+std::string build_df_station_data_xml(const nlohmann::json& df_station_data) {
+    if (!df_station_data.is_object())
+        throw std::runtime_error("build_df_station_data_xml: \"df_station_data\" must be an object");
+
+    pugi::xml_document doc;
+    pugi::xml_node root = doc.append_child("DFStationData");
+    for (auto& [key, value] : df_station_data.items())
+        append_child_value(root, lookup_tag(key), value);
+
+    return print_node(root);
+}
+
 std::string build_dfdata_xml(const nlohmann::json& df_data) {
     if (!df_data.is_object())
         throw std::runtime_error("build_dfdata_xml: \"df_data\" must be an object");

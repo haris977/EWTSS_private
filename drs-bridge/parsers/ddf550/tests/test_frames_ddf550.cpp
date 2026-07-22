@@ -1201,6 +1201,35 @@ static void test_dfjob() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: standalone DFStationData (FORMAT02/03's once-per-update station
+// info, DDF -> SDFC, separate top-level document -- NOT nested inside
+// DFData, unlike FORMAT01's usage of the same tag)
+// ---------------------------------------------------------------------------
+
+static void test_df_station_data_standalone() {
+    const char* xml =
+        "<DFStationData>"
+        "<DFStationName>Simulation1</DFStationName>"
+        "<DFStationLatitude Unit=\"deg\">48.12790000</DFStationLatitude>"
+        "<DFStationLongitude Unit=\"deg\">11.61290000</DFStationLongitude>"
+        "</DFStationData>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"channel\":\"preclassifier_output\""));
+    CHECK(json_has(json, "\"msg_kind\":\"df_station_data\""));
+    CHECK(json_has(json,
+        "\"body\":{\"df_station_data\":{"
+        "\"df_station_name\":\"Simulation1\","
+        "\"df_station_latitude\":{\"unit\":\"deg\",\"#text\":\"48.12790000\"},"
+        "\"df_station_longitude\":{\"unit\":\"deg\",\"#text\":\"11.61290000\"}}}"));
+}
+
+// ---------------------------------------------------------------------------
 // Test: Raw XML with leading whitespace (Reply) → response
 // ---------------------------------------------------------------------------
 
@@ -1663,6 +1692,43 @@ static void test_format_response_dfdata_format02_root_attribute_roundtrip() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: format_response("df_station_data") round-trip — FORMAT02/03's
+// standalone, once-per-update station-info document (the gap surfaced by
+// asking "how do 2 static emitters get sent under FORMAT02" -- the answer
+// requires this document to exist independently of any DFData call).
+// ---------------------------------------------------------------------------
+
+static void test_format_response_df_station_data_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"df_station_data\","
+        "\"df_station_data\":{"
+        "\"df_station_name\":\"Simulation1\","
+        "\"df_station_latitude\":{\"unit\":\"deg\",\"#text\":\"48.12790000\"},"
+        "\"df_station_longitude\":{\"unit\":\"deg\",\"#text\":\"11.61290000\"}"
+        "}}";
+
+    std::vector<uint8_t> wire;
+    CHECK(try_format("df_station_data", json_in, wire));
+
+    std::string xml(reinterpret_cast<const char*>(wire.data()), wire.size());
+    CHECK(xml.rfind("<DFStationData>", 0) == 0);
+    CHECK(xml.find("</DFStationData>") == xml.size() - 16);
+    CHECK(xml.find("<DFStationName>Simulation1</DFStationName>") != std::string::npos);
+    CHECK(xml.find("<DFStationLatitude Unit=\"deg\">48.12790000</DFStationLatitude>")
+          != std::string::npos);
+
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
+
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
+    CHECK(json_has(json_out, "\"channel\":\"preclassifier_output\""));
+    CHECK(json_has(json_out, "\"msg_kind\":\"df_station_data\""));
+    CHECK(json_has(json_out, "\"df_station_name\":\"Simulation1\""));
+    CHECK(json_has(json_out, "\"df_station_longitude\":{\"unit\":\"deg\",\"#text\":\"11.61290000\"}"));
+}
+
+// ---------------------------------------------------------------------------
 // Test: free_result with nullptr — must not crash
 // ---------------------------------------------------------------------------
 
@@ -1813,6 +1879,7 @@ int main() {
     test_dfdata_with_cdata();
     test_formatselect();
     test_dfjob();
+    test_df_station_data_standalone();
     test_raw_xml_leading_ws();
     test_raw_xml_no_close();
     test_too_short();
@@ -1826,6 +1893,7 @@ int main() {
     test_format_response_dfjob_roundtrip();
     test_format_response_dfdata_hopper_roundtrip();
     test_format_response_dfdata_format02_root_attribute_roundtrip();
+    test_format_response_df_station_data_roundtrip();
     test_free_result_null();
     test_free_result_real();
     test_parse_message_null();

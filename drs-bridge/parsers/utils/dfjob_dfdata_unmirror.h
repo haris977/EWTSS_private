@@ -39,6 +39,15 @@
 // DDF550_9150_Control_XML_to_JSON.md Part 2, DFJob example).
 std::string build_dfjob_xml(const nlohmann::json& df_job);
 
+// Builds "<DFStationData>...</DFStationData>" from a JSON object shaped
+// exactly like parse_message()'s own mirrored "df_station_data" body
+// value. This is FORMAT02/03's standalone, once-per-analysis-period usage
+// (root_tag "DFStationData", channel "preclassifier_output", msg_kind
+// "df_station_data") -- distinct from FORMAT01, which nests the same
+// content as a child of <DFData> instead (handled already, inside
+// build_dfdata_xml, via the ordinary "df_station_data" key lookup).
+std::string build_df_station_data_xml(const nlohmann::json& df_station_data);
+
 // Builds "<DFData ...>...</DFData>" from a JSON object shaped exactly like
 // parse_message()'s own mirrored "df_data" body value -- any of
 // FORMAT01/02/03; the shape itself determines which tags appear, no format

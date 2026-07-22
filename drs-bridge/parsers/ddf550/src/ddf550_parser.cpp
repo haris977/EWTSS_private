@@ -100,6 +100,8 @@ static int classify_xml_root(const uint8_t* data, int data_len,
         { "DFSelect",     1 },   // preclassifier filter command (icd-ddf550.md §4): SDFC -> DDF
         { "FormatSelect", 1 },   // preclassifier output-format command: SDFC -> DDF (DDFSystemControlInterfacePreClassifier.pdf §6.2.1)
         { "DFJob",        2 },   // preclassifier job definition: DDF -> SDFC, pushed on connect / job change (ibid. §6.2.2)
+        { "DFStationData", 2 },  // preclassifier station info: DDF -> SDFC, standalone doc, once per analysis
+                                  // period in FORMAT02/03 (ibid. §6.2.3) -- FORMAT01 nests this inside <DFData> instead
     };
     int avail = (int)(end - p);
     for (auto& r : kRoots) {
@@ -145,25 +147,30 @@ static int classify_xml_root(const uint8_t* data, int data_len,
 static std::string impl_parse_xml_ddf550(const uint8_t* frame, int frame_len,
                                           int frame_type, const char* root_tag)
 {
-    bool is_ddfcl_req    = (std::strcmp(root_tag, "DDFCLRequest") == 0);
-    bool is_ddfcl_rep    = (std::strcmp(root_tag, "DDFCLReply")   == 0);
-    bool is_dfdata       = (std::strcmp(root_tag, "DFData")       == 0);
-    bool is_event        = (std::strcmp(root_tag, "Event")        == 0);
-    bool is_dfselect     = (std::strcmp(root_tag, "DFSelect")     == 0);
-    bool is_formatselect = (std::strcmp(root_tag, "FormatSelect") == 0);
-    bool is_dfjob        = (std::strcmp(root_tag, "DFJob")        == 0);
+    bool is_ddfcl_req      = (std::strcmp(root_tag, "DDFCLRequest") == 0);
+    bool is_ddfcl_rep      = (std::strcmp(root_tag, "DDFCLReply")   == 0);
+    bool is_dfdata         = (std::strcmp(root_tag, "DFData")       == 0);
+    bool is_event          = (std::strcmp(root_tag, "Event")        == 0);
+    bool is_dfselect       = (std::strcmp(root_tag, "DFSelect")     == 0);
+    bool is_formatselect   = (std::strcmp(root_tag, "FormatSelect") == 0);
+    bool is_dfjob          = (std::strcmp(root_tag, "DFJob")        == 0);
+    bool is_df_station_data = (std::strcmp(root_tag, "DFStationData") == 0);
 
-    // DFJob groups with DFData ("preclassifier_output": DDF -> SDFC data on
-    // 9154). FormatSelect groups with DFSelect ("preclassifier": SDFC -> DDF
+    // DFJob/DFStationData group with DFData ("preclassifier_output": DDF ->
+    // SDFC data on 9154) -- DFStationData is FORMAT02/03's standalone,
+    // once-per-update station-info document (FORMAT01 nests the same
+    // content inside <DFData> instead, no separate root needed there).
+    // FormatSelect groups with DFSelect ("preclassifier": SDFC -> DDF
     // control on 9154) -- matches the existing DFSelect precedent, even
     // though "preclassifier" is shared with 9153 traffic too (see this
     // doc's item 5 / the DFSelect channel-label note already on record).
-    const char* channel  = (is_dfdata || is_dfjob)                                          ? "preclassifier_output"
+    const char* channel  = (is_dfdata || is_dfjob || is_df_station_data)                    ? "preclassifier_output"
                          : (is_ddfcl_req || is_ddfcl_rep || is_dfselect || is_formatselect) ? "preclassifier"
                                                                                               : "control";
     const char* msg_kind = (frame_type == 1) ? "request"
                          : is_dfdata         ? "dfdata"
                          : is_dfjob          ? "dfjob"
+                         : is_df_station_data ? "df_station_data"
                          : is_event          ? "event"
                                              : "reply";
 
@@ -345,12 +352,19 @@ SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 //    Magic word values are XML_MAGIC_START / XML_MAGIC_END (placeholders —
 //    verify from live capture before using on real hardware).
 //
-// 2. "dfjob" | "dfdata" -- preclassifier output (9154) idiom. Raw,
-//    unwrapped XML, no magic-word envelope (see dfjob_dfdata_unmirror.h).
+// 2. "dfjob" | "dfdata" | "df_station_data" -- preclassifier output (9154)
+//    idiom. Raw, unwrapped XML, no magic-word envelope (see
+//    dfjob_dfdata_unmirror.h). "df_station_data" is FORMAT02/03's
+//    standalone, once-per-analysis-period station-info document (a
+//    separate top-level message, not nested inside a "dfdata" call --
+//    FORMAT01 nests the same content inside "df_data" instead, no separate
+//    call needed there).
 //    Required JSON fields:
-//      "msg_kind"  : "dfjob" | "dfdata"
-//      "df_job"    : (msg_kind "dfjob") the mirrored "df_job" body value
-//      "df_data"   : (msg_kind "dfdata") the mirrored "df_data" body value
+//      "msg_kind"        : "dfjob" | "dfdata" | "df_station_data"
+//      "df_job"          : (msg_kind "dfjob") the mirrored "df_job" body value
+//      "df_data"         : (msg_kind "dfdata") the mirrored "df_data" body value
+//      "df_station_data" : (msg_kind "df_station_data") the mirrored
+//                          "df_station_data" body value
 //    Output: raw XML bytes, verbatim, no envelope.
 //
 // Returns 0 on success (byte count is communicated via *out_len, per the
@@ -372,16 +386,20 @@ SDFC_EXPORT int format_response(const char* /*kind*/, const char* kwargs_json,
 
         msg_kind = kwargs.value("msg_kind", "");
 
-        // DFJob/DFData (preclassifier output, TCP 9154): raw, unwrapped XML
-        // text, no id/type/channel wrapper at all -- a completely different
-        // shape from Request/Reply/DDFCLRequest/DDFCLReply below. See
-        // dfjob_dfdata_unmirror.h for the tag-lookup rationale.
-        if (msg_kind == "dfjob" || msg_kind == "dfdata") {
-            const char* key = (msg_kind == "dfjob") ? "df_job" : "df_data";
+        // DFJob/DFData/DFStationData (preclassifier output, TCP 9154): raw,
+        // unwrapped XML text, no id/type/channel wrapper at all -- a
+        // completely different shape from Request/Reply/DDFCLRequest/
+        // DDFCLReply below. See dfjob_dfdata_unmirror.h for the tag-lookup
+        // rationale. DFStationData is FORMAT02/03's standalone,
+        // once-per-update station-info document.
+        if (msg_kind == "dfjob" || msg_kind == "dfdata" || msg_kind == "df_station_data") {
+            const char* key = (msg_kind == "dfjob") ? "df_job"
+                             : (msg_kind == "dfdata") ? "df_data"
+                                                       : "df_station_data";
             if (!kwargs.contains(key)) return -1;
-            std::string xml = (msg_kind == "dfjob")
-                ? build_dfjob_xml(kwargs.at(key))
-                : build_dfdata_xml(kwargs.at(key));
+            std::string xml = (msg_kind == "dfjob")   ? build_dfjob_xml(kwargs.at(key))
+                             : (msg_kind == "dfdata")  ? build_dfdata_xml(kwargs.at(key))
+                                                        : build_df_station_data_xml(kwargs.at(key));
 
             auto* buf = static_cast<uint8_t*>(std::malloc(xml.size()));
             if (!buf) return -1;
