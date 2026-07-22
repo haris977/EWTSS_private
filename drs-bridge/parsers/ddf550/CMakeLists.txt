@@ -9,6 +9,8 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 add_library(ddf550 SHARED
     src/ddf550_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
+    ../utils/pugixml_generic_unmirror.cpp
+    ../utils/dfjob_dfdata_unmirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
     ../utils/json_kwargs.cpp
     ../utils/eb200_shared.cpp
@@ -35,6 +37,8 @@ add_executable(test_ddf550
     tests/test_frames_ddf550.cpp
     src/ddf550_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
+    ../utils/pugixml_generic_unmirror.cpp
+    ../utils/dfjob_dfdata_unmirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
     ../utils/json_kwargs.cpp
     ../utils/eb200_shared.cpp

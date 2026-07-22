@@ -1141,6 +1141,66 @@ static void test_dfdata_with_cdata() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: FormatSelect (preclassifier output-format command, SDFC -> DDF)
+//
+// DDFSystemControlInterfacePreClassifier.pdf §6.2.1. Previously unrecognized
+// by classify_xml_root -- any real frame was rejected as corrupt before
+// parse_message ever ran. Confirms the new kRoots entry actually decodes.
+// ---------------------------------------------------------------------------
+
+static void test_formatselect() {
+    const char* xml = "<FormatSelect>FORMAT02</FormatSelect>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"channel\":\"preclassifier\""));
+    CHECK(json_has(json, "\"msg_kind\":\"request\""));
+    CHECK(json_has(json, "\"body\":{\"format_select\":\"FORMAT02\"}"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: DFJob (preclassifier job definition, DDF -> SDFC)
+//
+// DDFSystemControlInterfacePreClassifier.pdf §6.2.2. Same previously-missing
+// classify_xml_root gap as FormatSelect. Also exercises the mirror's
+// repeated-tag-becomes-array rule on INTERLEAVED siblings (Frequency,
+// Bandwidth, Frequency, Bandwidth -- not grouped together in the source XML).
+// ---------------------------------------------------------------------------
+
+static void test_dfjob() {
+    const char* xml =
+        "<DFJob>"
+        "<Frequency Unit=\"Hz\">10000000</Frequency>"
+        "<Bandwidth Unit=\"Hz\">10000</Bandwidth>"
+        "<Frequency Unit=\"Hz\">20000000</Frequency>"
+        "<Bandwidth Unit=\"Hz\">12500</Bandwidth>"
+        "<FrequencyStart Unit=\"Hz\">330000000</FrequencyStart>"
+        "<FrequencyStop Unit=\"Hz\">440000000</FrequencyStop>"
+        "<FrequencyStep Unit=\"Hz\">12500</FrequencyStep>"
+        "</DFJob>";
+    auto frame_bytes = raw_bytes(xml);
+
+    std::vector<uint8_t> frame;
+    CHECK(try_extract(frame_bytes.data(), frame_bytes.size(), frame));
+
+    std::string json;
+    CHECK(try_parse(frame.data(), frame.size(), json));
+    CHECK(json_has(json, "\"channel\":\"preclassifier_output\""));
+    CHECK(json_has(json, "\"msg_kind\":\"dfjob\""));
+    CHECK(json_has(json,
+        "\"frequency\":[{\"unit\":\"Hz\",\"#text\":\"10000000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"20000000\"}]"));
+    CHECK(json_has(json,
+        "\"bandwidth\":[{\"unit\":\"Hz\",\"#text\":\"10000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"12500\"}]"));
+    CHECK(json_has(json, "\"frequency_start\":{\"unit\":\"Hz\",\"#text\":\"330000000\"}"));
+}
+
+// ---------------------------------------------------------------------------
 // Test: Raw XML with leading whitespace (Reply) → response
 // ---------------------------------------------------------------------------
 
@@ -1187,10 +1247,11 @@ static void test_too_short() {
 
 static void test_format_response_control() {
     const char* json_in =
-        "{\"msg_type\":\"set\","
+        "{\"msg_kind\":\"request\","
+        "\"msg_type\":\"set\","
         "\"id\":42,"
-        "\"command_name\":\"DfMode\","
-        "\"xml_body\":\"<Param name=\\\"eOperationMode\\\">DFMODE_FFM</Param>\"}";
+        "\"command\":{\"name\":\"DfMode\","
+        "\"param\":{\"name\":\"eOperationMode\",\"#text\":\"DFMODE_FFM\"}}}";
 
     std::vector<uint8_t> wire;
     CHECK(try_format("request", json_in, wire));
@@ -1218,11 +1279,11 @@ static void test_format_response_control() {
 
 static void test_format_response_preclassifier() {
     const char* json_in =
-        "{\"msg_type\":\"set\","
+        "{\"msg_kind\":\"request\","
+        "\"msg_type\":\"set\","
         "\"id\":10,"
-        "\"command_name\":\"AnalysisIntervalMs\","
         "\"channel\":\"preclassifier\","
-        "\"xml_body\":\"50000\"}";
+        "\"command\":{\"name\":\"AnalysisIntervalMs\",\"#text\":\"50000\"}}";
 
     std::vector<uint8_t> wire;
     CHECK(try_format("request", json_in, wire));
@@ -1247,17 +1308,28 @@ static void test_format_response_preclassifier() {
 static void test_format_response_missing_field() {
     std::vector<uint8_t> wire;
 
-    // Missing "command_name"
-    const char* bad = "{\"msg_type\":\"set\",\"id\":1,\"xml_body\":\"<P/>\"}";
+    // Missing "command"
+    const char* bad = "{\"msg_kind\":\"request\",\"msg_type\":\"set\",\"id\":1}";
     CHECK(!try_format("request", bad, wire));
 
     // Missing "id"
-    const char* bad2 = "{\"msg_type\":\"set\",\"command_name\":\"DfMode\",\"xml_body\":\"\"}";
+    const char* bad2 =
+        "{\"msg_kind\":\"request\",\"msg_type\":\"set\",\"command\":{\"name\":\"DfMode\"}}";
     CHECK(!try_format("request", bad2, wire));
 
     // Missing "msg_type"
-    const char* bad3 = "{\"id\":1,\"command_name\":\"DfMode\",\"xml_body\":\"\"}";
+    const char* bad3 =
+        "{\"msg_kind\":\"request\",\"id\":1,\"command\":{\"name\":\"DfMode\"}}";
     CHECK(!try_format("request", bad3, wire));
+
+    // Missing "msg_kind"
+    const char* bad4 =
+        "{\"msg_type\":\"set\",\"id\":1,\"command\":{\"name\":\"DfMode\"}}";
+    CHECK(!try_format("request", bad4, wire));
+
+    // Malformed JSON entirely
+    const char* bad5 = "{not valid json";
+    CHECK(!try_format("request", bad5, wire));
 }
 
 // ---------------------------------------------------------------------------
@@ -1266,10 +1338,10 @@ static void test_format_response_missing_field() {
 
 static void test_format_response_roundtrip() {
     const char* json_in =
-        "{\"msg_type\":\"get\","
+        "{\"msg_kind\":\"request\","
+        "\"msg_type\":\"get\","
         "\"id\":7,"
-        "\"command_name\":\"DeviceInfo\","
-        "\"xml_body\":\"\"}";
+        "\"command\":{\"name\":\"DeviceInfo\"}}";
 
     std::vector<uint8_t> wire;
     CHECK(try_format("request", json_in, wire));
@@ -1281,6 +1353,313 @@ static void test_format_response_roundtrip() {
     CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
     CHECK(json_has(json_out, "\"command\":{\"name\":\"DeviceInfo\"}"));
     CHECK(json_has(json_out, "\"type\":\"get\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response full round-trip — MeasureSettingsFFM GET reply
+//
+// Feeds format_response() the exact "command" JSON shape parse_message()
+// itself produces (all 19 real Params from Remote_commands.html's
+// MeasureSettingsFFM GET reply example, §1.2.2), builds the wire frame with
+// msg_kind="reply", then re-decodes that frame through extract_frame() +
+// parse_message() and confirms every single Param survives the round-trip
+// unchanged. This is the DRS-plays-the-hardware direction: encoding a
+// Reply, not a Request.
+// ---------------------------------------------------------------------------
+
+static void test_format_response_measure_settings_ffm_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"reply\","
+        "\"msg_type\":\"get\","
+        "\"id\":123,"
+        "\"command\":{\"name\":\"MeasureSettingsFFM\",\"param\":["
+        "{\"name\":\"iFrequency\",\"#text\":\"1000000000\"},"
+        "{\"name\":\"eAvgMode\",\"#text\":\"DFSQU_GATE\"},"
+        "{\"name\":\"eDfPanStep\",\"#text\":\"DFPAN_STEP_20KHZ\"},"
+        "{\"name\":\"eBlockAveragingSelect\",\"#text\":\"BLOCK_AVERAGING_SELECT_TIME\"},"
+        "{\"name\":\"iBlockAveragingCycles\",\"#text\":\"200\"},"
+        "{\"name\":\"iBlockAveragingTime\",\"#text\":\"200\"},"
+        "{\"name\":\"iThreshold\",\"#text\":\"11\"},"
+        "{\"name\":\"eAntPol\",\"#text\":\"POL_VERTICAL\"},"
+        "{\"name\":\"eAntPreAmp\",\"#text\":\"STATE_OFF\"},"
+        "{\"name\":\"eDfAlt\",\"#text\":\"DFALT_AUTO\"},"
+        "{\"name\":\"eSpan\",\"#text\":\"IFPAN_FREQ_RANGE_500\"},"
+        "{\"name\":\"eWindowType\",\"#text\":\"DF_WINDOW_TYPE_BLACKMAN_HARRIS\"},"
+        "{\"name\":\"eDfPanSelectivity\",\"#text\":\"DFPAN_SELECTIVITY_NORMAL\"},"
+        "{\"name\":\"eAttSelect\",\"#text\":\"ATT_MANUAL\"},"
+        "{\"name\":\"iAttValue\",\"#text\":\"0\"},"
+        "{\"name\":\"iAttHoldTime\",\"#text\":\"10\"},"
+        "{\"name\":\"eIFPanStep\",\"#text\":\"IFPAN_STEP_1KHZ\"},"
+        "{\"name\":\"eIFPanSelectivity\",\"#text\":\"IFPAN_SELECTIVITY_NORMAL\"},"
+        "{\"name\":\"eIFPanMode\",\"#text\":\"IFPAN_MODE_AVERAGE\"},"
+        "{\"name\":\"iSrEmitterEstimation\",\"#text\":\"0\"}"
+        "]}}";
+
+    std::vector<uint8_t> wire;
+    CHECK(try_format("reply", json_in, wire));
+
+    // Wire XML must be a Reply, not a Request -- this is DRS answering, not asking.
+    uint32_t len_field = ((uint32_t)wire[4] << 24) | ((uint32_t)wire[5] << 16) |
+                         ((uint32_t)wire[6] << 8)  |  (uint32_t)wire[7];
+    std::string xml(reinterpret_cast<const char*>(wire.data() + 8), (size_t)len_field);
+    CHECK(xml.find("<Reply type=\"get\" id=\"123\">") != std::string::npos);
+    CHECK(xml.find("</Reply>") != std::string::npos);
+    CHECK(xml.find("<Request") == std::string::npos);
+
+    // Re-decode the frame we just built and confirm every Param round-tripped.
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
+
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
+    CHECK(json_has(json_out, "\"msg_kind\":\"reply\""));
+    CHECK(json_has(json_out, "\"name\":\"MeasureSettingsFFM\""));
+    CHECK(json_has(json_out, "{\"name\":\"iFrequency\",\"#text\":\"1000000000\"}"));
+    CHECK(json_has(json_out, "{\"name\":\"eAvgMode\",\"#text\":\"DFSQU_GATE\"}"));
+    CHECK(json_has(json_out, "{\"name\":\"eDfPanStep\",\"#text\":\"DFPAN_STEP_20KHZ\"}"));
+    CHECK(json_has(json_out, "{\"name\":\"iSrEmitterEstimation\",\"#text\":\"0\"}"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response full round-trip — Temperature GET reply
+//
+// Temperature's reply (§1.4.10) is one of 12 commands (out of 103 in
+// Remote_commands.html) whose Command carries a nested <Array>/<Struct>
+// payload alongside its flat <Param>s -- the exact shape build_command_xml
+// used to silently drop (it only ever looked at "param"/"#text", never
+// "array"). This confirms the fix: the Array/Struct nesting round-trips
+// byte-for-byte through format_response -> extract_frame -> parse_message,
+// not just the flat Param.
+// ---------------------------------------------------------------------------
+
+static void test_format_response_temperature_array_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"reply\","
+        "\"msg_type\":\"get\","
+        "\"id\":123,"
+        "\"command\":{\"name\":\"Temperature\","
+        "\"param\":{\"name\":\"zModuleName\",\"#text\":\"ALL\"},"
+        "\"array\":{\"name\":\"asTempTestPoint\",\"struct\":"
+        "{\"name\":\"sTempTestPoint\",\"param\":["
+        "{\"name\":\"zModule\",\"#text\":\"P1\"},"
+        "{\"name\":\"zSensor\",\"#text\":\"TEMP_FPGA\"},"
+        "{\"name\":\"iValue\",\"#text\":\"57\"}"
+        "]}}}}";
+
+    std::vector<uint8_t> wire;
+    CHECK(try_format("reply", json_in, wire));
+
+    uint32_t len_field = ((uint32_t)wire[4] << 24) | ((uint32_t)wire[5] << 16) |
+                         ((uint32_t)wire[6] << 8)  |  (uint32_t)wire[7];
+    std::string xml(reinterpret_cast<const char*>(wire.data() + 8), (size_t)len_field);
+    CHECK(xml.find("<Param name=\"zModuleName\">ALL</Param>") != std::string::npos);
+    CHECK(xml.find("<Array name=\"asTempTestPoint\">") != std::string::npos);
+    CHECK(xml.find("<Struct name=\"sTempTestPoint\">") != std::string::npos);
+    CHECK(xml.find("<Param name=\"zSensor\">TEMP_FPGA</Param>") != std::string::npos);
+
+    // Re-decode and confirm the Array/Struct payload survived, not just Param.
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
+
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
+    CHECK(json_has(json_out, "\"name\":\"Temperature\""));
+    CHECK(json_has(json_out, "{\"name\":\"zModuleName\",\"#text\":\"ALL\"}"));
+    CHECK(json_has(json_out,
+        "\"array\":{\"name\":\"asTempTestPoint\",\"struct\":{\"name\":\"sTempTestPoint\","
+        "\"param\":[{\"name\":\"zModule\",\"#text\":\"P1\"},"
+        "{\"name\":\"zSensor\",\"#text\":\"TEMP_FPGA\"},"
+        "{\"name\":\"iValue\",\"#text\":\"57\"}]}}"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response round-trip — DDFCL "invalid command name" error reply
+//
+// DDFSystemControlInterfacePreClassifier.pdf Table 6-5. build_command_xml
+// previously only ever wrote "name" -- returnCode/returnMessage were silently
+// dropped on re-encode. Confirms both attributes now survive the round trip.
+// ---------------------------------------------------------------------------
+
+static void test_format_response_ddfcl_error_reply_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"reply\","
+        "\"msg_type\":\"get\","
+        "\"id\":2,"
+        "\"channel\":\"preclassifier\","
+        "\"command\":{\"name\":\"Bogus\",\"return_code\":\"2\","
+        "\"return_message\":\"Invalid command name\"}}";
+
+    std::vector<uint8_t> wire;
+    CHECK(try_format("reply", json_in, wire));
+
+    uint32_t len_field = ((uint32_t)wire[4] << 24) | ((uint32_t)wire[5] << 16) |
+                         ((uint32_t)wire[6] << 8)  |  (uint32_t)wire[7];
+    std::string xml(reinterpret_cast<const char*>(wire.data() + 8), (size_t)len_field);
+    CHECK(xml.find("<DDFCLReply") != std::string::npos);
+    // pugixml self-closes an empty element (no children/text) -- XML-
+    // semantically identical to <Command ...></Command>, just shorter.
+    CHECK(xml.find("<Command name=\"Bogus\" returnCode=\"2\" returnMessage=\"Invalid command name\"/>")
+          != std::string::npos);
+
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
+
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
+    CHECK(json_has(json_out, "\"channel\":\"preclassifier\""));
+    CHECK(json_has(json_out,
+        "\"command\":{\"name\":\"Bogus\",\"return_code\":\"2\","
+        "\"return_message\":\"Invalid command name\"}"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response("dfjob") round-trip — DFJob (preclassifier output,
+// TCP 9154, DRS -> SDFC)
+//
+// Confirms the new dfjob_dfdata_unmirror.h encoder produces raw, unwrapped
+// XML (no magic-word envelope, unlike Request/Reply), including the
+// interleaved-repeated-tag array case (Frequency/Bandwidth appear twice
+// each, not grouped together) surviving a full encode -> decode round trip.
+// ---------------------------------------------------------------------------
+
+static void test_format_response_dfjob_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"dfjob\","
+        "\"df_job\":{"
+        "\"frequency\":[{\"unit\":\"Hz\",\"#text\":\"10000000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"20000000\"}],"
+        "\"bandwidth\":[{\"unit\":\"Hz\",\"#text\":\"10000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"12500\"}],"
+        "\"frequency_start\":{\"unit\":\"Hz\",\"#text\":\"330000000\"},"
+        "\"frequency_stop\":{\"unit\":\"Hz\",\"#text\":\"440000000\"},"
+        "\"frequency_step\":{\"unit\":\"Hz\",\"#text\":\"12500\"}"
+        "}}";
+
+    std::vector<uint8_t> wire;
+    CHECK(try_format("dfjob", json_in, wire));
+
+    // Raw, unwrapped XML -- the whole wire buffer IS the XML text, no
+    // 12-byte magic-word envelope wrapped around it.
+    std::string xml(reinterpret_cast<const char*>(wire.data()), wire.size());
+    CHECK(xml.rfind("<DFJob>", 0) == 0);
+    CHECK(xml.find("</DFJob>") == xml.size() - 8);
+    CHECK(xml.find("<Frequency Unit=\"Hz\">10000000</Frequency>") != std::string::npos);
+    CHECK(xml.find("<Frequency Unit=\"Hz\">20000000</Frequency>") != std::string::npos);
+    CHECK(xml.find("<FrequencyStart Unit=\"Hz\">330000000</FrequencyStart>") != std::string::npos);
+
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
+
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
+    CHECK(json_has(json_out, "\"channel\":\"preclassifier_output\""));
+    CHECK(json_has(json_out, "\"msg_kind\":\"dfjob\""));
+    CHECK(json_has(json_out,
+        "\"frequency\":[{\"unit\":\"Hz\",\"#text\":\"10000000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"20000000\"}]"));
+    CHECK(json_has(json_out,
+        "\"bandwidth\":[{\"unit\":\"Hz\",\"#text\":\"10000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"12500\"}]"));
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response("dfdata") round-trip — DFData FORMAT01 hopper
+// (preclassifier output, TCP 9154, DRS -> SDFC)
+//
+// The most structurally demanding real example: nested DFStationData,
+// FrequencyListReport's repeated FrequencyReport array, and the DF/DDF
+// acronym-prefixed tags (DFStationData, DFStationName, DDF-CL-ID) that a
+// generic snake_case reversal cannot reconstruct -- proves the explicit
+// tag-lookup table gets all of them right.
+// ---------------------------------------------------------------------------
+
+static void test_format_response_dfdata_hopper_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"dfdata\","
+        "\"df_data\":{"
+        "\"emitter_class\":\"Hopper\","
+        "\"frequency_min\":{\"unit\":\"Hz\",\"#text\":\"55337500\"},"
+        "\"frequency_max\":{\"unit\":\"Hz\",\"#text\":\"59262905\"},"
+        "\"frequency_count\":\"58\","
+        "\"frequency_list\":\"55350000,55625000,55700000\","
+        "\"frequency_list_report\":{\"frequency_report\":["
+        "{\"frequency\":{\"unit\":\"Hz\",\"#text\":\"55350000\"}},"
+        "{\"frequency\":{\"unit\":\"Hz\",\"#text\":\"55625000\"}}"
+        "]},"
+        "\"bandwidth\":{\"unit\":\"Hz\",\"#text\":\"0\"},"
+        "\"df_station_data\":{"
+        "\"df_station_name\":\"Simulation1\","
+        "\"df_station_latitude\":{\"unit\":\"deg\",\"#text\":\"48.12790000\"},"
+        "\"df_station_longitude\":{\"unit\":\"deg\",\"#text\":\"11.61290000\"},"
+        "\"ddf-cl-id\":\"11\","
+        "\"bearing_avg\":{\"unit\":\"deg\",\"#text\":\"85.7\"},"
+        "\"quality\":\"94\","
+        "\"channel_spacing\":\"78947\","
+        "\"burst_duration\":\"22\""
+        "}"
+        "}}";
+
+    std::vector<uint8_t> wire;
+    CHECK(try_format("dfdata", json_in, wire));
+
+    std::string xml(reinterpret_cast<const char*>(wire.data()), wire.size());
+    CHECK(xml.rfind("<DFData>", 0) == 0);  // no top-level "ddf-cl-id" here -> no root attribute
+    CHECK(xml.find("<EmitterClass>Hopper</EmitterClass>") != std::string::npos);
+    CHECK(xml.find("<FrequencyMin Unit=\"Hz\">55337500</FrequencyMin>") != std::string::npos);
+    CHECK(xml.find("<FrequencyListReport><FrequencyReport><Frequency Unit=\"Hz\">55350000"
+                   "</Frequency></FrequencyReport><FrequencyReport><Frequency Unit=\"Hz\">"
+                   "55625000</Frequency></FrequencyReport></FrequencyListReport>")
+          != std::string::npos);
+    // The acronym-prefixed tags -- proof the lookup table (not a generic
+    // algorithm) is what's producing these, not "DfStationData"/"Ddf-cl-id".
+    CHECK(xml.find("<DFStationData>") != std::string::npos);
+    CHECK(xml.find("<DFStationName>Simulation1</DFStationName>") != std::string::npos);
+    CHECK(xml.find("<DDF-CL-ID>11</DDF-CL-ID>") != std::string::npos);
+
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
+
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
+    CHECK(json_has(json_out, "\"msg_kind\":\"dfdata\""));
+    CHECK(json_has(json_out, "\"emitter_class\":\"Hopper\""));
+    CHECK(json_has(json_out, "\"ddf-cl-id\":\"11\""));
+    CHECK(json_has(json_out, "\"df_station_name\":\"Simulation1\""));
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response("dfdata") round-trip — DFData FORMAT02/03 shape,
+// "ddf-cl-id" as a ROOT ATTRIBUTE on <DFData> (not a nested child element)
+//
+// Proves the position-based disambiguation: the same JSON key "ddf-cl-id"
+// becomes an XML attribute here (top-level key of df_data) versus a child
+// element in the FORMAT01 test above (nested inside df_station_data).
+// ---------------------------------------------------------------------------
+
+static void test_format_response_dfdata_format02_root_attribute_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"dfdata\","
+        "\"df_data\":{"
+        "\"ddf-cl-id\":\"16\","
+        "\"emitter_class\":\"Static\","
+        "\"start_frequency\":{\"unit\":\"Hz\",\"#text\":\"59237500\"},"
+        "\"quality\":\"94\""
+        "}}";
+
+    std::vector<uint8_t> wire;
+    CHECK(try_format("dfdata", json_in, wire));
+
+    std::string xml(reinterpret_cast<const char*>(wire.data()), wire.size());
+    CHECK(xml.rfind("<DFData DDF-CL-ID=\"16\">", 0) == 0);
+    CHECK(xml.find("<StartFrequency Unit=\"Hz\">59237500</StartFrequency>") != std::string::npos);
+
+    std::vector<uint8_t> out_frame;
+    CHECK(try_extract(wire.data(), wire.size(), out_frame));
+
+    std::string json_out;
+    CHECK(try_parse(out_frame.data(), out_frame.size(), json_out));
+    CHECK(json_has(json_out, "\"ddf-cl-id\":\"16\""));
+    CHECK(json_has(json_out, "\"start_frequency\":{\"unit\":\"Hz\",\"#text\":\"59237500\"}"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1432,6 +1811,8 @@ int main() {
     test_dfdata_chirp();
     test_dfdata_with_whitespace();
     test_dfdata_with_cdata();
+    test_formatselect();
+    test_dfjob();
     test_raw_xml_leading_ws();
     test_raw_xml_no_close();
     test_too_short();
@@ -1439,6 +1820,12 @@ int main() {
     test_format_response_preclassifier();
     test_format_response_missing_field();
     test_format_response_roundtrip();
+    test_format_response_measure_settings_ffm_roundtrip();
+    test_format_response_temperature_array_roundtrip();
+    test_format_response_ddfcl_error_reply_roundtrip();
+    test_format_response_dfjob_roundtrip();
+    test_format_response_dfdata_hopper_roundtrip();
+    test_format_response_dfdata_format02_root_attribute_roundtrip();
     test_free_result_null();
     test_free_result_real();
     test_parse_message_null();
