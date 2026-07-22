@@ -9,6 +9,8 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 add_library(ddf1gtx SHARED
     src/ddf1gtx_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
+    ../utils/pugixml_generic_unmirror.cpp
+    ../utils/dfjob_dfdata_unmirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
     ../utils/json_kwargs.cpp
     ../utils/eb200_shared.cpp
@@ -30,6 +32,8 @@ add_executable(test_ddf1gtx
     tests/test_frames_ddf1gtx.cpp
     src/ddf1gtx_parser.cpp
     ../utils/pugixml_generic_mirror.cpp
+    ../utils/pugixml_generic_unmirror.cpp
+    ../utils/dfjob_dfdata_unmirror.cpp
     ../utils/pugixml-1.16/pugixml.cpp
     ../utils/json_kwargs.cpp
     ../utils/eb200_shared.cpp

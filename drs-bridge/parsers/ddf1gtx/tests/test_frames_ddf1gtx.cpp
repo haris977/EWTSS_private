@@ -717,6 +717,120 @@ static void test_wrapped_xml_device_info_reply() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: <Event> async notification frame → recognised, msg_kind=event
+// ---------------------------------------------------------------------------
+
+static void test_wrapped_xml_event() {
+    const char* xml =
+        "<Event type=\"notify\" id=\"1\">"
+        "<Command name=\"ScanComplete\">"
+        "</Command></Event>";
+    auto frame_bytes = wrap_xml(xml);
+
+    uint8_t* frame = nullptr;
+    size_t frame_len = 0;
+    CHECK(extract_frame(frame_bytes.data(), frame_bytes.size(), &frame, &frame_len) == 0);
+
+    char* json = nullptr;
+    size_t json_len = 0;
+    CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
+    CHECK(json != nullptr);
+    CHECK(json_has(json, "\"msg_kind\":\"event\""));
+    CHECK(json_has(json, "\"command\":{\"name\":\"ScanComplete\"}"));
+    free_result(json);
+    free_result(frame);
+}
+
+// ---------------------------------------------------------------------------
+// Test: <DFSelect> preclassifier filter command (port 9153) → recognised,
+// classified as a preclassifier request
+// ---------------------------------------------------------------------------
+
+static void test_raw_xml_dfselect() {
+    const char* xml =
+        "<DFSelect>"
+        "<EmitterClass>Hopper</EmitterClass>"
+        "<EmitterClass>Burst</EmitterClass>"
+        "</DFSelect>";
+    auto frame_bytes = raw_bytes(xml);
+
+    uint8_t* frame = nullptr;
+    size_t frame_len = 0;
+    CHECK(extract_frame(frame_bytes.data(), frame_bytes.size(), &frame, &frame_len) == 0);
+
+    char* json = nullptr;
+    size_t json_len = 0;
+    CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
+    CHECK(json != nullptr);
+    CHECK(json_has(json, "\"channel\":\"preclassifier\""));
+    CHECK(json_has(json, "\"msg_kind\":\"request\""));
+    free_result(json);
+    free_result(frame);
+}
+
+// ---------------------------------------------------------------------------
+// Test: FormatSelect (preclassifier output-format command, SDFC -> DDF)
+// ---------------------------------------------------------------------------
+
+static void test_formatselect() {
+    const char* xml = "<FormatSelect>FORMAT02</FormatSelect>";
+    auto frame_bytes = raw_bytes(xml);
+
+    uint8_t* frame = nullptr;
+    size_t frame_len = 0;
+    CHECK(extract_frame(frame_bytes.data(), frame_bytes.size(), &frame, &frame_len) == 0);
+
+    char* json = nullptr;
+    size_t json_len = 0;
+    CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
+    CHECK(json != nullptr);
+    CHECK(json_has(json, "\"channel\":\"preclassifier\""));
+    CHECK(json_has(json, "\"msg_kind\":\"request\""));
+    CHECK(json_has(json, "\"body\":{\"format_select\":\"FORMAT02\"}"));
+    free_result(json);
+    free_result(frame);
+}
+
+// ---------------------------------------------------------------------------
+// Test: DFJob (preclassifier job definition, DDF -> SDFC) — also exercises
+// the mirror's repeated-tag-becomes-array rule on interleaved siblings.
+// ---------------------------------------------------------------------------
+
+static void test_dfjob() {
+    const char* xml =
+        "<DFJob>"
+        "<Frequency Unit=\"Hz\">10000000</Frequency>"
+        "<Bandwidth Unit=\"Hz\">10000</Bandwidth>"
+        "<Frequency Unit=\"Hz\">20000000</Frequency>"
+        "<Bandwidth Unit=\"Hz\">12500</Bandwidth>"
+        "<FrequencyStart Unit=\"Hz\">330000000</FrequencyStart>"
+        "<FrequencyStop Unit=\"Hz\">440000000</FrequencyStop>"
+        "<FrequencyStep Unit=\"Hz\">12500</FrequencyStep>"
+        "</DFJob>";
+    auto frame_bytes = raw_bytes(xml);
+
+    uint8_t* frame = nullptr;
+    size_t frame_len = 0;
+    CHECK(extract_frame(frame_bytes.data(), frame_bytes.size(), &frame, &frame_len) == 0);
+
+    char* json = nullptr;
+    size_t json_len = 0;
+    CHECK(parse_message(frame, frame_len, &json, &json_len) == 0);
+    CHECK(json != nullptr);
+    CHECK(json_has(json, "\"channel\":\"preclassifier_output\""));
+    CHECK(json_has(json, "\"msg_kind\":\"dfjob\""));
+    CHECK(json_has(json,
+        "\"frequency\":[{\"unit\":\"Hz\",\"#text\":\"10000000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"20000000\"}]"));
+    CHECK(json_has(json,
+        "\"bandwidth\":[{\"unit\":\"Hz\",\"#text\":\"10000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"12500\"}]"));
+    CHECK(json_has(json, "\"frequency_start\":{\"unit\":\"Hz\",\"#text\":\"330000000\"}"));
+    free_result(json);
+    free_result(frame);
+}
+
+// ---------------------------------------------------------------------------
 // Test: Wrapped XML incomplete → -1
 // ---------------------------------------------------------------------------
 
@@ -919,19 +1033,20 @@ static void test_too_short() {
 }
 
 // ---------------------------------------------------------------------------
-// Test: format_response — control channel (Request)
+// Test: format_response — control channel (Request), JSON-command-object shape
 // ---------------------------------------------------------------------------
 
 static void test_format_response_control() {
     const char* json_in =
-        "{\"msg_type\":\"set\","
+        "{\"msg_kind\":\"request\","
+        "\"msg_type\":\"set\","
         "\"id\":42,"
-        "\"command_name\":\"DfMode\","
-        "\"xml_body\":\"<Param name=\\\"eOperationMode\\\">DFMODE_FFM</Param>\"}";
+        "\"command\":{\"name\":\"DfMode\","
+        "\"param\":{\"name\":\"eOperationMode\",\"#text\":\"DFMODE_FFM\"}}}";
 
     uint8_t* frame = nullptr;
     size_t out_len = 0;
-    int rc = format_response("set", json_in, &frame, &out_len);
+    int rc = format_response("request", json_in, &frame, &out_len);
     CHECK(rc == 0);
     CHECK(out_len > 12);
 
@@ -957,17 +1072,17 @@ static void test_format_response_control() {
 
 static void test_format_response_scan_range_add() {
     const char* json_in =
-        "{\"msg_type\":\"set\","
+        "{\"msg_kind\":\"request\","
+        "\"msg_type\":\"set\","
         "\"id\":6,"
-        "\"command_name\":\"ScanRangeAdd\","
-        "\"xml_body\":"
-        "\"<Param name=\\\"iFreqBegin\\\">87500000</Param>"
-        "<Param name=\\\"iFreqEnd\\\">108000000</Param>"
-        "<Param name=\\\"eDFPanStep\\\">DFPANSTEP_25KHZ</Param>\"}";
+        "\"command\":{\"name\":\"ScanRangeAdd\",\"param\":["
+        "{\"name\":\"iFreqBegin\",\"#text\":\"87500000\"},"
+        "{\"name\":\"iFreqEnd\",\"#text\":\"108000000\"},"
+        "{\"name\":\"eDFPanStep\",\"#text\":\"DFPANSTEP_25KHZ\"}]}}";
 
     uint8_t* wire = nullptr;
     size_t out_len = 0;
-    int rc = format_response("set", json_in, &wire, &out_len);
+    int rc = format_response("request", json_in, &wire, &out_len);
     CHECK(rc == 0);
     CHECK(out_len > 12);
 
@@ -989,15 +1104,15 @@ static void test_format_response_scan_range_add() {
 
 static void test_format_response_preclassifier() {
     const char* json_in =
-        "{\"msg_type\":\"set\","
+        "{\"msg_kind\":\"request\","
+        "\"msg_type\":\"set\","
         "\"id\":10,"
-        "\"command_name\":\"AnalysisIntervalMs\","
         "\"channel\":\"preclassifier\","
-        "\"xml_body\":\"50000\"}";
+        "\"command\":{\"name\":\"AnalysisIntervalMs\",\"#text\":\"50000\"}}";
 
     uint8_t* frame = nullptr;
     size_t out_len = 0;
-    int rc = format_response("set", json_in, &frame, &out_len);
+    int rc = format_response("request", json_in, &frame, &out_len);
     CHECK(rc == 0);
     CHECK(out_len > 12);
 
@@ -1022,14 +1137,28 @@ static void test_format_response_missing_field() {
     uint8_t* frame = nullptr;
     size_t out_len = 0;
 
-    const char* bad = "{\"msg_type\":\"set\",\"id\":1,\"xml_body\":\"<P/>\"}";
-    CHECK(format_response("set", bad, &frame, &out_len) == -1);  // missing command_name
+    // Missing "command"
+    const char* bad = "{\"msg_kind\":\"request\",\"msg_type\":\"set\",\"id\":1}";
+    CHECK(format_response("request", bad, &frame, &out_len) == -1);
 
-    const char* bad2 = "{\"msg_type\":\"set\",\"command_name\":\"DfMode\",\"xml_body\":\"\"}";
-    CHECK(format_response("set", bad2, &frame, &out_len) == -1);  // missing id
+    // Missing "id"
+    const char* bad2 =
+        "{\"msg_kind\":\"request\",\"msg_type\":\"set\",\"command\":{\"name\":\"DfMode\"}}";
+    CHECK(format_response("request", bad2, &frame, &out_len) == -1);
 
-    const char* bad3 = "{\"id\":1,\"command_name\":\"DfMode\",\"xml_body\":\"\"}";
-    CHECK(format_response("set", bad3, &frame, &out_len) == -1);  // missing msg_type
+    // Missing "msg_type"
+    const char* bad3 =
+        "{\"msg_kind\":\"request\",\"id\":1,\"command\":{\"name\":\"DfMode\"}}";
+    CHECK(format_response("request", bad3, &frame, &out_len) == -1);
+
+    // Missing "msg_kind"
+    const char* bad4 =
+        "{\"msg_type\":\"set\",\"id\":1,\"command\":{\"name\":\"DfMode\"}}";
+    CHECK(format_response("request", bad4, &frame, &out_len) == -1);
+
+    // Malformed JSON entirely
+    const char* bad5 = "{not valid json";
+    CHECK(format_response("request", bad5, &frame, &out_len) == -1);
 }
 
 // ---------------------------------------------------------------------------
@@ -1038,14 +1167,14 @@ static void test_format_response_missing_field() {
 
 static void test_format_response_roundtrip() {
     const char* json_in =
-        "{\"msg_type\":\"get\","
+        "{\"msg_kind\":\"request\","
+        "\"msg_type\":\"get\","
         "\"id\":7,"
-        "\"command_name\":\"DeviceInfo\","
-        "\"xml_body\":\"\"}";
+        "\"command\":{\"name\":\"DeviceInfo\"}}";
 
     uint8_t* wire = nullptr;
     size_t wire_len = 0;
-    int frc = format_response("set", json_in, &wire, &wire_len);
+    int frc = format_response("request", json_in, &wire, &wire_len);
     CHECK(frc == 0);
     CHECK(wire_len > 0);
 
@@ -1062,6 +1191,91 @@ static void test_format_response_roundtrip() {
     CHECK(json_has(json_out, "\"hw\":\"ddf1gtx\""));
     CHECK(json_has(json_out, "\"command\":{\"name\":\"DeviceInfo\"}"));
     CHECK(json_has(json_out, "\"type\":\"get\""));
+    free_result(json_out);
+    free_result(out_frame);
+    free_result(wire);
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response("dfjob") round-trip — DFJob (preclassifier output,
+// TCP 9154, DRS -> SDFC). Confirms the ported dfjob_dfdata_unmirror.h
+// encoder produces raw, unwrapped XML (no magic-word envelope).
+// ---------------------------------------------------------------------------
+
+static void test_format_response_dfjob_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"dfjob\","
+        "\"df_job\":{"
+        "\"frequency\":[{\"unit\":\"Hz\",\"#text\":\"10000000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"20000000\"}],"
+        "\"bandwidth\":[{\"unit\":\"Hz\",\"#text\":\"10000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"12500\"}],"
+        "\"frequency_start\":{\"unit\":\"Hz\",\"#text\":\"330000000\"},"
+        "\"frequency_stop\":{\"unit\":\"Hz\",\"#text\":\"440000000\"},"
+        "\"frequency_step\":{\"unit\":\"Hz\",\"#text\":\"12500\"}"
+        "}}";
+
+    uint8_t* wire = nullptr;
+    size_t wire_len = 0;
+    CHECK(format_response("dfjob", json_in, &wire, &wire_len) == 0);
+
+    std::string xml(reinterpret_cast<const char*>(wire), wire_len);
+    CHECK(xml.rfind("<DFJob>", 0) == 0);
+    CHECK(xml.find("</DFJob>") == xml.size() - 8);
+    CHECK(xml.find("<Frequency Unit=\"Hz\">10000000</Frequency>") != std::string::npos);
+    CHECK(xml.find("<FrequencyStart Unit=\"Hz\">330000000</FrequencyStart>") != std::string::npos);
+
+    uint8_t* out_frame = nullptr;
+    size_t out_len = 0;
+    CHECK(extract_frame(wire, wire_len, &out_frame, &out_len) == 0);
+
+    char* json_out = nullptr;
+    size_t json_out_len = 0;
+    CHECK(parse_message(out_frame, out_len, &json_out, &json_out_len) == 0);
+    CHECK(json_out != nullptr);
+    CHECK(json_has(json_out, "\"channel\":\"preclassifier_output\""));
+    CHECK(json_has(json_out, "\"msg_kind\":\"dfjob\""));
+    CHECK(json_has(json_out,
+        "\"frequency\":[{\"unit\":\"Hz\",\"#text\":\"10000000\"},"
+        "{\"unit\":\"Hz\",\"#text\":\"20000000\"}]"));
+    free_result(json_out);
+    free_result(out_frame);
+    free_result(wire);
+}
+
+// ---------------------------------------------------------------------------
+// Test: format_response("dfdata") round-trip — DFData FORMAT02 shape, with
+// "ddf-cl-id" as a root attribute on <DFData>.
+// ---------------------------------------------------------------------------
+
+static void test_format_response_dfdata_roundtrip() {
+    const char* json_in =
+        "{\"msg_kind\":\"dfdata\","
+        "\"df_data\":{"
+        "\"ddf-cl-id\":\"16\","
+        "\"emitter_class\":\"Static\","
+        "\"start_frequency\":{\"unit\":\"Hz\",\"#text\":\"59237500\"},"
+        "\"quality\":\"94\""
+        "}}";
+
+    uint8_t* wire = nullptr;
+    size_t wire_len = 0;
+    CHECK(format_response("dfdata", json_in, &wire, &wire_len) == 0);
+
+    std::string xml(reinterpret_cast<const char*>(wire), wire_len);
+    CHECK(xml.rfind("<DFData DDF-CL-ID=\"16\">", 0) == 0);
+    CHECK(xml.find("<StartFrequency Unit=\"Hz\">59237500</StartFrequency>") != std::string::npos);
+
+    uint8_t* out_frame = nullptr;
+    size_t out_len = 0;
+    CHECK(extract_frame(wire, wire_len, &out_frame, &out_len) == 0);
+
+    char* json_out = nullptr;
+    size_t json_out_len = 0;
+    CHECK(parse_message(out_frame, out_len, &json_out, &json_out_len) == 0);
+    CHECK(json_out != nullptr);
+    CHECK(json_has(json_out, "\"ddf-cl-id\":\"16\""));
+    CHECK(json_has(json_out, "\"start_frequency\":{\"unit\":\"Hz\",\"#text\":\"59237500\"}"));
     free_result(json_out);
     free_result(out_frame);
     free_result(wire);
@@ -1217,6 +1431,10 @@ int main() {
     test_wrapped_xml_trace_disable();
     test_wrapped_xml_reply();
     test_wrapped_xml_device_info_reply();
+    test_wrapped_xml_event();
+    test_raw_xml_dfselect();
+    test_formatselect();
+    test_dfjob();
     test_wrapped_xml_incomplete();
     test_wrapped_xml_partial_body();
     test_ddfcl_request_wrapped();
@@ -1231,6 +1449,8 @@ int main() {
     test_format_response_preclassifier();
     test_format_response_missing_field();
     test_format_response_roundtrip();
+    test_format_response_dfjob_roundtrip();
+    test_format_response_dfdata_roundtrip();
     test_free_result_null();
     test_parse_message_null();
     test_eb200_audio_iq_demod();

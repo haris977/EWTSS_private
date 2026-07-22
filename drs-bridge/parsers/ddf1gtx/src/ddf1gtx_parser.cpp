@@ -9,10 +9,12 @@
 //   DDFCL control    (TCP 9153) — BE binary wrapper; bidirectional
 //   DDFCL output     (TCP 9154) — raw XML; DDF → SDFC  (FORMAT02 DFData)
 //
-// Frame type mapping (returned by extract_frame):
-//   1 = <Request> / <DDFCLRequest>      (SDFC → DDF command)
-//   2 = <Reply> / <DDFCLReply> / <DFData> (DDF → SDFC)
-//   3 = EB200 binary streaming frame    (DDF → SDFC, port 9152)
+// extract_frame returns 0 on a complete frame, -1 otherwise (incomplete or
+// corrupt — sdfc_abi.h's contract does not distinguish the two). Frame type
+// is inferred separately, inside parse_message, from the frame's own bytes:
+//   <Request> / <DDFCLRequest> / <DFSelect>        (SDFC → DDF command)
+//   <Reply> / <DDFCLReply> / <DFData> / <Event>    (DDF → SDFC)
+//   EB200 binary streaming frame (port 9152)        (DDF → SDFC)
 //
 // Protocol notes (§3, §5.1.7):
 //   XML wrapper: 4B MagicStart + 4B Length(BE) + N bytes XML + 4B MagicEnd
@@ -29,12 +31,17 @@
 #include "eb200_shared.h"
 #include "pugixml.hpp"
 #include "pugixml_generic_mirror.h"
+#include "pugixml_generic_unmirror.h"
+#include "dfjob_dfdata_unmirror.h"
+#include "json.hpp"
 
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
 #include <string>
 #include <algorithm>
+#include <vector>
+#include <utility>
 
 using namespace sdfc;
 
@@ -93,6 +100,10 @@ static int classify_xml_root(const uint8_t* data, int data_len,
         { "Request",      1 },
         { "Reply",        2 },
         { "DFData",       2 },
+        { "Event",        2 },   // async status/alarm/scan-complete: DDF -> SDFC
+        { "DFSelect",     1 },   // preclassifier filter command: SDFC -> DDF
+        { "FormatSelect", 1 },   // preclassifier output-format command: SDFC -> DDF (DDFSystemControlInterfacePreClassifier.pdf §6.2.1)
+        { "DFJob",        2 },   // preclassifier job definition: DDF -> SDFC, pushed on connect / job change (ibid. §6.2.2)
     };
     int avail = (int)(end - p);
     for (auto& r : kRoots) {
@@ -123,15 +134,25 @@ static int classify_xml_root(const uint8_t* data, int data_len,
 static std::string impl_parse_xml_ddf1gtx(const uint8_t* frame, int frame_len,
                                            int frame_type, const char* root_tag)
 {
-    bool is_ddfcl_req = (std::strcmp(root_tag, "DDFCLRequest") == 0);
-    bool is_ddfcl_rep = (std::strcmp(root_tag, "DDFCLReply")   == 0);
-    bool is_dfdata    = (std::strcmp(root_tag, "DFData")       == 0);
+    bool is_ddfcl_req    = (std::strcmp(root_tag, "DDFCLRequest") == 0);
+    bool is_ddfcl_rep    = (std::strcmp(root_tag, "DDFCLReply")   == 0);
+    bool is_dfdata       = (std::strcmp(root_tag, "DFData")       == 0);
+    bool is_event        = (std::strcmp(root_tag, "Event")        == 0);
+    bool is_dfselect     = (std::strcmp(root_tag, "DFSelect")     == 0);
+    bool is_formatselect = (std::strcmp(root_tag, "FormatSelect") == 0);
+    bool is_dfjob        = (std::strcmp(root_tag, "DFJob")        == 0);
 
-    const char* channel  = is_dfdata                       ? "preclassifier_output"
-                         : (is_ddfcl_req || is_ddfcl_rep)   ? "preclassifier"
-                                                             : "control";
+    // DFJob groups with DFData ("preclassifier_output": DDF -> SDFC data on
+    // 9154). FormatSelect groups with DFSelect ("preclassifier": SDFC -> DDF
+    // control on 9154) -- matches the existing DFSelect precedent, even
+    // though "preclassifier" is shared with 9153 traffic too.
+    const char* channel  = (is_dfdata || is_dfjob)                                          ? "preclassifier_output"
+                         : (is_ddfcl_req || is_ddfcl_rep || is_dfselect || is_formatselect) ? "preclassifier"
+                                                                                              : "control";
     const char* msg_kind = (frame_type == 1) ? "request"
                          : is_dfdata         ? "dfdata"
+                         : is_dfjob          ? "dfjob"
+                         : is_event          ? "event"
                                              : "reply";
 
     pugi::xml_document doc;
@@ -284,83 +305,133 @@ SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 // format_response  (ABI entry point)
 // ---------------------------------------------------------------------------
 //
-// Encodes a JSON descriptor into a DDF-1GTX wrapped XML wire frame.
+// Encodes a JSON descriptor into a DDF-1GTX wire frame. Two independent
+// shapes, selected by "msg_kind":
 //
-// Required JSON fields:
-//   "msg_type"     : "get" | "set"
-//   "id"           : integer request correlation ID
-//   "command_name" : DDF-1GTX Command name (e.g. "DfMode", "ScanRangeAdd")
-//   "xml_body"     : inner XML (Param children), JSON-escaped
+// 1. "request" | "reply" -- control (9150) or preclassifier-control (9153)
+//    idiom. The "command" field takes exactly the JSON shape
+//    parse_message() itself produces at body.<request|reply>.command (see
+//    docs/ewtss/specs/rdfs-generic-mirror-json-contract.md) -- a caller (or
+//    a simulated/random-mode generator standing in for DRS's hardware
+//    role) can hand back that sub-object verbatim instead of hand-building
+//    an XML string. See pugixml_generic_unmirror.h for exactly which
+//    command shapes are in scope (Command+Param(s)/Struct/Array, nested to
+//    any depth).
 //
-// Optional:
-//   "channel"      : "preclassifier"  → DDFCLRequest root tag
-//                    (any other value) → Request root tag
+//    Required JSON fields:
+//      "msg_kind"  : "request" | "reply"   -- selects Request/DDFCLRequest
+//                    vs Reply/DDFCLReply (DRS's own direction: "reply" is
+//                    what DRS sends acting as the hardware answering a
+//                    command)
+//      "msg_type"  : "get" | "set"          -- the wire "type" attribute
+//      "id"        : integer request/reply correlation ID
+//      "command"   : {"name": "...", "param"/"struct"/"array": <...>}
+//    Optional:
+//      "channel"   : "preclassifier"  → DDFCLRequest/DDFCLReply root tag
+//                    (any other value) → Request/Reply root tag
+//    Output: [magic_start(4 BE)][length(4 BE)][XML bytes][magic_end(4 BE)]
+//    Magic word values are XML_MAGIC_START / XML_MAGIC_END (placeholders —
+//    verify from live capture before using on real hardware).
 //
-// Output: [magic_start(4 BE)][length(4 BE)][XML bytes][magic_end(4 BE)]
-// Magic word values are XML_MAGIC_START / XML_MAGIC_END (placeholders —
-// verify from live capture before using on real hardware).
+// 2. "dfjob" | "dfdata" -- preclassifier output (9154) idiom. Raw,
+//    unwrapped XML, no magic-word envelope (see dfjob_dfdata_unmirror.h).
+//    Required JSON fields:
+//      "msg_kind"  : "dfjob" | "dfdata"
+//      "df_job"    : (msg_kind "dfjob") the mirrored "df_job" body value
+//      "df_data"   : (msg_kind "dfdata") the mirrored "df_data" body value
+//    Output: raw XML bytes, verbatim, no envelope.
 //
-// Returns total bytes written, or -1 on encoding error.
+// Returns 0 on success (byte count is communicated via *out_len, per the
+// sdfc_abi.h 0/-1 convention), or -1 on encoding error (missing/invalid
+// fields, or a shape build_command_xml()/build_dfjob_xml()/
+// build_dfdata_xml() doesn't support).
 
 SDFC_EXPORT int format_response(const char* /*kind*/, const char* kwargs_json,
                                  uint8_t** out_buf, size_t* out_len)
 {
     if (!kwargs_json || !out_buf || !out_len) return -1;
 
-    std::string msg_type    = json_str_field(kwargs_json, "msg_type");
-    std::string cmd_name    = json_str_field(kwargs_json, "command_name");
-    std::string xml_body    = json_str_field(kwargs_json, "xml_body");
-    std::string channel     = json_str_field(kwargs_json, "channel");
-    long long   id          = json_int_field(kwargs_json, "id");
+    std::string cmd_xml;
+    std::string msg_kind, msg_type, channel;
+    long long id = -1;
+    try {
+        nlohmann::json kwargs = nlohmann::json::parse(kwargs_json);
+        if (!kwargs.is_object()) return -1;
 
-    if (msg_type.empty() || cmd_name.empty() || id < 0) return -1;
+        msg_kind = kwargs.value("msg_kind", "");
+
+        // DFJob/DFData (preclassifier output, TCP 9154): raw, unwrapped XML
+        // text, no id/type/channel wrapper at all -- a completely different
+        // shape from Request/Reply/DDFCLRequest/DDFCLReply below. See
+        // dfjob_dfdata_unmirror.h for the tag-lookup rationale.
+        if (msg_kind == "dfjob" || msg_kind == "dfdata") {
+            const char* key = (msg_kind == "dfjob") ? "df_job" : "df_data";
+            if (!kwargs.contains(key)) return -1;
+            std::string xml = (msg_kind == "dfjob")
+                ? build_dfjob_xml(kwargs.at(key))
+                : build_dfdata_xml(kwargs.at(key));
+
+            auto* buf = static_cast<uint8_t*>(std::malloc(xml.size()));
+            if (!buf) return -1;
+            memcpy(buf, xml.data(), xml.size());
+            *out_buf = buf;
+            *out_len = xml.size();
+            return 0;
+        }
+
+        msg_type = kwargs.value("msg_type", "");
+        channel  = kwargs.value("channel", "");
+        if (!kwargs.contains("id") || !kwargs.at("id").is_number_integer()) return -1;
+        id = kwargs.at("id").get<long long>();
+
+        if ((msg_kind != "request" && msg_kind != "reply") || msg_type.empty() || id < 0)
+            return -1;
+        if (!kwargs.contains("command")) return -1;
+
+        cmd_xml = build_command_xml(kwargs.at("command"));
+    } catch (...) {
+        return -1;
+    }
 
     bool use_ddfcl = (channel == "preclassifier");
+    bool is_reply  = (msg_kind == "reply");
 
-    // Build the inner XML
+    // Build the outer XML (matches ICD attribute order per real examples:
+    // DDFCLRequest/DDFCLReply are id-then-type, Request/Reply are type-then-id)
     char xml_hdr[512];
     int xml_hdr_len;
     if (use_ddfcl) {
         xml_hdr_len = std::snprintf(xml_hdr, sizeof(xml_hdr),
-            "<DDFCLRequest id=\"%lld\" type=\"%s\">",
-            id, msg_type.c_str());
+            "<%s id=\"%lld\" type=\"%s\">",
+            is_reply ? "DDFCLReply" : "DDFCLRequest", id, msg_type.c_str());
     } else {
         xml_hdr_len = std::snprintf(xml_hdr, sizeof(xml_hdr),
-            "<Request type=\"%s\" id=\"%lld\">",
-            msg_type.c_str(), id);
+            "<%s type=\"%s\" id=\"%lld\">",
+            is_reply ? "Reply" : "Request", msg_type.c_str(), id);
     }
     if (xml_hdr_len <= 0 || xml_hdr_len >= (int)sizeof(xml_hdr)) return -1;
 
-    char cmd_open[256], cmd_close[256];
-    int cmd_open_len = std::snprintf(cmd_open, sizeof(cmd_open),
-        "<Command name=\"%s\">", cmd_name.c_str());
-    int cmd_close_len;
-    if (use_ddfcl) {
-        cmd_close_len = std::snprintf(cmd_close, sizeof(cmd_close),
-            "</Command></DDFCLRequest>");
-    } else {
-        cmd_close_len = std::snprintf(cmd_close, sizeof(cmd_close),
-            "</Command></Request>");
-    }
-    if (cmd_open_len  <= 0 || cmd_open_len  >= (int)sizeof(cmd_open))  return -1;
-    if (cmd_close_len <= 0 || cmd_close_len >= (int)sizeof(cmd_close)) return -1;
+    char xml_close[64];
+    int xml_close_len = std::snprintf(xml_close, sizeof(xml_close), "</%s>",
+        use_ddfcl ? (is_reply ? "DDFCLReply" : "DDFCLRequest")
+                  : (is_reply ? "Reply" : "Request"));
+    if (xml_close_len <= 0 || xml_close_len >= (int)sizeof(xml_close)) return -1;
 
-    int body_len = (int)xml_body.size();
-    int xml_total = xml_hdr_len + cmd_open_len + body_len + cmd_close_len;
+    int body_len = (int)cmd_xml.size();
+    int xml_total = xml_hdr_len + body_len + xml_close_len;
 
-    // Binary envelope: 4 magic_start + 4 length + xml_total + 4 magic_end
+    // Binary envelope: 4 magic_start + 4 length + xml_total + 4 magic_end = xml_total + 12
     int frame_total = xml_total + 12;
     if (frame_total > MAX_FRAME_BUFFER_BYTES) return -1;
 
     auto* buf = static_cast<uint8_t*>(std::malloc((size_t)frame_total));
     if (!buf) return -1;
     uint8_t* p = buf;
-    store_u32be(p, XML_MAGIC_START);            p += 4;
-    store_u32be(p, (uint32_t)xml_total);        p += 4;
-    memcpy(p, xml_hdr,          (size_t)xml_hdr_len);   p += xml_hdr_len;
-    memcpy(p, cmd_open,         (size_t)cmd_open_len);  p += cmd_open_len;
-    memcpy(p, xml_body.c_str(), (size_t)body_len);      p += body_len;
-    memcpy(p, cmd_close,        (size_t)cmd_close_len); p += cmd_close_len;
+    store_u32be(p, XML_MAGIC_START);   p += 4;
+    store_u32be(p, (uint32_t)xml_total); p += 4;
+    memcpy(p, xml_hdr,   (size_t)xml_hdr_len); p += xml_hdr_len;
+    memcpy(p, cmd_xml.c_str(), (size_t)body_len); p += body_len;
+    memcpy(p, xml_close, (size_t)xml_close_len); p += xml_close_len;
     store_u32be(p, XML_MAGIC_END);
 
     *out_buf = buf;
