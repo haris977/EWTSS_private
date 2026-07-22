@@ -1,0 +1,2984 @@
+=== Control request -- DfMode (set, id=42) ===
+input_json:
+{
+  "msg_kind": "request",
+  "msg_type": "set",
+  "id": 42,
+  "command": {
+    "name": "DfMode",
+    "param": {
+      "name": "eOperationMode",
+      "#text": "DFMODE_FFM"
+    }
+  }
+}
+output_hex: 00000000000000763c5265717565737420747970653d22736574222069643d223432223e3c436f6d6d616e64206e616d653d2244664d6f6465223e3c506172616d206e616d653d22654f7065726174696f6e4d6f6465223e44464d4f44455f46464d3c2f506172616d3e3c2f436f6d6d616e643e3c2f526571756573743e00000000
+envelope  : magic_start=00000000  length_field=118  magic_end=00000000  (actual XML bytes: 118)
+output_xml:
+<?xml version="1.0" ?>
+<Request type="set" id="42">
+  <Command name="DfMode">
+    <Param name="eOperationMode">DFMODE_FFM</Param>
+  </Command>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "set",
+      "id": "42",
+      "command": {
+        "name": "DfMode",
+        "param": {
+          "name": "eOperationMode",
+          "#text": "DFMODE_FFM"
+        }
+      }
+    }
+  }
+}
+
+=== Control reply -- MeasureSettingsFFM (get, id=123, 19 Params, Remote_commands.html §1.2.2) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 123,
+  "command": {
+    "name": "MeasureSettingsFFM",
+    "param": [
+      {
+        "name": "iFrequency",
+        "#text": "1000000000"
+      },
+      {
+        "name": "eAvgMode",
+        "#text": "DFSQU_GATE"
+      },
+      {
+        "name": "eDfPanStep",
+        "#text": "DFPAN_STEP_20KHZ"
+      },
+      {
+        "name": "eBlockAveragingSelect",
+        "#text": "BLOCK_AVERAGING_SELECT_TIME"
+      },
+      {
+        "name": "iBlockAveragingCycles",
+        "#text": "200"
+      },
+      {
+        "name": "iBlockAveragingTime",
+        "#text": "200"
+      },
+      {
+        "name": "iThreshold",
+        "#text": "11"
+      },
+      {
+        "name": "eAntPol",
+        "#text": "POL_VERTICAL"
+      },
+      {
+        "name": "eAntPreAmp",
+        "#text": "STATE_OFF"
+      },
+      {
+        "name": "eDfAlt",
+        "#text": "DFALT_AUTO"
+      },
+      {
+        "name": "eSpan",
+        "#text": "IFPAN_FREQ_RANGE_500"
+      },
+      {
+        "name": "eWindowType",
+        "#text": "DF_WINDOW_TYPE_BLACKMAN_HARRIS"
+      },
+      {
+        "name": "eDfPanSelectivity",
+        "#text": "DFPAN_SELECTIVITY_NORMAL"
+      },
+      {
+        "name": "eAttSelect",
+        "#text": "ATT_MANUAL"
+      },
+      {
+        "name": "iAttValue",
+        "#text": "0"
+      },
+      {
+        "name": "iAttHoldTime",
+        "#text": "10"
+      },
+      {
+        "name": "eIFPanStep",
+        "#text": "IFPAN_STEP_1KHZ"
+      },
+      {
+        "name": "eIFPanSelectivity",
+        "#text": "IFPAN_SELECTIVITY_NORMAL"
+      },
+      {
+        "name": "eIFPanMode",
+        "#text": "IFPAN_MODE_AVERAGE"
+      },
+      {
+        "name": "iSrEmitterEstimation",
+        "#text": "0"
+      }
+    ]
+  }
+}
+output_hex: 00000000000004063c5265706c7920747970653d22676574222069643d22313233223e3c436f6d6d616e64206e616d653d224d65617375726553657474696e677346464d223e3c506172616d206e616d653d22694672657175656e6379223e313030303030303030303c2f506172616d3e3c506172616d206e616d653d22654176674d6f6465223e44465351555f474154453c2f506172616d3e3c506172616d206e616d653d2265446650616e53746570223e444650414e5f535445505f32304b485a3c2f506172616d3e3c506172616d206e616d653d2265426c6f636b417665726167696e6753656c656374223e424c4f434b5f415645524147494e475f53454c4543545f54494d453c2f506172616d3e3c506172616d206e616d653d2269426c6f636b417665726167696e674379636c6573223e3230303c2f506172616d3e3c506172616d206e616d653d2269426c6f636b417665726167696e6754696d65223e3230303c2f506172616d3e3c506172616d206e616d653d22695468726573686f6c64223e31313c2f506172616d3e3c506172616d206e616d653d2265416e74506f6c223e504f4c5f564552544943414c3c2f506172616d3e3c506172616d206e616d653d2265416e74507265416d70223e53544154455f4f46463c2f506172616d3e3c506172616d206e616d653d22654466416c74223e4446414c545f4155544f3c2f506172616d3e3c506172616d206e616d653d22655370616e223e494650414e5f465245515f52414e47455f3530303c2f506172616d3e3c506172616d206e616d653d226557696e646f7754797065223e44465f57494e444f575f545950455f424c41434b4d414e5f4841525249533c2f506172616d3e3c506172616d206e616d653d2265446650616e53656c6563746976697479223e444650414e5f53454c45435449564954595f4e4f524d414c3c2f506172616d3e3c506172616d206e616d653d226541747453656c656374223e4154545f4d414e55414c3c2f506172616d3e3c506172616d206e616d653d226941747456616c7565223e303c2f506172616d3e3c506172616d206e616d653d2269417474486f6c6454696d65223e31303c2f506172616d3e3c506172616d206e616d653d2265494650616e53746570223e494650414e5f535445505f314b485a3c2f506172616d3e3c506172616d206e616d653d2265494650616e53656c6563746976697479223e494650414e5f53454c45435449564954595f4e4f524d414c3c2f506172616d3e3c506172616d206e616d653d2265494650616e4d6f6465223e494650414e5f4d4f44455f415645524147453c2f506172616d3e3c506172616d206e616d653d22695372456d6974746572457374696d6174696f6e223e303c2f506172616d3e3c2f436f6d6d616e643e3c2f5265706c793e00000000
+envelope  : magic_start=00000000  length_field=1030  magic_end=00000000  (actual XML bytes: 1030)
+output_xml:
+<?xml version="1.0" ?>
+<Reply type="get" id="123">
+  <Command name="MeasureSettingsFFM">
+    <Param name="iFrequency">1000000000</Param>
+    <Param name="eAvgMode">DFSQU_GATE</Param>
+    <Param name="eDfPanStep">DFPAN_STEP_20KHZ</Param>
+    <Param name="eBlockAveragingSelect">BLOCK_AVERAGING_SELECT_TIME</Param>
+    <Param name="iBlockAveragingCycles">200</Param>
+    <Param name="iBlockAveragingTime">200</Param>
+    <Param name="iThreshold">11</Param>
+    <Param name="eAntPol">POL_VERTICAL</Param>
+    <Param name="eAntPreAmp">STATE_OFF</Param>
+    <Param name="eDfAlt">DFALT_AUTO</Param>
+    <Param name="eSpan">IFPAN_FREQ_RANGE_500</Param>
+    <Param name="eWindowType">DF_WINDOW_TYPE_BLACKMAN_HARRIS</Param>
+    <Param name="eDfPanSelectivity">DFPAN_SELECTIVITY_NORMAL</Param>
+    <Param name="eAttSelect">ATT_MANUAL</Param>
+    <Param name="iAttValue">0</Param>
+    <Param name="iAttHoldTime">10</Param>
+    <Param name="eIFPanStep">IFPAN_STEP_1KHZ</Param>
+    <Param name="eIFPanSelectivity">IFPAN_SELECTIVITY_NORMAL</Param>
+    <Param name="eIFPanMode">IFPAN_MODE_AVERAGE</Param>
+    <Param name="iSrEmitterEstimation">0</Param>
+  </Command>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "123",
+      "command": {
+        "name": "MeasureSettingsFFM",
+        "param": [
+          {
+            "name": "iFrequency",
+            "#text": "1000000000"
+          },
+          {
+            "name": "eAvgMode",
+            "#text": "DFSQU_GATE"
+          },
+          {
+            "name": "eDfPanStep",
+            "#text": "DFPAN_STEP_20KHZ"
+          },
+          {
+            "name": "eBlockAveragingSelect",
+            "#text": "BLOCK_AVERAGING_SELECT_TIME"
+          },
+          {
+            "name": "iBlockAveragingCycles",
+            "#text": "200"
+          },
+          {
+            "name": "iBlockAveragingTime",
+            "#text": "200"
+          },
+          {
+            "name": "iThreshold",
+            "#text": "11"
+          },
+          {
+            "name": "eAntPol",
+            "#text": "POL_VERTICAL"
+          },
+          {
+            "name": "eAntPreAmp",
+            "#text": "STATE_OFF"
+          },
+          {
+            "name": "eDfAlt",
+            "#text": "DFALT_AUTO"
+          },
+          {
+            "name": "eSpan",
+            "#text": "IFPAN_FREQ_RANGE_500"
+          },
+          {
+            "name": "eWindowType",
+            "#text": "DF_WINDOW_TYPE_BLACKMAN_HARRIS"
+          },
+          {
+            "name": "eDfPanSelectivity",
+            "#text": "DFPAN_SELECTIVITY_NORMAL"
+          },
+          {
+            "name": "eAttSelect",
+            "#text": "ATT_MANUAL"
+          },
+          {
+            "name": "iAttValue",
+            "#text": "0"
+          },
+          {
+            "name": "iAttHoldTime",
+            "#text": "10"
+          },
+          {
+            "name": "eIFPanStep",
+            "#text": "IFPAN_STEP_1KHZ"
+          },
+          {
+            "name": "eIFPanSelectivity",
+            "#text": "IFPAN_SELECTIVITY_NORMAL"
+          },
+          {
+            "name": "eIFPanMode",
+            "#text": "IFPAN_MODE_AVERAGE"
+          },
+          {
+            "name": "iSrEmitterEstimation",
+            "#text": "0"
+          }
+        ]
+      }
+    }
+  }
+}
+
+=== Control reply -- Temperature (get, id=123, nested Array/Struct, §1.4.10) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 123,
+  "command": {
+    "name": "Temperature",
+    "param": {
+      "name": "zModuleName",
+      "#text": "ALL"
+    },
+    "array": {
+      "name": "asTempTestPoint",
+      "struct": {
+        "name": "sTempTestPoint",
+        "param": [
+          {
+            "name": "zModule",
+            "#text": "P1"
+          },
+          {
+            "name": "zSensor",
+            "#text": "TEMP_FPGA"
+          },
+          {
+            "name": "iValue",
+            "#text": "57"
+          }
+        ]
+      }
+    }
+  }
+}
+output_hex: 00000000000001213c5265706c7920747970653d22676574222069643d22313233223e3c436f6d6d616e64206e616d653d2254656d7065726174757265223e3c506172616d206e616d653d227a4d6f64756c654e616d65223e414c4c3c2f506172616d3e3c4172726179206e616d653d22617354656d7054657374506f696e74223e3c537472756374206e616d653d227354656d7054657374506f696e74223e3c506172616d206e616d653d227a4d6f64756c65223e50313c2f506172616d3e3c506172616d206e616d653d227a53656e736f72223e54454d505f465047413c2f506172616d3e3c506172616d206e616d653d226956616c7565223e35373c2f506172616d3e3c2f5374727563743e3c2f41727261793e3c2f436f6d6d616e643e3c2f5265706c793e00000000
+envelope  : magic_start=00000000  length_field=289  magic_end=00000000  (actual XML bytes: 289)
+output_xml:
+<?xml version="1.0" ?>
+<Reply type="get" id="123">
+  <Command name="Temperature">
+    <Param name="zModuleName">ALL</Param>
+    <Array name="asTempTestPoint">
+      <Struct name="sTempTestPoint">
+        <Param name="zModule">P1</Param>
+        <Param name="zSensor">TEMP_FPGA</Param>
+        <Param name="iValue">57</Param>
+      </Struct>
+    </Array>
+  </Command>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "123",
+      "command": {
+        "name": "Temperature",
+        "param": {
+          "name": "zModuleName",
+          "#text": "ALL"
+        },
+        "array": {
+          "name": "asTempTestPoint",
+          "struct": {
+            "name": "sTempTestPoint",
+            "param": [
+              {
+                "name": "zModule",
+                "#text": "P1"
+              },
+              {
+                "name": "zSensor",
+                "#text": "TEMP_FPGA"
+              },
+              {
+                "name": "iValue",
+                "#text": "57"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Preclassifier request -- AnalysisIntervalMs (set, id=10) ===
+input_json:
+{
+  "msg_kind": "request",
+  "msg_type": "set",
+  "id": 10,
+  "channel": "preclassifier",
+  "command": {
+    "name": "AnalysisIntervalMs",
+    "#text": "50000"
+  }
+}
+output_hex: 00000000000000623c444446434c526571756573742069643d2231302220747970653d22736574223e3c436f6d6d616e64206e616d653d22416e616c79736973496e74657276616c4d73223e35303030303c2f436f6d6d616e643e3c2f444446434c526571756573743e00000000
+envelope  : magic_start=00000000  length_field=98  magic_end=00000000  (actual XML bytes: 98)
+output_xml:
+<?xml version="1.0" ?>
+<DDFCLRequest id="10" type="set">
+  <Command name="AnalysisIntervalMs">50000</Command>
+</DDFCLRequest>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier",
+  "msg_kind": "request",
+  "body": {
+    "ddfcl_request": {
+      "id": "10",
+      "type": "set",
+      "command": {
+        "name": "AnalysisIntervalMs",
+        "#text": "50000"
+      }
+    }
+  }
+}
+
+=== Preclassifier reply -- DDFCL error (invalid command name, Table 6-5) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 2,
+  "channel": "preclassifier",
+  "command": {
+    "name": "Bogus",
+    "return_code": "2",
+    "return_message": "Invalid command name"
+  }
+}
+output_hex: 00000000000000763c444446434c5265706c792069643d22322220747970653d22676574223e3c436f6d6d616e64206e616d653d22426f677573222072657475726e436f64653d2232222072657475726e4d6573736167653d22496e76616c696420636f6d6d616e64206e616d65222f3e3c2f444446434c5265706c793e00000000
+envelope  : magic_start=00000000  length_field=118  magic_end=00000000  (actual XML bytes: 118)
+output_xml:
+<?xml version="1.0" ?>
+<DDFCLReply id="2" type="get">
+  <Command name="Bogus" returnCode="2" returnMessage="Invalid command name"/>
+</DDFCLReply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier",
+  "msg_kind": "reply",
+  "body": {
+    "ddfcl_reply": {
+      "id": "2",
+      "type": "get",
+      "command": {
+        "name": "Bogus",
+        "return_code": "2",
+        "return_message": "Invalid command name"
+      }
+    }
+  }
+}
+
+=== DFJob (preclassifier output, TCP 9154, DRS->SDFC) ===
+input_json:
+{
+  "msg_kind": "dfjob",
+  "df_job": {
+    "frequency": [
+      {
+        "unit": "Hz",
+        "#text": "10000000"
+      },
+      {
+        "unit": "Hz",
+        "#text": "20000000"
+      }
+    ],
+    "bandwidth": [
+      {
+        "unit": "Hz",
+        "#text": "10000"
+      },
+      {
+        "unit": "Hz",
+        "#text": "12500"
+      }
+    ],
+    "frequency_start": {
+      "unit": "Hz",
+      "#text": "330000000"
+    },
+    "frequency_stop": {
+      "unit": "Hz",
+      "#text": "440000000"
+    },
+    "frequency_step": {
+      "unit": "Hz",
+      "#text": "12500"
+    }
+  }
+}
+output_hex: 3c44464a6f623e3c42616e64776964746820556e69743d22487a223e31303030303c2f42616e6477696474683e3c42616e64776964746820556e69743d22487a223e31323530303c2f42616e6477696474683e3c4672657175656e637920556e69743d22487a223e31303030303030303c2f4672657175656e63793e3c4672657175656e637920556e69743d22487a223e32303030303030303c2f4672657175656e63793e3c4672657175656e6379537461727420556e69743d22487a223e3333303030303030303c2f4672657175656e637953746172743e3c4672657175656e63795374657020556e69743d22487a223e31323530303c2f4672657175656e6379537465703e3c4672657175656e637953746f7020556e69743d22487a223e3434303030303030303c2f4672657175656e637953746f703e3c2f44464a6f623e
+output_xml:
+<?xml version="1.0" ?>
+<DFJob>
+  <Bandwidth Unit="Hz">10000</Bandwidth>
+  <Bandwidth Unit="Hz">12500</Bandwidth>
+  <Frequency Unit="Hz">10000000</Frequency>
+  <Frequency Unit="Hz">20000000</Frequency>
+  <FrequencyStart Unit="Hz">330000000</FrequencyStart>
+  <FrequencyStep Unit="Hz">12500</FrequencyStep>
+  <FrequencyStop Unit="Hz">440000000</FrequencyStop>
+</DFJob>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfjob",
+  "body": {
+    "df_job": {
+      "bandwidth": [
+        {
+          "unit": "Hz",
+          "#text": "10000"
+        },
+        {
+          "unit": "Hz",
+          "#text": "12500"
+        }
+      ],
+      "frequency": [
+        {
+          "unit": "Hz",
+          "#text": "10000000"
+        },
+        {
+          "unit": "Hz",
+          "#text": "20000000"
+        }
+      ],
+      "frequency_start": {
+        "unit": "Hz",
+        "#text": "330000000"
+      },
+      "frequency_step": {
+        "unit": "Hz",
+        "#text": "12500"
+      },
+      "frequency_stop": {
+        "unit": "Hz",
+        "#text": "440000000"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT01 Hopper (preclassifier output, TCP 9154, DRS->SDFC) ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "emitter_class": "Hopper",
+    "frequency_min": {
+      "unit": "Hz",
+      "#text": "55337500"
+    },
+    "frequency_max": {
+      "unit": "Hz",
+      "#text": "59262905"
+    },
+    "frequency_count": "58",
+    "frequency_list": "55350000,55625000,55700000",
+    "frequency_list_report": {
+      "frequency_report": [
+        {
+          "frequency": {
+            "unit": "Hz",
+            "#text": "55350000"
+          }
+        },
+        {
+          "frequency": {
+            "unit": "Hz",
+            "#text": "55625000"
+          }
+        }
+      ]
+    },
+    "bandwidth": {
+      "unit": "Hz",
+      "#text": "0"
+    },
+    "df_station_data": {
+      "df_station_name": "Simulation1",
+      "df_station_latitude": {
+        "unit": "deg",
+        "#text": "48.12790000"
+      },
+      "df_station_longitude": {
+        "unit": "deg",
+        "#text": "11.61290000"
+      },
+      "ddf-cl-id": "11",
+      "bearing_avg": {
+        "unit": "deg",
+        "#text": "85.7"
+      },
+      "quality": "94",
+      "channel_spacing": "78947",
+      "burst_duration": "22"
+    }
+  }
+}
+output_hex: 3c4446446174613e3c42616e64776964746820556e69743d22487a223e303c2f42616e6477696474683e3c444653746174696f6e446174613e3c42656172696e6741766720556e69743d22646567223e38352e373c2f42656172696e674176673e3c42757273744475726174696f6e3e32323c2f42757273744475726174696f6e3e3c4368616e6e656c53706163696e673e37383934373c2f4368616e6e656c53706163696e673e3c4444462d434c2d49443e31313c2f4444462d434c2d49443e3c444653746174696f6e4c6174697475646520556e69743d22646567223e34382e31323739303030303c2f444653746174696f6e4c617469747564653e3c444653746174696f6e4c6f6e67697475646520556e69743d22646567223e31312e36313239303030303c2f444653746174696f6e4c6f6e6769747564653e3c444653746174696f6e4e616d653e53696d756c6174696f6e313c2f444653746174696f6e4e616d653e3c5175616c6974793e39343c2f5175616c6974793e3c2f444653746174696f6e446174613e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c4672657175656e6379436f756e743e35383c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e35353335303030302c35353632353030302c35353730303030303c2f4672657175656e63794c6973743e3c4672657175656e63794c6973745265706f72743e3c4672657175656e63795265706f72743e3c4672657175656e637920556e69743d22487a223e35353335303030303c2f4672657175656e63793e3c2f4672657175656e63795265706f72743e3c4672657175656e63795265706f72743e3c4672657175656e637920556e69743d22487a223e35353632353030303c2f4672657175656e63793e3c2f4672657175656e63795265706f72743e3c2f4672657175656e63794c6973745265706f72743e3c4672657175656e63794d617820556e69743d22487a223e35393236323930353c2f4672657175656e63794d61783e3c4672657175656e63794d696e20556e69743d22487a223e35353333373530303c2f4672657175656e63794d696e3e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData>
+  <Bandwidth Unit="Hz">0</Bandwidth>
+  <DFStationData>
+    <BearingAvg Unit="deg">85.7</BearingAvg>
+    <BurstDuration>22</BurstDuration>
+    <ChannelSpacing>78947</ChannelSpacing>
+    <DDF-CL-ID>11</DDF-CL-ID>
+    <DFStationLatitude Unit="deg">48.12790000</DFStationLatitude>
+    <DFStationLongitude Unit="deg">11.61290000</DFStationLongitude>
+    <DFStationName>Simulation1</DFStationName>
+    <Quality>94</Quality>
+  </DFStationData>
+  <EmitterClass>Hopper</EmitterClass>
+  <FrequencyCount>58</FrequencyCount>
+  <FrequencyList>55350000,55625000,55700000</FrequencyList>
+  <FrequencyListReport>
+    <FrequencyReport>
+      <Frequency Unit="Hz">55350000</Frequency>
+    </FrequencyReport>
+    <FrequencyReport>
+      <Frequency Unit="Hz">55625000</Frequency>
+    </FrequencyReport>
+  </FrequencyListReport>
+  <FrequencyMax Unit="Hz">59262905</FrequencyMax>
+  <FrequencyMin Unit="Hz">55337500</FrequencyMin>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "bandwidth": {
+        "unit": "Hz",
+        "#text": "0"
+      },
+      "df_station_data": {
+        "bearing_avg": {
+          "unit": "deg",
+          "#text": "85.7"
+        },
+        "burst_duration": "22",
+        "channel_spacing": "78947",
+        "ddf-cl-id": "11",
+        "df_station_latitude": {
+          "unit": "deg",
+          "#text": "48.12790000"
+        },
+        "df_station_longitude": {
+          "unit": "deg",
+          "#text": "11.61290000"
+        },
+        "df_station_name": "Simulation1",
+        "quality": "94"
+      },
+      "emitter_class": "Hopper",
+      "frequency_count": "58",
+      "frequency_list": "55350000,55625000,55700000",
+      "frequency_list_report": {
+        "frequency_report": [
+          {
+            "frequency": {
+              "unit": "Hz",
+              "#text": "55350000"
+            }
+          },
+          {
+            "frequency": {
+              "unit": "Hz",
+              "#text": "55625000"
+            }
+          }
+        ]
+      },
+      "frequency_max": {
+        "unit": "Hz",
+        "#text": "59262905"
+      },
+      "frequency_min": {
+        "unit": "Hz",
+        "#text": "55337500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Static, ddf-cl-id as root attribute ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "16",
+    "emitter_class": "Static",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "59237500"
+    },
+    "quality": "94"
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223136223e3c456d6974746572436c6173733e5374617469633c2f456d6974746572436c6173733e3c5175616c6974793e39343c2f5175616c6974793e3c53746172744672657175656e637920556e69743d22487a223e35393233373530303c2f53746172744672657175656e63793e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="16">
+  <EmitterClass>Static</EmitterClass>
+  <Quality>94</Quality>
+  <StartFrequency Unit="Hz">59237500</StartFrequency>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "16",
+      "emitter_class": "Static",
+      "quality": "94",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "59237500"
+      }
+    }
+  }
+}
+
+=== Control request -- DfMode (set, id=42) ===
+input_json:
+{
+  "msg_kind": "request",
+  "msg_type": "set",
+  "id": 42,
+  "command": {
+    "name": "DfMode",
+    "param": {
+      "name": "eOperationMode",
+      "#text": "DFMODE_FFM"
+    }
+  }
+}
+output_hex: 00000000000000763c5265717565737420747970653d22736574222069643d223432223e3c436f6d6d616e64206e616d653d2244664d6f6465223e3c506172616d206e616d653d22654f7065726174696f6e4d6f6465223e44464d4f44455f46464d3c2f506172616d3e3c2f436f6d6d616e643e3c2f526571756573743e00000000
+envelope  : magic_start=00000000  length_field=118  magic_end=00000000  (actual XML bytes: 118)
+output_xml:
+<?xml version="1.0" ?>
+<Request type="set" id="42">
+  <Command name="DfMode">
+    <Param name="eOperationMode">DFMODE_FFM</Param>
+  </Command>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "set",
+      "id": "42",
+      "command": {
+        "name": "DfMode",
+        "param": {
+          "name": "eOperationMode",
+          "#text": "DFMODE_FFM"
+        }
+      }
+    }
+  }
+}
+
+=== Control reply -- MeasureSettingsFFM (get, id=123, 19 Params, Remote_commands.html §1.2.2) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 123,
+  "command": {
+    "name": "MeasureSettingsFFM",
+    "param": [
+      {
+        "name": "iFrequency",
+        "#text": "1000000000"
+      },
+      {
+        "name": "eAvgMode",
+        "#text": "DFSQU_GATE"
+      },
+      {
+        "name": "eDfPanStep",
+        "#text": "DFPAN_STEP_20KHZ"
+      },
+      {
+        "name": "eBlockAveragingSelect",
+        "#text": "BLOCK_AVERAGING_SELECT_TIME"
+      },
+      {
+        "name": "iBlockAveragingCycles",
+        "#text": "200"
+      },
+      {
+        "name": "iBlockAveragingTime",
+        "#text": "200"
+      },
+      {
+        "name": "iThreshold",
+        "#text": "11"
+      },
+      {
+        "name": "eAntPol",
+        "#text": "POL_VERTICAL"
+      },
+      {
+        "name": "eAntPreAmp",
+        "#text": "STATE_OFF"
+      },
+      {
+        "name": "eDfAlt",
+        "#text": "DFALT_AUTO"
+      },
+      {
+        "name": "eSpan",
+        "#text": "IFPAN_FREQ_RANGE_500"
+      },
+      {
+        "name": "eWindowType",
+        "#text": "DF_WINDOW_TYPE_BLACKMAN_HARRIS"
+      },
+      {
+        "name": "eDfPanSelectivity",
+        "#text": "DFPAN_SELECTIVITY_NORMAL"
+      },
+      {
+        "name": "eAttSelect",
+        "#text": "ATT_MANUAL"
+      },
+      {
+        "name": "iAttValue",
+        "#text": "0"
+      },
+      {
+        "name": "iAttHoldTime",
+        "#text": "10"
+      },
+      {
+        "name": "eIFPanStep",
+        "#text": "IFPAN_STEP_1KHZ"
+      },
+      {
+        "name": "eIFPanSelectivity",
+        "#text": "IFPAN_SELECTIVITY_NORMAL"
+      },
+      {
+        "name": "eIFPanMode",
+        "#text": "IFPAN_MODE_AVERAGE"
+      },
+      {
+        "name": "iSrEmitterEstimation",
+        "#text": "0"
+      }
+    ]
+  }
+}
+output_hex: 00000000000004063c5265706c7920747970653d22676574222069643d22313233223e3c436f6d6d616e64206e616d653d224d65617375726553657474696e677346464d223e3c506172616d206e616d653d22694672657175656e6379223e313030303030303030303c2f506172616d3e3c506172616d206e616d653d22654176674d6f6465223e44465351555f474154453c2f506172616d3e3c506172616d206e616d653d2265446650616e53746570223e444650414e5f535445505f32304b485a3c2f506172616d3e3c506172616d206e616d653d2265426c6f636b417665726167696e6753656c656374223e424c4f434b5f415645524147494e475f53454c4543545f54494d453c2f506172616d3e3c506172616d206e616d653d2269426c6f636b417665726167696e674379636c6573223e3230303c2f506172616d3e3c506172616d206e616d653d2269426c6f636b417665726167696e6754696d65223e3230303c2f506172616d3e3c506172616d206e616d653d22695468726573686f6c64223e31313c2f506172616d3e3c506172616d206e616d653d2265416e74506f6c223e504f4c5f564552544943414c3c2f506172616d3e3c506172616d206e616d653d2265416e74507265416d70223e53544154455f4f46463c2f506172616d3e3c506172616d206e616d653d22654466416c74223e4446414c545f4155544f3c2f506172616d3e3c506172616d206e616d653d22655370616e223e494650414e5f465245515f52414e47455f3530303c2f506172616d3e3c506172616d206e616d653d226557696e646f7754797065223e44465f57494e444f575f545950455f424c41434b4d414e5f4841525249533c2f506172616d3e3c506172616d206e616d653d2265446650616e53656c6563746976697479223e444650414e5f53454c45435449564954595f4e4f524d414c3c2f506172616d3e3c506172616d206e616d653d226541747453656c656374223e4154545f4d414e55414c3c2f506172616d3e3c506172616d206e616d653d226941747456616c7565223e303c2f506172616d3e3c506172616d206e616d653d2269417474486f6c6454696d65223e31303c2f506172616d3e3c506172616d206e616d653d2265494650616e53746570223e494650414e5f535445505f314b485a3c2f506172616d3e3c506172616d206e616d653d2265494650616e53656c6563746976697479223e494650414e5f53454c45435449564954595f4e4f524d414c3c2f506172616d3e3c506172616d206e616d653d2265494650616e4d6f6465223e494650414e5f4d4f44455f415645524147453c2f506172616d3e3c506172616d206e616d653d22695372456d6974746572457374696d6174696f6e223e303c2f506172616d3e3c2f436f6d6d616e643e3c2f5265706c793e00000000
+envelope  : magic_start=00000000  length_field=1030  magic_end=00000000  (actual XML bytes: 1030)
+output_xml:
+<?xml version="1.0" ?>
+<Reply type="get" id="123">
+  <Command name="MeasureSettingsFFM">
+    <Param name="iFrequency">1000000000</Param>
+    <Param name="eAvgMode">DFSQU_GATE</Param>
+    <Param name="eDfPanStep">DFPAN_STEP_20KHZ</Param>
+    <Param name="eBlockAveragingSelect">BLOCK_AVERAGING_SELECT_TIME</Param>
+    <Param name="iBlockAveragingCycles">200</Param>
+    <Param name="iBlockAveragingTime">200</Param>
+    <Param name="iThreshold">11</Param>
+    <Param name="eAntPol">POL_VERTICAL</Param>
+    <Param name="eAntPreAmp">STATE_OFF</Param>
+    <Param name="eDfAlt">DFALT_AUTO</Param>
+    <Param name="eSpan">IFPAN_FREQ_RANGE_500</Param>
+    <Param name="eWindowType">DF_WINDOW_TYPE_BLACKMAN_HARRIS</Param>
+    <Param name="eDfPanSelectivity">DFPAN_SELECTIVITY_NORMAL</Param>
+    <Param name="eAttSelect">ATT_MANUAL</Param>
+    <Param name="iAttValue">0</Param>
+    <Param name="iAttHoldTime">10</Param>
+    <Param name="eIFPanStep">IFPAN_STEP_1KHZ</Param>
+    <Param name="eIFPanSelectivity">IFPAN_SELECTIVITY_NORMAL</Param>
+    <Param name="eIFPanMode">IFPAN_MODE_AVERAGE</Param>
+    <Param name="iSrEmitterEstimation">0</Param>
+  </Command>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "123",
+      "command": {
+        "name": "MeasureSettingsFFM",
+        "param": [
+          {
+            "name": "iFrequency",
+            "#text": "1000000000"
+          },
+          {
+            "name": "eAvgMode",
+            "#text": "DFSQU_GATE"
+          },
+          {
+            "name": "eDfPanStep",
+            "#text": "DFPAN_STEP_20KHZ"
+          },
+          {
+            "name": "eBlockAveragingSelect",
+            "#text": "BLOCK_AVERAGING_SELECT_TIME"
+          },
+          {
+            "name": "iBlockAveragingCycles",
+            "#text": "200"
+          },
+          {
+            "name": "iBlockAveragingTime",
+            "#text": "200"
+          },
+          {
+            "name": "iThreshold",
+            "#text": "11"
+          },
+          {
+            "name": "eAntPol",
+            "#text": "POL_VERTICAL"
+          },
+          {
+            "name": "eAntPreAmp",
+            "#text": "STATE_OFF"
+          },
+          {
+            "name": "eDfAlt",
+            "#text": "DFALT_AUTO"
+          },
+          {
+            "name": "eSpan",
+            "#text": "IFPAN_FREQ_RANGE_500"
+          },
+          {
+            "name": "eWindowType",
+            "#text": "DF_WINDOW_TYPE_BLACKMAN_HARRIS"
+          },
+          {
+            "name": "eDfPanSelectivity",
+            "#text": "DFPAN_SELECTIVITY_NORMAL"
+          },
+          {
+            "name": "eAttSelect",
+            "#text": "ATT_MANUAL"
+          },
+          {
+            "name": "iAttValue",
+            "#text": "0"
+          },
+          {
+            "name": "iAttHoldTime",
+            "#text": "10"
+          },
+          {
+            "name": "eIFPanStep",
+            "#text": "IFPAN_STEP_1KHZ"
+          },
+          {
+            "name": "eIFPanSelectivity",
+            "#text": "IFPAN_SELECTIVITY_NORMAL"
+          },
+          {
+            "name": "eIFPanMode",
+            "#text": "IFPAN_MODE_AVERAGE"
+          },
+          {
+            "name": "iSrEmitterEstimation",
+            "#text": "0"
+          }
+        ]
+      }
+    }
+  }
+}
+
+=== Control reply -- Temperature (get, id=123, nested Array/Struct, §1.4.10) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 123,
+  "command": {
+    "name": "Temperature",
+    "param": {
+      "name": "zModuleName",
+      "#text": "ALL"
+    },
+    "array": {
+      "name": "asTempTestPoint",
+      "struct": {
+        "name": "sTempTestPoint",
+        "param": [
+          {
+            "name": "zModule",
+            "#text": "P1"
+          },
+          {
+            "name": "zSensor",
+            "#text": "TEMP_FPGA"
+          },
+          {
+            "name": "iValue",
+            "#text": "57"
+          }
+        ]
+      }
+    }
+  }
+}
+output_hex: 00000000000001213c5265706c7920747970653d22676574222069643d22313233223e3c436f6d6d616e64206e616d653d2254656d7065726174757265223e3c506172616d206e616d653d227a4d6f64756c654e616d65223e414c4c3c2f506172616d3e3c4172726179206e616d653d22617354656d7054657374506f696e74223e3c537472756374206e616d653d227354656d7054657374506f696e74223e3c506172616d206e616d653d227a4d6f64756c65223e50313c2f506172616d3e3c506172616d206e616d653d227a53656e736f72223e54454d505f465047413c2f506172616d3e3c506172616d206e616d653d226956616c7565223e35373c2f506172616d3e3c2f5374727563743e3c2f41727261793e3c2f436f6d6d616e643e3c2f5265706c793e00000000
+envelope  : magic_start=00000000  length_field=289  magic_end=00000000  (actual XML bytes: 289)
+output_xml:
+<?xml version="1.0" ?>
+<Reply type="get" id="123">
+  <Command name="Temperature">
+    <Param name="zModuleName">ALL</Param>
+    <Array name="asTempTestPoint">
+      <Struct name="sTempTestPoint">
+        <Param name="zModule">P1</Param>
+        <Param name="zSensor">TEMP_FPGA</Param>
+        <Param name="iValue">57</Param>
+      </Struct>
+    </Array>
+  </Command>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "123",
+      "command": {
+        "name": "Temperature",
+        "param": {
+          "name": "zModuleName",
+          "#text": "ALL"
+        },
+        "array": {
+          "name": "asTempTestPoint",
+          "struct": {
+            "name": "sTempTestPoint",
+            "param": [
+              {
+                "name": "zModule",
+                "#text": "P1"
+              },
+              {
+                "name": "zSensor",
+                "#text": "TEMP_FPGA"
+              },
+              {
+                "name": "iValue",
+                "#text": "57"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Preclassifier request -- AnalysisIntervalMs (set, id=10) ===
+input_json:
+{
+  "msg_kind": "request",
+  "msg_type": "set",
+  "id": 10,
+  "channel": "preclassifier",
+  "command": {
+    "name": "AnalysisIntervalMs",
+    "#text": "50000"
+  }
+}
+output_hex: 00000000000000623c444446434c526571756573742069643d2231302220747970653d22736574223e3c436f6d6d616e64206e616d653d22416e616c79736973496e74657276616c4d73223e35303030303c2f436f6d6d616e643e3c2f444446434c526571756573743e00000000
+envelope  : magic_start=00000000  length_field=98  magic_end=00000000  (actual XML bytes: 98)
+output_xml:
+<?xml version="1.0" ?>
+<DDFCLRequest id="10" type="set">
+  <Command name="AnalysisIntervalMs">50000</Command>
+</DDFCLRequest>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier",
+  "msg_kind": "request",
+  "body": {
+    "ddfcl_request": {
+      "id": "10",
+      "type": "set",
+      "command": {
+        "name": "AnalysisIntervalMs",
+        "#text": "50000"
+      }
+    }
+  }
+}
+
+=== Preclassifier reply -- DDFCL error (invalid command name, Table 6-5) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 2,
+  "channel": "preclassifier",
+  "command": {
+    "name": "Bogus",
+    "return_code": "2",
+    "return_message": "Invalid command name"
+  }
+}
+output_hex: 00000000000000763c444446434c5265706c792069643d22322220747970653d22676574223e3c436f6d6d616e64206e616d653d22426f677573222072657475726e436f64653d2232222072657475726e4d6573736167653d22496e76616c696420636f6d6d616e64206e616d65222f3e3c2f444446434c5265706c793e00000000
+envelope  : magic_start=00000000  length_field=118  magic_end=00000000  (actual XML bytes: 118)
+output_xml:
+<?xml version="1.0" ?>
+<DDFCLReply id="2" type="get">
+  <Command name="Bogus" returnCode="2" returnMessage="Invalid command name"/>
+</DDFCLReply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier",
+  "msg_kind": "reply",
+  "body": {
+    "ddfcl_reply": {
+      "id": "2",
+      "type": "get",
+      "command": {
+        "name": "Bogus",
+        "return_code": "2",
+        "return_message": "Invalid command name"
+      }
+    }
+  }
+}
+
+=== DFJob (preclassifier output, TCP 9154, DRS->SDFC) ===
+input_json:
+{
+  "msg_kind": "dfjob",
+  "df_job": {
+    "frequency": [
+      {
+        "unit": "Hz",
+        "#text": "10000000"
+      },
+      {
+        "unit": "Hz",
+        "#text": "20000000"
+      }
+    ],
+    "bandwidth": [
+      {
+        "unit": "Hz",
+        "#text": "10000"
+      },
+      {
+        "unit": "Hz",
+        "#text": "12500"
+      }
+    ],
+    "frequency_start": {
+      "unit": "Hz",
+      "#text": "330000000"
+    },
+    "frequency_stop": {
+      "unit": "Hz",
+      "#text": "440000000"
+    },
+    "frequency_step": {
+      "unit": "Hz",
+      "#text": "12500"
+    }
+  }
+}
+output_hex: 3c44464a6f623e3c42616e64776964746820556e69743d22487a223e31303030303c2f42616e6477696474683e3c42616e64776964746820556e69743d22487a223e31323530303c2f42616e6477696474683e3c4672657175656e637920556e69743d22487a223e31303030303030303c2f4672657175656e63793e3c4672657175656e637920556e69743d22487a223e32303030303030303c2f4672657175656e63793e3c4672657175656e6379537461727420556e69743d22487a223e3333303030303030303c2f4672657175656e637953746172743e3c4672657175656e63795374657020556e69743d22487a223e31323530303c2f4672657175656e6379537465703e3c4672657175656e637953746f7020556e69743d22487a223e3434303030303030303c2f4672657175656e637953746f703e3c2f44464a6f623e
+output_xml:
+<?xml version="1.0" ?>
+<DFJob>
+  <Bandwidth Unit="Hz">10000</Bandwidth>
+  <Bandwidth Unit="Hz">12500</Bandwidth>
+  <Frequency Unit="Hz">10000000</Frequency>
+  <Frequency Unit="Hz">20000000</Frequency>
+  <FrequencyStart Unit="Hz">330000000</FrequencyStart>
+  <FrequencyStep Unit="Hz">12500</FrequencyStep>
+  <FrequencyStop Unit="Hz">440000000</FrequencyStop>
+</DFJob>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfjob",
+  "body": {
+    "df_job": {
+      "bandwidth": [
+        {
+          "unit": "Hz",
+          "#text": "10000"
+        },
+        {
+          "unit": "Hz",
+          "#text": "12500"
+        }
+      ],
+      "frequency": [
+        {
+          "unit": "Hz",
+          "#text": "10000000"
+        },
+        {
+          "unit": "Hz",
+          "#text": "20000000"
+        }
+      ],
+      "frequency_start": {
+        "unit": "Hz",
+        "#text": "330000000"
+      },
+      "frequency_step": {
+        "unit": "Hz",
+        "#text": "12500"
+      },
+      "frequency_stop": {
+        "unit": "Hz",
+        "#text": "440000000"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT01 Hopper (preclassifier output, TCP 9154, DRS->SDFC) ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "emitter_class": "Hopper",
+    "frequency_min": {
+      "unit": "Hz",
+      "#text": "55337500"
+    },
+    "frequency_max": {
+      "unit": "Hz",
+      "#text": "59262905"
+    },
+    "frequency_count": "58",
+    "frequency_list": "55350000,55625000,55700000",
+    "frequency_list_report": {
+      "frequency_report": [
+        {
+          "frequency": {
+            "unit": "Hz",
+            "#text": "55350000"
+          }
+        },
+        {
+          "frequency": {
+            "unit": "Hz",
+            "#text": "55625000"
+          }
+        }
+      ]
+    },
+    "bandwidth": {
+      "unit": "Hz",
+      "#text": "0"
+    },
+    "df_station_data": {
+      "df_station_name": "Simulation1",
+      "df_station_latitude": {
+        "unit": "deg",
+        "#text": "48.12790000"
+      },
+      "df_station_longitude": {
+        "unit": "deg",
+        "#text": "11.61290000"
+      },
+      "ddf-cl-id": "11",
+      "bearing_avg": {
+        "unit": "deg",
+        "#text": "85.7"
+      },
+      "quality": "94",
+      "channel_spacing": "78947",
+      "burst_duration": "22"
+    }
+  }
+}
+output_hex: 3c4446446174613e3c42616e64776964746820556e69743d22487a223e303c2f42616e6477696474683e3c444653746174696f6e446174613e3c42656172696e6741766720556e69743d22646567223e38352e373c2f42656172696e674176673e3c42757273744475726174696f6e3e32323c2f42757273744475726174696f6e3e3c4368616e6e656c53706163696e673e37383934373c2f4368616e6e656c53706163696e673e3c4444462d434c2d49443e31313c2f4444462d434c2d49443e3c444653746174696f6e4c6174697475646520556e69743d22646567223e34382e31323739303030303c2f444653746174696f6e4c617469747564653e3c444653746174696f6e4c6f6e67697475646520556e69743d22646567223e31312e36313239303030303c2f444653746174696f6e4c6f6e6769747564653e3c444653746174696f6e4e616d653e53696d756c6174696f6e313c2f444653746174696f6e4e616d653e3c5175616c6974793e39343c2f5175616c6974793e3c2f444653746174696f6e446174613e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c4672657175656e6379436f756e743e35383c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e35353335303030302c35353632353030302c35353730303030303c2f4672657175656e63794c6973743e3c4672657175656e63794c6973745265706f72743e3c4672657175656e63795265706f72743e3c4672657175656e637920556e69743d22487a223e35353335303030303c2f4672657175656e63793e3c2f4672657175656e63795265706f72743e3c4672657175656e63795265706f72743e3c4672657175656e637920556e69743d22487a223e35353632353030303c2f4672657175656e63793e3c2f4672657175656e63795265706f72743e3c2f4672657175656e63794c6973745265706f72743e3c4672657175656e63794d617820556e69743d22487a223e35393236323930353c2f4672657175656e63794d61783e3c4672657175656e63794d696e20556e69743d22487a223e35353333373530303c2f4672657175656e63794d696e3e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData>
+  <Bandwidth Unit="Hz">0</Bandwidth>
+  <DFStationData>
+    <BearingAvg Unit="deg">85.7</BearingAvg>
+    <BurstDuration>22</BurstDuration>
+    <ChannelSpacing>78947</ChannelSpacing>
+    <DDF-CL-ID>11</DDF-CL-ID>
+    <DFStationLatitude Unit="deg">48.12790000</DFStationLatitude>
+    <DFStationLongitude Unit="deg">11.61290000</DFStationLongitude>
+    <DFStationName>Simulation1</DFStationName>
+    <Quality>94</Quality>
+  </DFStationData>
+  <EmitterClass>Hopper</EmitterClass>
+  <FrequencyCount>58</FrequencyCount>
+  <FrequencyList>55350000,55625000,55700000</FrequencyList>
+  <FrequencyListReport>
+    <FrequencyReport>
+      <Frequency Unit="Hz">55350000</Frequency>
+    </FrequencyReport>
+    <FrequencyReport>
+      <Frequency Unit="Hz">55625000</Frequency>
+    </FrequencyReport>
+  </FrequencyListReport>
+  <FrequencyMax Unit="Hz">59262905</FrequencyMax>
+  <FrequencyMin Unit="Hz">55337500</FrequencyMin>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "bandwidth": {
+        "unit": "Hz",
+        "#text": "0"
+      },
+      "df_station_data": {
+        "bearing_avg": {
+          "unit": "deg",
+          "#text": "85.7"
+        },
+        "burst_duration": "22",
+        "channel_spacing": "78947",
+        "ddf-cl-id": "11",
+        "df_station_latitude": {
+          "unit": "deg",
+          "#text": "48.12790000"
+        },
+        "df_station_longitude": {
+          "unit": "deg",
+          "#text": "11.61290000"
+        },
+        "df_station_name": "Simulation1",
+        "quality": "94"
+      },
+      "emitter_class": "Hopper",
+      "frequency_count": "58",
+      "frequency_list": "55350000,55625000,55700000",
+      "frequency_list_report": {
+        "frequency_report": [
+          {
+            "frequency": {
+              "unit": "Hz",
+              "#text": "55350000"
+            }
+          },
+          {
+            "frequency": {
+              "unit": "Hz",
+              "#text": "55625000"
+            }
+          }
+        ]
+      },
+      "frequency_max": {
+        "unit": "Hz",
+        "#text": "59262905"
+      },
+      "frequency_min": {
+        "unit": "Hz",
+        "#text": "55337500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Static, ddf-cl-id as root attribute ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "16",
+    "emitter_class": "Static",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "59237500"
+    },
+    "quality": "94"
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223136223e3c456d6974746572436c6173733e5374617469633c2f456d6974746572436c6173733e3c5175616c6974793e39343c2f5175616c6974793e3c53746172744672657175656e637920556e69743d22487a223e35393233373530303c2f53746172744672657175656e63793e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="16">
+  <EmitterClass>Static</EmitterClass>
+  <Quality>94</Quality>
+  <StartFrequency Unit="Hz">59237500</StartFrequency>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "16",
+      "emitter_class": "Static",
+      "quality": "94",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "59237500"
+      }
+    }
+  }
+}
+
+=== Control request -- DfMode (set, id=42) ===
+input_json:
+{
+  "msg_kind": "request",
+  "msg_type": "set",
+  "id": 42,
+  "command": {
+    "name": "DfMode",
+    "param": {
+      "name": "eOperationMode",
+      "#text": "DFMODE_FFM"
+    }
+  }
+}
+output_hex: 00000000000000763c5265717565737420747970653d22736574222069643d223432223e3c436f6d6d616e64206e616d653d2244664d6f6465223e3c506172616d206e616d653d22654f7065726174696f6e4d6f6465223e44464d4f44455f46464d3c2f506172616d3e3c2f436f6d6d616e643e3c2f526571756573743e00000000
+envelope  : magic_start=00000000  length_field=118  magic_end=00000000  (actual XML bytes: 118)
+output_xml:
+<?xml version="1.0" ?>
+<Request type="set" id="42">
+  <Command name="DfMode">
+    <Param name="eOperationMode">DFMODE_FFM</Param>
+  </Command>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "set",
+      "id": "42",
+      "command": {
+        "name": "DfMode",
+        "param": {
+          "name": "eOperationMode",
+          "#text": "DFMODE_FFM"
+        }
+      }
+    }
+  }
+}
+
+=== Control reply -- MeasureSettingsFFM (get, id=123, 19 Params, Remote_commands.html §1.2.2) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 123,
+  "command": {
+    "name": "MeasureSettingsFFM",
+    "param": [
+      {
+        "name": "iFrequency",
+        "#text": "1000000000"
+      },
+      {
+        "name": "eAvgMode",
+        "#text": "DFSQU_GATE"
+      },
+      {
+        "name": "eDfPanStep",
+        "#text": "DFPAN_STEP_20KHZ"
+      },
+      {
+        "name": "eBlockAveragingSelect",
+        "#text": "BLOCK_AVERAGING_SELECT_TIME"
+      },
+      {
+        "name": "iBlockAveragingCycles",
+        "#text": "200"
+      },
+      {
+        "name": "iBlockAveragingTime",
+        "#text": "200"
+      },
+      {
+        "name": "iThreshold",
+        "#text": "11"
+      },
+      {
+        "name": "eAntPol",
+        "#text": "POL_VERTICAL"
+      },
+      {
+        "name": "eAntPreAmp",
+        "#text": "STATE_OFF"
+      },
+      {
+        "name": "eDfAlt",
+        "#text": "DFALT_AUTO"
+      },
+      {
+        "name": "eSpan",
+        "#text": "IFPAN_FREQ_RANGE_500"
+      },
+      {
+        "name": "eWindowType",
+        "#text": "DF_WINDOW_TYPE_BLACKMAN_HARRIS"
+      },
+      {
+        "name": "eDfPanSelectivity",
+        "#text": "DFPAN_SELECTIVITY_NORMAL"
+      },
+      {
+        "name": "eAttSelect",
+        "#text": "ATT_MANUAL"
+      },
+      {
+        "name": "iAttValue",
+        "#text": "0"
+      },
+      {
+        "name": "iAttHoldTime",
+        "#text": "10"
+      },
+      {
+        "name": "eIFPanStep",
+        "#text": "IFPAN_STEP_1KHZ"
+      },
+      {
+        "name": "eIFPanSelectivity",
+        "#text": "IFPAN_SELECTIVITY_NORMAL"
+      },
+      {
+        "name": "eIFPanMode",
+        "#text": "IFPAN_MODE_AVERAGE"
+      },
+      {
+        "name": "iSrEmitterEstimation",
+        "#text": "0"
+      }
+    ]
+  }
+}
+output_hex: 00000000000004063c5265706c7920747970653d22676574222069643d22313233223e3c436f6d6d616e64206e616d653d224d65617375726553657474696e677346464d223e3c506172616d206e616d653d22694672657175656e6379223e313030303030303030303c2f506172616d3e3c506172616d206e616d653d22654176674d6f6465223e44465351555f474154453c2f506172616d3e3c506172616d206e616d653d2265446650616e53746570223e444650414e5f535445505f32304b485a3c2f506172616d3e3c506172616d206e616d653d2265426c6f636b417665726167696e6753656c656374223e424c4f434b5f415645524147494e475f53454c4543545f54494d453c2f506172616d3e3c506172616d206e616d653d2269426c6f636b417665726167696e674379636c6573223e3230303c2f506172616d3e3c506172616d206e616d653d2269426c6f636b417665726167696e6754696d65223e3230303c2f506172616d3e3c506172616d206e616d653d22695468726573686f6c64223e31313c2f506172616d3e3c506172616d206e616d653d2265416e74506f6c223e504f4c5f564552544943414c3c2f506172616d3e3c506172616d206e616d653d2265416e74507265416d70223e53544154455f4f46463c2f506172616d3e3c506172616d206e616d653d22654466416c74223e4446414c545f4155544f3c2f506172616d3e3c506172616d206e616d653d22655370616e223e494650414e5f465245515f52414e47455f3530303c2f506172616d3e3c506172616d206e616d653d226557696e646f7754797065223e44465f57494e444f575f545950455f424c41434b4d414e5f4841525249533c2f506172616d3e3c506172616d206e616d653d2265446650616e53656c6563746976697479223e444650414e5f53454c45435449564954595f4e4f524d414c3c2f506172616d3e3c506172616d206e616d653d226541747453656c656374223e4154545f4d414e55414c3c2f506172616d3e3c506172616d206e616d653d226941747456616c7565223e303c2f506172616d3e3c506172616d206e616d653d2269417474486f6c6454696d65223e31303c2f506172616d3e3c506172616d206e616d653d2265494650616e53746570223e494650414e5f535445505f314b485a3c2f506172616d3e3c506172616d206e616d653d2265494650616e53656c6563746976697479223e494650414e5f53454c45435449564954595f4e4f524d414c3c2f506172616d3e3c506172616d206e616d653d2265494650616e4d6f6465223e494650414e5f4d4f44455f415645524147453c2f506172616d3e3c506172616d206e616d653d22695372456d6974746572457374696d6174696f6e223e303c2f506172616d3e3c2f436f6d6d616e643e3c2f5265706c793e00000000
+envelope  : magic_start=00000000  length_field=1030  magic_end=00000000  (actual XML bytes: 1030)
+output_xml:
+<?xml version="1.0" ?>
+<Reply type="get" id="123">
+  <Command name="MeasureSettingsFFM">
+    <Param name="iFrequency">1000000000</Param>
+    <Param name="eAvgMode">DFSQU_GATE</Param>
+    <Param name="eDfPanStep">DFPAN_STEP_20KHZ</Param>
+    <Param name="eBlockAveragingSelect">BLOCK_AVERAGING_SELECT_TIME</Param>
+    <Param name="iBlockAveragingCycles">200</Param>
+    <Param name="iBlockAveragingTime">200</Param>
+    <Param name="iThreshold">11</Param>
+    <Param name="eAntPol">POL_VERTICAL</Param>
+    <Param name="eAntPreAmp">STATE_OFF</Param>
+    <Param name="eDfAlt">DFALT_AUTO</Param>
+    <Param name="eSpan">IFPAN_FREQ_RANGE_500</Param>
+    <Param name="eWindowType">DF_WINDOW_TYPE_BLACKMAN_HARRIS</Param>
+    <Param name="eDfPanSelectivity">DFPAN_SELECTIVITY_NORMAL</Param>
+    <Param name="eAttSelect">ATT_MANUAL</Param>
+    <Param name="iAttValue">0</Param>
+    <Param name="iAttHoldTime">10</Param>
+    <Param name="eIFPanStep">IFPAN_STEP_1KHZ</Param>
+    <Param name="eIFPanSelectivity">IFPAN_SELECTIVITY_NORMAL</Param>
+    <Param name="eIFPanMode">IFPAN_MODE_AVERAGE</Param>
+    <Param name="iSrEmitterEstimation">0</Param>
+  </Command>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "123",
+      "command": {
+        "name": "MeasureSettingsFFM",
+        "param": [
+          {
+            "name": "iFrequency",
+            "#text": "1000000000"
+          },
+          {
+            "name": "eAvgMode",
+            "#text": "DFSQU_GATE"
+          },
+          {
+            "name": "eDfPanStep",
+            "#text": "DFPAN_STEP_20KHZ"
+          },
+          {
+            "name": "eBlockAveragingSelect",
+            "#text": "BLOCK_AVERAGING_SELECT_TIME"
+          },
+          {
+            "name": "iBlockAveragingCycles",
+            "#text": "200"
+          },
+          {
+            "name": "iBlockAveragingTime",
+            "#text": "200"
+          },
+          {
+            "name": "iThreshold",
+            "#text": "11"
+          },
+          {
+            "name": "eAntPol",
+            "#text": "POL_VERTICAL"
+          },
+          {
+            "name": "eAntPreAmp",
+            "#text": "STATE_OFF"
+          },
+          {
+            "name": "eDfAlt",
+            "#text": "DFALT_AUTO"
+          },
+          {
+            "name": "eSpan",
+            "#text": "IFPAN_FREQ_RANGE_500"
+          },
+          {
+            "name": "eWindowType",
+            "#text": "DF_WINDOW_TYPE_BLACKMAN_HARRIS"
+          },
+          {
+            "name": "eDfPanSelectivity",
+            "#text": "DFPAN_SELECTIVITY_NORMAL"
+          },
+          {
+            "name": "eAttSelect",
+            "#text": "ATT_MANUAL"
+          },
+          {
+            "name": "iAttValue",
+            "#text": "0"
+          },
+          {
+            "name": "iAttHoldTime",
+            "#text": "10"
+          },
+          {
+            "name": "eIFPanStep",
+            "#text": "IFPAN_STEP_1KHZ"
+          },
+          {
+            "name": "eIFPanSelectivity",
+            "#text": "IFPAN_SELECTIVITY_NORMAL"
+          },
+          {
+            "name": "eIFPanMode",
+            "#text": "IFPAN_MODE_AVERAGE"
+          },
+          {
+            "name": "iSrEmitterEstimation",
+            "#text": "0"
+          }
+        ]
+      }
+    }
+  }
+}
+
+=== Control reply -- Temperature (get, id=123, nested Array/Struct, §1.4.10) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 123,
+  "command": {
+    "name": "Temperature",
+    "param": {
+      "name": "zModuleName",
+      "#text": "ALL"
+    },
+    "array": {
+      "name": "asTempTestPoint",
+      "struct": {
+        "name": "sTempTestPoint",
+        "param": [
+          {
+            "name": "zModule",
+            "#text": "P1"
+          },
+          {
+            "name": "zSensor",
+            "#text": "TEMP_FPGA"
+          },
+          {
+            "name": "iValue",
+            "#text": "57"
+          }
+        ]
+      }
+    }
+  }
+}
+output_hex: 00000000000001213c5265706c7920747970653d22676574222069643d22313233223e3c436f6d6d616e64206e616d653d2254656d7065726174757265223e3c506172616d206e616d653d227a4d6f64756c654e616d65223e414c4c3c2f506172616d3e3c4172726179206e616d653d22617354656d7054657374506f696e74223e3c537472756374206e616d653d227354656d7054657374506f696e74223e3c506172616d206e616d653d227a4d6f64756c65223e50313c2f506172616d3e3c506172616d206e616d653d227a53656e736f72223e54454d505f465047413c2f506172616d3e3c506172616d206e616d653d226956616c7565223e35373c2f506172616d3e3c2f5374727563743e3c2f41727261793e3c2f436f6d6d616e643e3c2f5265706c793e00000000
+envelope  : magic_start=00000000  length_field=289  magic_end=00000000  (actual XML bytes: 289)
+output_xml:
+<?xml version="1.0" ?>
+<Reply type="get" id="123">
+  <Command name="Temperature">
+    <Param name="zModuleName">ALL</Param>
+    <Array name="asTempTestPoint">
+      <Struct name="sTempTestPoint">
+        <Param name="zModule">P1</Param>
+        <Param name="zSensor">TEMP_FPGA</Param>
+        <Param name="iValue">57</Param>
+      </Struct>
+    </Array>
+  </Command>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "control",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "123",
+      "command": {
+        "name": "Temperature",
+        "param": {
+          "name": "zModuleName",
+          "#text": "ALL"
+        },
+        "array": {
+          "name": "asTempTestPoint",
+          "struct": {
+            "name": "sTempTestPoint",
+            "param": [
+              {
+                "name": "zModule",
+                "#text": "P1"
+              },
+              {
+                "name": "zSensor",
+                "#text": "TEMP_FPGA"
+              },
+              {
+                "name": "iValue",
+                "#text": "57"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Preclassifier request -- AnalysisIntervalMs (set, id=10) ===
+input_json:
+{
+  "msg_kind": "request",
+  "msg_type": "set",
+  "id": 10,
+  "channel": "preclassifier",
+  "command": {
+    "name": "AnalysisIntervalMs",
+    "#text": "50000"
+  }
+}
+output_hex: 00000000000000623c444446434c526571756573742069643d2231302220747970653d22736574223e3c436f6d6d616e64206e616d653d22416e616c79736973496e74657276616c4d73223e35303030303c2f436f6d6d616e643e3c2f444446434c526571756573743e00000000
+envelope  : magic_start=00000000  length_field=98  magic_end=00000000  (actual XML bytes: 98)
+output_xml:
+<?xml version="1.0" ?>
+<DDFCLRequest id="10" type="set">
+  <Command name="AnalysisIntervalMs">50000</Command>
+</DDFCLRequest>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier",
+  "msg_kind": "request",
+  "body": {
+    "ddfcl_request": {
+      "id": "10",
+      "type": "set",
+      "command": {
+        "name": "AnalysisIntervalMs",
+        "#text": "50000"
+      }
+    }
+  }
+}
+
+=== Preclassifier reply -- DDFCL error (invalid command name, Table 6-5) ===
+input_json:
+{
+  "msg_kind": "reply",
+  "msg_type": "get",
+  "id": 2,
+  "channel": "preclassifier",
+  "command": {
+    "name": "Bogus",
+    "return_code": "2",
+    "return_message": "Invalid command name"
+  }
+}
+output_hex: 00000000000000763c444446434c5265706c792069643d22322220747970653d22676574223e3c436f6d6d616e64206e616d653d22426f677573222072657475726e436f64653d2232222072657475726e4d6573736167653d22496e76616c696420636f6d6d616e64206e616d65222f3e3c2f444446434c5265706c793e00000000
+envelope  : magic_start=00000000  length_field=118  magic_end=00000000  (actual XML bytes: 118)
+output_xml:
+<?xml version="1.0" ?>
+<DDFCLReply id="2" type="get">
+  <Command name="Bogus" returnCode="2" returnMessage="Invalid command name"/>
+</DDFCLReply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier",
+  "msg_kind": "reply",
+  "body": {
+    "ddfcl_reply": {
+      "id": "2",
+      "type": "get",
+      "command": {
+        "name": "Bogus",
+        "return_code": "2",
+        "return_message": "Invalid command name"
+      }
+    }
+  }
+}
+
+=== DFJob (preclassifier output, TCP 9154, DRS->SDFC) ===
+input_json:
+{
+  "msg_kind": "dfjob",
+  "df_job": {
+    "frequency": [
+      {
+        "unit": "Hz",
+        "#text": "10000000"
+      },
+      {
+        "unit": "Hz",
+        "#text": "20000000"
+      }
+    ],
+    "bandwidth": [
+      {
+        "unit": "Hz",
+        "#text": "10000"
+      },
+      {
+        "unit": "Hz",
+        "#text": "12500"
+      }
+    ],
+    "frequency_start": {
+      "unit": "Hz",
+      "#text": "330000000"
+    },
+    "frequency_stop": {
+      "unit": "Hz",
+      "#text": "440000000"
+    },
+    "frequency_step": {
+      "unit": "Hz",
+      "#text": "12500"
+    }
+  }
+}
+output_hex: 3c44464a6f623e3c42616e64776964746820556e69743d22487a223e31303030303c2f42616e6477696474683e3c42616e64776964746820556e69743d22487a223e31323530303c2f42616e6477696474683e3c4672657175656e637920556e69743d22487a223e31303030303030303c2f4672657175656e63793e3c4672657175656e637920556e69743d22487a223e32303030303030303c2f4672657175656e63793e3c4672657175656e6379537461727420556e69743d22487a223e3333303030303030303c2f4672657175656e637953746172743e3c4672657175656e63795374657020556e69743d22487a223e31323530303c2f4672657175656e6379537465703e3c4672657175656e637953746f7020556e69743d22487a223e3434303030303030303c2f4672657175656e637953746f703e3c2f44464a6f623e
+output_xml:
+<?xml version="1.0" ?>
+<DFJob>
+  <Bandwidth Unit="Hz">10000</Bandwidth>
+  <Bandwidth Unit="Hz">12500</Bandwidth>
+  <Frequency Unit="Hz">10000000</Frequency>
+  <Frequency Unit="Hz">20000000</Frequency>
+  <FrequencyStart Unit="Hz">330000000</FrequencyStart>
+  <FrequencyStep Unit="Hz">12500</FrequencyStep>
+  <FrequencyStop Unit="Hz">440000000</FrequencyStop>
+</DFJob>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfjob",
+  "body": {
+    "df_job": {
+      "bandwidth": [
+        {
+          "unit": "Hz",
+          "#text": "10000"
+        },
+        {
+          "unit": "Hz",
+          "#text": "12500"
+        }
+      ],
+      "frequency": [
+        {
+          "unit": "Hz",
+          "#text": "10000000"
+        },
+        {
+          "unit": "Hz",
+          "#text": "20000000"
+        }
+      ],
+      "frequency_start": {
+        "unit": "Hz",
+        "#text": "330000000"
+      },
+      "frequency_step": {
+        "unit": "Hz",
+        "#text": "12500"
+      },
+      "frequency_stop": {
+        "unit": "Hz",
+        "#text": "440000000"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT01 Hopper (preclassifier output, TCP 9154, DRS->SDFC) ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "emitter_class": "Hopper",
+    "frequency_min": {
+      "unit": "Hz",
+      "#text": "55337500"
+    },
+    "frequency_max": {
+      "unit": "Hz",
+      "#text": "59262905"
+    },
+    "frequency_count": "58",
+    "frequency_list": "55350000,55625000,55700000",
+    "frequency_list_report": {
+      "frequency_report": [
+        {
+          "frequency": {
+            "unit": "Hz",
+            "#text": "55350000"
+          }
+        },
+        {
+          "frequency": {
+            "unit": "Hz",
+            "#text": "55625000"
+          }
+        }
+      ]
+    },
+    "bandwidth": {
+      "unit": "Hz",
+      "#text": "0"
+    },
+    "df_station_data": {
+      "df_station_name": "Simulation1",
+      "df_station_latitude": {
+        "unit": "deg",
+        "#text": "48.12790000"
+      },
+      "df_station_longitude": {
+        "unit": "deg",
+        "#text": "11.61290000"
+      },
+      "ddf-cl-id": "11",
+      "bearing_avg": {
+        "unit": "deg",
+        "#text": "85.7"
+      },
+      "quality": "94",
+      "channel_spacing": "78947",
+      "burst_duration": "22"
+    }
+  }
+}
+output_hex: 3c4446446174613e3c42616e64776964746820556e69743d22487a223e303c2f42616e6477696474683e3c444653746174696f6e446174613e3c42656172696e6741766720556e69743d22646567223e38352e373c2f42656172696e674176673e3c42757273744475726174696f6e3e32323c2f42757273744475726174696f6e3e3c4368616e6e656c53706163696e673e37383934373c2f4368616e6e656c53706163696e673e3c4444462d434c2d49443e31313c2f4444462d434c2d49443e3c444653746174696f6e4c6174697475646520556e69743d22646567223e34382e31323739303030303c2f444653746174696f6e4c617469747564653e3c444653746174696f6e4c6f6e67697475646520556e69743d22646567223e31312e36313239303030303c2f444653746174696f6e4c6f6e6769747564653e3c444653746174696f6e4e616d653e53696d756c6174696f6e313c2f444653746174696f6e4e616d653e3c5175616c6974793e39343c2f5175616c6974793e3c2f444653746174696f6e446174613e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c4672657175656e6379436f756e743e35383c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e35353335303030302c35353632353030302c35353730303030303c2f4672657175656e63794c6973743e3c4672657175656e63794c6973745265706f72743e3c4672657175656e63795265706f72743e3c4672657175656e637920556e69743d22487a223e35353335303030303c2f4672657175656e63793e3c2f4672657175656e63795265706f72743e3c4672657175656e63795265706f72743e3c4672657175656e637920556e69743d22487a223e35353632353030303c2f4672657175656e63793e3c2f4672657175656e63795265706f72743e3c2f4672657175656e63794c6973745265706f72743e3c4672657175656e63794d617820556e69743d22487a223e35393236323930353c2f4672657175656e63794d61783e3c4672657175656e63794d696e20556e69743d22487a223e35353333373530303c2f4672657175656e63794d696e3e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData>
+  <Bandwidth Unit="Hz">0</Bandwidth>
+  <DFStationData>
+    <BearingAvg Unit="deg">85.7</BearingAvg>
+    <BurstDuration>22</BurstDuration>
+    <ChannelSpacing>78947</ChannelSpacing>
+    <DDF-CL-ID>11</DDF-CL-ID>
+    <DFStationLatitude Unit="deg">48.12790000</DFStationLatitude>
+    <DFStationLongitude Unit="deg">11.61290000</DFStationLongitude>
+    <DFStationName>Simulation1</DFStationName>
+    <Quality>94</Quality>
+  </DFStationData>
+  <EmitterClass>Hopper</EmitterClass>
+  <FrequencyCount>58</FrequencyCount>
+  <FrequencyList>55350000,55625000,55700000</FrequencyList>
+  <FrequencyListReport>
+    <FrequencyReport>
+      <Frequency Unit="Hz">55350000</Frequency>
+    </FrequencyReport>
+    <FrequencyReport>
+      <Frequency Unit="Hz">55625000</Frequency>
+    </FrequencyReport>
+  </FrequencyListReport>
+  <FrequencyMax Unit="Hz">59262905</FrequencyMax>
+  <FrequencyMin Unit="Hz">55337500</FrequencyMin>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "bandwidth": {
+        "unit": "Hz",
+        "#text": "0"
+      },
+      "df_station_data": {
+        "bearing_avg": {
+          "unit": "deg",
+          "#text": "85.7"
+        },
+        "burst_duration": "22",
+        "channel_spacing": "78947",
+        "ddf-cl-id": "11",
+        "df_station_latitude": {
+          "unit": "deg",
+          "#text": "48.12790000"
+        },
+        "df_station_longitude": {
+          "unit": "deg",
+          "#text": "11.61290000"
+        },
+        "df_station_name": "Simulation1",
+        "quality": "94"
+      },
+      "emitter_class": "Hopper",
+      "frequency_count": "58",
+      "frequency_list": "55350000,55625000,55700000",
+      "frequency_list_report": {
+        "frequency_report": [
+          {
+            "frequency": {
+              "unit": "Hz",
+              "#text": "55350000"
+            }
+          },
+          {
+            "frequency": {
+              "unit": "Hz",
+              "#text": "55625000"
+            }
+          }
+        ]
+      },
+      "frequency_max": {
+        "unit": "Hz",
+        "#text": "59262905"
+      },
+      "frequency_min": {
+        "unit": "Hz",
+        "#text": "55337500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Static, ddf-cl-id as root attribute ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "16",
+    "emitter_class": "Static",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "59237500"
+    },
+    "quality": "94"
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223136223e3c456d6974746572436c6173733e5374617469633c2f456d6974746572436c6173733e3c5175616c6974793e39343c2f5175616c6974793e3c53746172744672657175656e637920556e69743d22487a223e35393233373530303c2f53746172744672657175656e63793e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="16">
+  <EmitterClass>Static</EmitterClass>
+  <Quality>94</Quality>
+  <StartFrequency Unit="Hz">59237500</StartFrequency>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "16",
+      "emitter_class": "Static",
+      "quality": "94",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "59237500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Hopper, full field set (scan_range_id/detection times/burst stats) ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "17",
+    "scan_range_id": "1",
+    "emitter_class": "Hopper",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "55237500"
+    },
+    "center_frequency": {
+      "unit": "Hz",
+      "#text": "57405418"
+    },
+    "stop_frequency": {
+      "unit": "Hz",
+      "#text": "59912500"
+    },
+    "bearing_avg": {
+      "unit": "deg",
+      "#text": "85.2"
+    },
+    "bearing_std_dev": {
+      "unit": "deg",
+      "#text": "2.9"
+    },
+    "level_avg": {
+      "unit": "dBuV",
+      "#text": "18.0"
+    },
+    "level_std_dev": {
+      "unit": "dBuV",
+      "#text": "1.4"
+    },
+    "elevation_avg": {
+      "unit": "deg",
+      "#text": "7.6"
+    },
+    "elevation_std_dev": {
+      "unit": "deg",
+      "#text": "0.8"
+    },
+    "first_detection_time": "2013-01-15 13:00:14.556000",
+    "last_detection_time": "2013-01-15 13:00:23.919000",
+    "quality": "95",
+    "frequency_count": "42",
+    "frequency_list": "55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000,...",
+    "burst_duration": {
+      "unit": "ms",
+      "#text": "44"
+    },
+    "burst_bandwidth": {
+      "unit": "Hz",
+      "#text": "120"
+    }
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223137223e3c42656172696e6741766720556e69743d22646567223e38352e323c2f42656172696e674176673e3c42656172696e6753746444657620556e69743d22646567223e322e393c2f42656172696e675374644465763e3c427572737442616e64776964746820556e69743d22487a223e3132303c2f427572737442616e6477696474683e3c42757273744475726174696f6e20556e69743d226d73223e34343c2f42757273744475726174696f6e3e3c43656e7465724672657175656e637920556e69743d22487a223e35373430353431383c2f43656e7465724672657175656e63793e3c456c65766174696f6e41766720556e69743d22646567223e372e363c2f456c65766174696f6e4176673e3c456c65766174696f6e53746444657620556e69743d22646567223e302e383c2f456c65766174696f6e5374644465763e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c4669727374446574656374696f6e54696d653e323031332d30312d31352031333a30303a31342e3535363030303c2f4669727374446574656374696f6e54696d653e3c4672657175656e6379436f756e743e34323c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e35353335303030302c35353632353030302c35353730303030302c35353830303030302c35353935303030302c35353937353030302c35363035303030302c35363132353030302c2e2e2e3c2f4672657175656e63794c6973743e3c4c617374446574656374696f6e54696d653e323031332d30312d31352031333a30303a32332e3931393030303c2f4c617374446574656374696f6e54696d653e3c4c6576656c41766720556e69743d2264427556223e31382e303c2f4c6576656c4176673e3c4c6576656c53746444657620556e69743d2264427556223e312e343c2f4c6576656c5374644465763e3c5175616c6974793e39353c2f5175616c6974793e3c5363616e52616e676549643e313c2f5363616e52616e676549643e3c53746172744672657175656e637920556e69743d22487a223e35353233373530303c2f53746172744672657175656e63793e3c53746f704672657175656e637920556e69743d22487a223e35393931323530303c2f53746f704672657175656e63793e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="17">
+  <BearingAvg Unit="deg">85.2</BearingAvg>
+  <BearingStdDev Unit="deg">2.9</BearingStdDev>
+  <BurstBandwidth Unit="Hz">120</BurstBandwidth>
+  <BurstDuration Unit="ms">44</BurstDuration>
+  <CenterFrequency Unit="Hz">57405418</CenterFrequency>
+  <ElevationAvg Unit="deg">7.6</ElevationAvg>
+  <ElevationStdDev Unit="deg">0.8</ElevationStdDev>
+  <EmitterClass>Hopper</EmitterClass>
+  <FirstDetectionTime>2013-01-15 13:00:14.556000</FirstDetectionTime>
+  <FrequencyCount>42</FrequencyCount>
+  <FrequencyList>55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000,...</FrequencyList>
+  <LastDetectionTime>2013-01-15 13:00:23.919000</LastDetectionTime>
+  <LevelAvg Unit="dBuV">18.0</LevelAvg>
+  <LevelStdDev Unit="dBuV">1.4</LevelStdDev>
+  <Quality>95</Quality>
+  <ScanRangeId>1</ScanRangeId>
+  <StartFrequency Unit="Hz">55237500</StartFrequency>
+  <StopFrequency Unit="Hz">59912500</StopFrequency>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "17",
+      "bearing_avg": {
+        "unit": "deg",
+        "#text": "85.2"
+      },
+      "bearing_std_dev": {
+        "unit": "deg",
+        "#text": "2.9"
+      },
+      "burst_bandwidth": {
+        "unit": "Hz",
+        "#text": "120"
+      },
+      "burst_duration": {
+        "unit": "ms",
+        "#text": "44"
+      },
+      "center_frequency": {
+        "unit": "Hz",
+        "#text": "57405418"
+      },
+      "elevation_avg": {
+        "unit": "deg",
+        "#text": "7.6"
+      },
+      "elevation_std_dev": {
+        "unit": "deg",
+        "#text": "0.8"
+      },
+      "emitter_class": "Hopper",
+      "first_detection_time": "2013-01-15 13:00:14.556000",
+      "frequency_count": "42",
+      "frequency_list": "55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000,...",
+      "last_detection_time": "2013-01-15 13:00:23.919000",
+      "level_avg": {
+        "unit": "dBuV",
+        "#text": "18.0"
+      },
+      "level_std_dev": {
+        "unit": "dBuV",
+        "#text": "1.4"
+      },
+      "quality": "95",
+      "scan_range_id": "1",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "55237500"
+      },
+      "stop_frequency": {
+        "unit": "Hz",
+        "#text": "59912500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Hopper, full field set (scan_range_id/detection times/burst stats) ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "17",
+    "scan_range_id": "1",
+    "emitter_class": "Hopper",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "55237500"
+    },
+    "center_frequency": {
+      "unit": "Hz",
+      "#text": "57405418"
+    },
+    "stop_frequency": {
+      "unit": "Hz",
+      "#text": "59912500"
+    },
+    "bearing_avg": {
+      "unit": "deg",
+      "#text": "85.2"
+    },
+    "bearing_std_dev": {
+      "unit": "deg",
+      "#text": "2.9"
+    },
+    "level_avg": {
+      "unit": "dBuV",
+      "#text": "18.0"
+    },
+    "level_std_dev": {
+      "unit": "dBuV",
+      "#text": "1.4"
+    },
+    "elevation_avg": {
+      "unit": "deg",
+      "#text": "7.6"
+    },
+    "elevation_std_dev": {
+      "unit": "deg",
+      "#text": "0.8"
+    },
+    "first_detection_time": "2013-01-15 13:00:14.556000",
+    "last_detection_time": "2013-01-15 13:00:23.919000",
+    "quality": "95",
+    "frequency_count": "42",
+    "frequency_list": "55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000,...",
+    "burst_duration": {
+      "unit": "ms",
+      "#text": "44"
+    },
+    "burst_bandwidth": {
+      "unit": "Hz",
+      "#text": "120"
+    }
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223137223e3c42656172696e6741766720556e69743d22646567223e38352e323c2f42656172696e674176673e3c42656172696e6753746444657620556e69743d22646567223e322e393c2f42656172696e675374644465763e3c427572737442616e64776964746820556e69743d22487a223e3132303c2f427572737442616e6477696474683e3c42757273744475726174696f6e20556e69743d226d73223e34343c2f42757273744475726174696f6e3e3c43656e7465724672657175656e637920556e69743d22487a223e35373430353431383c2f43656e7465724672657175656e63793e3c456c65766174696f6e41766720556e69743d22646567223e372e363c2f456c65766174696f6e4176673e3c456c65766174696f6e53746444657620556e69743d22646567223e302e383c2f456c65766174696f6e5374644465763e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c4669727374446574656374696f6e54696d653e323031332d30312d31352031333a30303a31342e3535363030303c2f4669727374446574656374696f6e54696d653e3c4672657175656e6379436f756e743e34323c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e35353335303030302c35353632353030302c35353730303030302c35353830303030302c35353935303030302c35353937353030302c35363035303030302c35363132353030302c2e2e2e3c2f4672657175656e63794c6973743e3c4c617374446574656374696f6e54696d653e323031332d30312d31352031333a30303a32332e3931393030303c2f4c617374446574656374696f6e54696d653e3c4c6576656c41766720556e69743d2264427556223e31382e303c2f4c6576656c4176673e3c4c6576656c53746444657620556e69743d2264427556223e312e343c2f4c6576656c5374644465763e3c5175616c6974793e39353c2f5175616c6974793e3c5363616e52616e676549643e313c2f5363616e52616e676549643e3c53746172744672657175656e637920556e69743d22487a223e35353233373530303c2f53746172744672657175656e63793e3c53746f704672657175656e637920556e69743d22487a223e35393931323530303c2f53746f704672657175656e63793e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="17">
+  <BearingAvg Unit="deg">85.2</BearingAvg>
+  <BearingStdDev Unit="deg">2.9</BearingStdDev>
+  <BurstBandwidth Unit="Hz">120</BurstBandwidth>
+  <BurstDuration Unit="ms">44</BurstDuration>
+  <CenterFrequency Unit="Hz">57405418</CenterFrequency>
+  <ElevationAvg Unit="deg">7.6</ElevationAvg>
+  <ElevationStdDev Unit="deg">0.8</ElevationStdDev>
+  <EmitterClass>Hopper</EmitterClass>
+  <FirstDetectionTime>2013-01-15 13:00:14.556000</FirstDetectionTime>
+  <FrequencyCount>42</FrequencyCount>
+  <FrequencyList>55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000,...</FrequencyList>
+  <LastDetectionTime>2013-01-15 13:00:23.919000</LastDetectionTime>
+  <LevelAvg Unit="dBuV">18.0</LevelAvg>
+  <LevelStdDev Unit="dBuV">1.4</LevelStdDev>
+  <Quality>95</Quality>
+  <ScanRangeId>1</ScanRangeId>
+  <StartFrequency Unit="Hz">55237500</StartFrequency>
+  <StopFrequency Unit="Hz">59912500</StopFrequency>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "17",
+      "bearing_avg": {
+        "unit": "deg",
+        "#text": "85.2"
+      },
+      "bearing_std_dev": {
+        "unit": "deg",
+        "#text": "2.9"
+      },
+      "burst_bandwidth": {
+        "unit": "Hz",
+        "#text": "120"
+      },
+      "burst_duration": {
+        "unit": "ms",
+        "#text": "44"
+      },
+      "center_frequency": {
+        "unit": "Hz",
+        "#text": "57405418"
+      },
+      "elevation_avg": {
+        "unit": "deg",
+        "#text": "7.6"
+      },
+      "elevation_std_dev": {
+        "unit": "deg",
+        "#text": "0.8"
+      },
+      "emitter_class": "Hopper",
+      "first_detection_time": "2013-01-15 13:00:14.556000",
+      "frequency_count": "42",
+      "frequency_list": "55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000,...",
+      "last_detection_time": "2013-01-15 13:00:23.919000",
+      "level_avg": {
+        "unit": "dBuV",
+        "#text": "18.0"
+      },
+      "level_std_dev": {
+        "unit": "dBuV",
+        "#text": "1.4"
+      },
+      "quality": "95",
+      "scan_range_id": "1",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "55237500"
+      },
+      "stop_frequency": {
+        "unit": "Hz",
+        "#text": "59912500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Hopper, real Unit glyphs (° / dBµV) + whitespace-preserved frequency_list ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "17",
+    "emitter_class": "Hopper",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "55237500"
+    },
+    "center_frequency": {
+      "unit": "Hz",
+      "#text": "57405418"
+    },
+    "stop_frequency": {
+      "unit": "Hz",
+      "#text": "59912500"
+    },
+    "bearing_avg": {
+      "unit": "\u00b0",
+      "#text": "85.2"
+    },
+    "bearing_std_dev": {
+      "unit": "\u00b0",
+      "#text": "2.9"
+    },
+    "level_avg": {
+      "unit": "dB\u00b5V",
+      "#text": "18.0"
+    },
+    "level_std_dev": {
+      "unit": "dB\u00b5V",
+      "#text": "1.4"
+    },
+    "elevation_avg": {
+      "unit": "\u00b0",
+      "#text": "7.6"
+    },
+    "elevation_std_dev": {
+      "unit": "\u00b0",
+      "#text": "0.8"
+    },
+    "first_detection_time": "2013-01-15 13:00:14.556000",
+    "last_detection_time": "2013-01-15 13:00:23.919000",
+    "quality": "95",
+    "frequency_count": "42",
+    "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+    "burst_duration": {
+      "unit": "ms",
+      "#text": "44"
+    },
+    "burst_bandwidth": {
+      "unit": "Hz",
+      "#text": "120"
+    }
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223137223e3c42656172696e6741766720556e69743d22c2b0223e38352e323c2f42656172696e674176673e3c42656172696e6753746444657620556e69743d22c2b0223e322e393c2f42656172696e675374644465763e3c427572737442616e64776964746820556e69743d22487a223e3132303c2f427572737442616e6477696474683e3c42757273744475726174696f6e20556e69743d226d73223e34343c2f42757273744475726174696f6e3e3c43656e7465724672657175656e637920556e69743d22487a223e35373430353431383c2f43656e7465724672657175656e63793e3c456c65766174696f6e41766720556e69743d22c2b0223e372e363c2f456c65766174696f6e4176673e3c456c65766174696f6e53746444657620556e69743d22c2b0223e302e383c2f456c65766174696f6e5374644465763e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c4669727374446574656374696f6e54696d653e323031332d30312d31352031333a30303a31342e3535363030303c2f4669727374446574656374696f6e54696d653e3c4672657175656e6379436f756e743e34323c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e0a202035353335303030302c35353632353030302c35353730303030302c35353830303030302c35353935303030302c35353937353030302c35363035303030302c35363132353030302c202e2e2e0a20203c2f4672657175656e63794c6973743e3c4c617374446574656374696f6e54696d653e323031332d30312d31352031333a30303a32332e3931393030303c2f4c617374446574656374696f6e54696d653e3c4c6576656c41766720556e69743d226442c2b556223e31382e303c2f4c6576656c4176673e3c4c6576656c53746444657620556e69743d226442c2b556223e312e343c2f4c6576656c5374644465763e3c5175616c6974793e39353c2f5175616c6974793e3c53746172744672657175656e637920556e69743d22487a223e35353233373530303c2f53746172744672657175656e63793e3c53746f704672657175656e637920556e69743d22487a223e35393931323530303c2f53746f704672657175656e63793e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="17">
+  <BearingAvg Unit="°">85.2</BearingAvg>
+  <BearingStdDev Unit="°">2.9</BearingStdDev>
+  <BurstBandwidth Unit="Hz">120</BurstBandwidth>
+  <BurstDuration Unit="ms">44</BurstDuration>
+  <CenterFrequency Unit="Hz">57405418</CenterFrequency>
+  <ElevationAvg Unit="°">7.6</ElevationAvg>
+  <ElevationStdDev Unit="°">0.8</ElevationStdDev>
+  <EmitterClass>Hopper</EmitterClass>
+  <FirstDetectionTime>2013-01-15 13:00:14.556000</FirstDetectionTime>
+  <FrequencyCount>42</FrequencyCount>
+  <FrequencyList>
+  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...
+  </FrequencyList>
+  <LastDetectionTime>2013-01-15 13:00:23.919000</LastDetectionTime>
+  <LevelAvg Unit="dBµV">18.0</LevelAvg>
+  <LevelStdDev Unit="dBµV">1.4</LevelStdDev>
+  <Quality>95</Quality>
+  <StartFrequency Unit="Hz">55237500</StartFrequency>
+  <StopFrequency Unit="Hz">59912500</StopFrequency>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "17",
+      "bearing_avg": {
+        "unit": "\u00b0",
+        "#text": "85.2"
+      },
+      "bearing_std_dev": {
+        "unit": "\u00b0",
+        "#text": "2.9"
+      },
+      "burst_bandwidth": {
+        "unit": "Hz",
+        "#text": "120"
+      },
+      "burst_duration": {
+        "unit": "ms",
+        "#text": "44"
+      },
+      "center_frequency": {
+        "unit": "Hz",
+        "#text": "57405418"
+      },
+      "elevation_avg": {
+        "unit": "\u00b0",
+        "#text": "7.6"
+      },
+      "elevation_std_dev": {
+        "unit": "\u00b0",
+        "#text": "0.8"
+      },
+      "emitter_class": "Hopper",
+      "first_detection_time": "2013-01-15 13:00:14.556000",
+      "frequency_count": "42",
+      "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+      "last_detection_time": "2013-01-15 13:00:23.919000",
+      "level_avg": {
+        "unit": "dB\u00b5V",
+        "#text": "18.0"
+      },
+      "level_std_dev": {
+        "unit": "dB\u00b5V",
+        "#text": "1.4"
+      },
+      "quality": "95",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "55237500"
+      },
+      "stop_frequency": {
+        "unit": "Hz",
+        "#text": "59912500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Hopper, real Unit glyphs (° / dBµV) + whitespace-preserved frequency_list ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "17",
+    "emitter_class": "Hopper",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "55237500"
+    },
+    "center_frequency": {
+      "unit": "Hz",
+      "#text": "57405418"
+    },
+    "stop_frequency": {
+      "unit": "Hz",
+      "#text": "59912500"
+    },
+    "bearing_avg": {
+      "unit": "\u00b0",
+      "#text": "85.2"
+    },
+    "bearing_std_dev": {
+      "unit": "\u00b0",
+      "#text": "2.9"
+    },
+    "level_avg": {
+      "unit": "dB\u00b5V",
+      "#text": "18.0"
+    },
+    "level_std_dev": {
+      "unit": "dB\u00b5V",
+      "#text": "1.4"
+    },
+    "elevation_avg": {
+      "unit": "\u00b0",
+      "#text": "7.6"
+    },
+    "elevation_std_dev": {
+      "unit": "\u00b0",
+      "#text": "0.8"
+    },
+    "first_detection_time": "2013-01-15 13:00:14.556000",
+    "last_detection_time": "2013-01-15 13:00:23.919000",
+    "quality": "95",
+    "frequency_count": "42",
+    "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+    "burst_duration": {
+      "unit": "ms",
+      "#text": "44"
+    },
+    "burst_bandwidth": {
+      "unit": "Hz",
+      "#text": "120"
+    }
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223137223e3c42656172696e6741766720556e69743d22c2b0223e38352e323c2f42656172696e674176673e3c42656172696e6753746444657620556e69743d22c2b0223e322e393c2f42656172696e675374644465763e3c427572737442616e64776964746820556e69743d22487a223e3132303c2f427572737442616e6477696474683e3c42757273744475726174696f6e20556e69743d226d73223e34343c2f42757273744475726174696f6e3e3c43656e7465724672657175656e637920556e69743d22487a223e35373430353431383c2f43656e7465724672657175656e63793e3c456c65766174696f6e41766720556e69743d22c2b0223e372e363c2f456c65766174696f6e4176673e3c456c65766174696f6e53746444657620556e69743d22c2b0223e302e383c2f456c65766174696f6e5374644465763e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c4669727374446574656374696f6e54696d653e323031332d30312d31352031333a30303a31342e3535363030303c2f4669727374446574656374696f6e54696d653e3c4672657175656e6379436f756e743e34323c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e0a202035353335303030302c35353632353030302c35353730303030302c35353830303030302c35353935303030302c35353937353030302c35363035303030302c35363132353030302c202e2e2e0a20203c2f4672657175656e63794c6973743e3c4c617374446574656374696f6e54696d653e323031332d30312d31352031333a30303a32332e3931393030303c2f4c617374446574656374696f6e54696d653e3c4c6576656c41766720556e69743d226442c2b556223e31382e303c2f4c6576656c4176673e3c4c6576656c53746444657620556e69743d226442c2b556223e312e343c2f4c6576656c5374644465763e3c5175616c6974793e39353c2f5175616c6974793e3c53746172744672657175656e637920556e69743d22487a223e35353233373530303c2f53746172744672657175656e63793e3c53746f704672657175656e637920556e69743d22487a223e35393931323530303c2f53746f704672657175656e63793e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="17">
+  <BearingAvg Unit="°">85.2</BearingAvg>
+  <BearingStdDev Unit="°">2.9</BearingStdDev>
+  <BurstBandwidth Unit="Hz">120</BurstBandwidth>
+  <BurstDuration Unit="ms">44</BurstDuration>
+  <CenterFrequency Unit="Hz">57405418</CenterFrequency>
+  <ElevationAvg Unit="°">7.6</ElevationAvg>
+  <ElevationStdDev Unit="°">0.8</ElevationStdDev>
+  <EmitterClass>Hopper</EmitterClass>
+  <FirstDetectionTime>2013-01-15 13:00:14.556000</FirstDetectionTime>
+  <FrequencyCount>42</FrequencyCount>
+  <FrequencyList>
+  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...
+  </FrequencyList>
+  <LastDetectionTime>2013-01-15 13:00:23.919000</LastDetectionTime>
+  <LevelAvg Unit="dBµV">18.0</LevelAvg>
+  <LevelStdDev Unit="dBµV">1.4</LevelStdDev>
+  <Quality>95</Quality>
+  <StartFrequency Unit="Hz">55237500</StartFrequency>
+  <StopFrequency Unit="Hz">59912500</StopFrequency>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "17",
+      "bearing_avg": {
+        "unit": "\u00b0",
+        "#text": "85.2"
+      },
+      "bearing_std_dev": {
+        "unit": "\u00b0",
+        "#text": "2.9"
+      },
+      "burst_bandwidth": {
+        "unit": "Hz",
+        "#text": "120"
+      },
+      "burst_duration": {
+        "unit": "ms",
+        "#text": "44"
+      },
+      "center_frequency": {
+        "unit": "Hz",
+        "#text": "57405418"
+      },
+      "elevation_avg": {
+        "unit": "\u00b0",
+        "#text": "7.6"
+      },
+      "elevation_std_dev": {
+        "unit": "\u00b0",
+        "#text": "0.8"
+      },
+      "emitter_class": "Hopper",
+      "first_detection_time": "2013-01-15 13:00:14.556000",
+      "frequency_count": "42",
+      "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+      "last_detection_time": "2013-01-15 13:00:23.919000",
+      "level_avg": {
+        "unit": "dB\u00b5V",
+        "#text": "18.0"
+      },
+      "level_std_dev": {
+        "unit": "dB\u00b5V",
+        "#text": "1.4"
+      },
+      "quality": "95",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "55237500"
+      },
+      "stop_frequency": {
+        "unit": "Hz",
+        "#text": "59912500"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Hopper, real Unit glyphs (° / dBµV) + whitespace-preserved frequency_list ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "17",
+    "emitter_class": "Hopper",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "55237500"
+    },
+    "center_frequency": {
+      "unit": "Hz",
+      "#text": "57405418"
+    },
+    "stop_frequency": {
+      "unit": "Hz",
+      "#text": "59912500"
+    },
+    "bearing_avg": {
+      "unit": "\u00b0",
+      "#text": "85.2"
+    },
+    "bearing_std_dev": {
+      "unit": "\u00b0",
+      "#text": "2.9"
+    },
+    "level_avg": {
+      "unit": "dB\u00b5V",
+      "#text": "18.0"
+    },
+    "level_std_dev": {
+      "unit": "dB\u00b5V",
+      "#text": "1.4"
+    },
+    "elevation_avg": {
+      "unit": "\u00b0",
+      "#text": "7.6"
+    },
+    "elevation_std_dev": {
+      "unit": "\u00b0",
+      "#text": "0.8"
+    },
+    "first_detection_time": "2013-01-15 13:00:14.556000",
+    "last_detection_time": "2013-01-15 13:00:23.919000",
+    "quality": "95",
+    "frequency_count": "42",
+    "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+    "burst_duration": {
+      "unit": "ms",
+      "#text": "44"
+    },
+    "burst_bandwidth": {
+      "unit": "Hz",
+      "#text": "120"
+    }
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223137223e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c53746172744672657175656e637920556e69743d22487a223e35353233373530303c2f53746172744672657175656e63793e3c43656e7465724672657175656e637920556e69743d22487a223e35373430353431383c2f43656e7465724672657175656e63793e3c53746f704672657175656e637920556e69743d22487a223e35393931323530303c2f53746f704672657175656e63793e3c42656172696e6741766720556e69743d22c2b0223e38352e323c2f42656172696e674176673e3c42656172696e6753746444657620556e69743d22c2b0223e322e393c2f42656172696e675374644465763e3c4c6576656c41766720556e69743d226442c2b556223e31382e303c2f4c6576656c4176673e3c4c6576656c53746444657620556e69743d226442c2b556223e312e343c2f4c6576656c5374644465763e3c456c65766174696f6e41766720556e69743d22c2b0223e372e363c2f456c65766174696f6e4176673e3c456c65766174696f6e53746444657620556e69743d22c2b0223e302e383c2f456c65766174696f6e5374644465763e3c4669727374446574656374696f6e54696d653e323031332d30312d31352031333a30303a31342e3535363030303c2f4669727374446574656374696f6e54696d653e3c4c617374446574656374696f6e54696d653e323031332d30312d31352031333a30303a32332e3931393030303c2f4c617374446574656374696f6e54696d653e3c5175616c6974793e39353c2f5175616c6974793e3c4672657175656e6379436f756e743e34323c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e0a202035353335303030302c35353632353030302c35353730303030302c35353830303030302c35353935303030302c35353937353030302c35363035303030302c35363132353030302c202e2e2e0a20203c2f4672657175656e63794c6973743e3c42757273744475726174696f6e20556e69743d226d73223e34343c2f42757273744475726174696f6e3e3c427572737442616e64776964746820556e69743d22487a223e3132303c2f427572737442616e6477696474683e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="17">
+  <EmitterClass>Hopper</EmitterClass>
+  <StartFrequency Unit="Hz">55237500</StartFrequency>
+  <CenterFrequency Unit="Hz">57405418</CenterFrequency>
+  <StopFrequency Unit="Hz">59912500</StopFrequency>
+  <BearingAvg Unit="°">85.2</BearingAvg>
+  <BearingStdDev Unit="°">2.9</BearingStdDev>
+  <LevelAvg Unit="dBµV">18.0</LevelAvg>
+  <LevelStdDev Unit="dBµV">1.4</LevelStdDev>
+  <ElevationAvg Unit="°">7.6</ElevationAvg>
+  <ElevationStdDev Unit="°">0.8</ElevationStdDev>
+  <FirstDetectionTime>2013-01-15 13:00:14.556000</FirstDetectionTime>
+  <LastDetectionTime>2013-01-15 13:00:23.919000</LastDetectionTime>
+  <Quality>95</Quality>
+  <FrequencyCount>42</FrequencyCount>
+  <FrequencyList>
+  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...
+  </FrequencyList>
+  <BurstDuration Unit="ms">44</BurstDuration>
+  <BurstBandwidth Unit="Hz">120</BurstBandwidth>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "17",
+      "emitter_class": "Hopper",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "55237500"
+      },
+      "center_frequency": {
+        "unit": "Hz",
+        "#text": "57405418"
+      },
+      "stop_frequency": {
+        "unit": "Hz",
+        "#text": "59912500"
+      },
+      "bearing_avg": {
+        "unit": "\u00b0",
+        "#text": "85.2"
+      },
+      "bearing_std_dev": {
+        "unit": "\u00b0",
+        "#text": "2.9"
+      },
+      "level_avg": {
+        "unit": "dB\u00b5V",
+        "#text": "18.0"
+      },
+      "level_std_dev": {
+        "unit": "dB\u00b5V",
+        "#text": "1.4"
+      },
+      "elevation_avg": {
+        "unit": "\u00b0",
+        "#text": "7.6"
+      },
+      "elevation_std_dev": {
+        "unit": "\u00b0",
+        "#text": "0.8"
+      },
+      "first_detection_time": "2013-01-15 13:00:14.556000",
+      "last_detection_time": "2013-01-15 13:00:23.919000",
+      "quality": "95",
+      "frequency_count": "42",
+      "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+      "burst_duration": {
+        "unit": "ms",
+        "#text": "44"
+      },
+      "burst_bandwidth": {
+        "unit": "Hz",
+        "#text": "120"
+      }
+    }
+  }
+}
+
+=== DFData -- FORMAT02/03 Hopper, real Unit glyphs (° / dBµV) + whitespace-preserved frequency_list ===
+input_json:
+{
+  "msg_kind": "dfdata",
+  "df_data": {
+    "ddf-cl-id": "17",
+    "emitter_class": "Hopper",
+    "start_frequency": {
+      "unit": "Hz",
+      "#text": "55237500"
+    },
+    "center_frequency": {
+      "unit": "Hz",
+      "#text": "57405418"
+    },
+    "stop_frequency": {
+      "unit": "Hz",
+      "#text": "59912500"
+    },
+    "bearing_avg": {
+      "unit": "\u00b0",
+      "#text": "85.2"
+    },
+    "bearing_std_dev": {
+      "unit": "\u00b0",
+      "#text": "2.9"
+    },
+    "level_avg": {
+      "unit": "dB\u00b5V",
+      "#text": "18.0"
+    },
+    "level_std_dev": {
+      "unit": "dB\u00b5V",
+      "#text": "1.4"
+    },
+    "elevation_avg": {
+      "unit": "\u00b0",
+      "#text": "7.6"
+    },
+    "elevation_std_dev": {
+      "unit": "\u00b0",
+      "#text": "0.8"
+    },
+    "first_detection_time": "2013-01-15 13:00:14.556000",
+    "last_detection_time": "2013-01-15 13:00:23.919000",
+    "quality": "95",
+    "frequency_count": "42",
+    "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+    "burst_duration": {
+      "unit": "ms",
+      "#text": "44"
+    },
+    "burst_bandwidth": {
+      "unit": "Hz",
+      "#text": "120"
+    }
+  }
+}
+output_hex: 3c444644617461204444462d434c2d49443d223137223e3c456d6974746572436c6173733e486f707065723c2f456d6974746572436c6173733e3c53746172744672657175656e637920556e69743d22487a223e35353233373530303c2f53746172744672657175656e63793e3c43656e7465724672657175656e637920556e69743d22487a223e35373430353431383c2f43656e7465724672657175656e63793e3c53746f704672657175656e637920556e69743d22487a223e35393931323530303c2f53746f704672657175656e63793e3c42656172696e6741766720556e69743d22c2b0223e38352e323c2f42656172696e674176673e3c42656172696e6753746444657620556e69743d22c2b0223e322e393c2f42656172696e675374644465763e3c4c6576656c41766720556e69743d226442c2b556223e31382e303c2f4c6576656c4176673e3c4c6576656c53746444657620556e69743d226442c2b556223e312e343c2f4c6576656c5374644465763e3c456c65766174696f6e41766720556e69743d22c2b0223e372e363c2f456c65766174696f6e4176673e3c456c65766174696f6e53746444657620556e69743d22c2b0223e302e383c2f456c65766174696f6e5374644465763e3c4669727374446574656374696f6e54696d653e323031332d30312d31352031333a30303a31342e3535363030303c2f4669727374446574656374696f6e54696d653e3c4c617374446574656374696f6e54696d653e323031332d30312d31352031333a30303a32332e3931393030303c2f4c617374446574656374696f6e54696d653e3c5175616c6974793e39353c2f5175616c6974793e3c4672657175656e6379436f756e743e34323c2f4672657175656e6379436f756e743e3c4672657175656e63794c6973743e0a202035353335303030302c35353632353030302c35353730303030302c35353830303030302c35353935303030302c35353937353030302c35363035303030302c35363132353030302c202e2e2e0a20203c2f4672657175656e63794c6973743e3c42757273744475726174696f6e20556e69743d226d73223e34343c2f42757273744475726174696f6e3e3c427572737442616e64776964746820556e69743d22487a223e3132303c2f427572737442616e6477696474683e3c2f4446446174613e
+output_xml:
+<?xml version="1.0" ?>
+<DFData DDF-CL-ID="17">
+  <EmitterClass>Hopper</EmitterClass>
+  <StartFrequency Unit="Hz">55237500</StartFrequency>
+  <CenterFrequency Unit="Hz">57405418</CenterFrequency>
+  <StopFrequency Unit="Hz">59912500</StopFrequency>
+  <BearingAvg Unit="°">85.2</BearingAvg>
+  <BearingStdDev Unit="°">2.9</BearingStdDev>
+  <LevelAvg Unit="dBµV">18.0</LevelAvg>
+  <LevelStdDev Unit="dBµV">1.4</LevelStdDev>
+  <ElevationAvg Unit="°">7.6</ElevationAvg>
+  <ElevationStdDev Unit="°">0.8</ElevationStdDev>
+  <FirstDetectionTime>2013-01-15 13:00:14.556000</FirstDetectionTime>
+  <LastDetectionTime>2013-01-15 13:00:23.919000</LastDetectionTime>
+  <Quality>95</Quality>
+  <FrequencyCount>42</FrequencyCount>
+  <FrequencyList>
+  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...
+  </FrequencyList>
+  <BurstDuration Unit="ms">44</BurstDuration>
+  <BurstBandwidth Unit="Hz">120</BurstBandwidth>
+</DFData>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ddf550",
+  "channel": "preclassifier_output",
+  "msg_kind": "dfdata",
+  "body": {
+    "df_data": {
+      "ddf-cl-id": "17",
+      "emitter_class": "Hopper",
+      "start_frequency": {
+        "unit": "Hz",
+        "#text": "55237500"
+      },
+      "center_frequency": {
+        "unit": "Hz",
+        "#text": "57405418"
+      },
+      "stop_frequency": {
+        "unit": "Hz",
+        "#text": "59912500"
+      },
+      "bearing_avg": {
+        "unit": "\u00b0",
+        "#text": "85.2"
+      },
+      "bearing_std_dev": {
+        "unit": "\u00b0",
+        "#text": "2.9"
+      },
+      "level_avg": {
+        "unit": "dB\u00b5V",
+        "#text": "18.0"
+      },
+      "level_std_dev": {
+        "unit": "dB\u00b5V",
+        "#text": "1.4"
+      },
+      "elevation_avg": {
+        "unit": "\u00b0",
+        "#text": "7.6"
+      },
+      "elevation_std_dev": {
+        "unit": "\u00b0",
+        "#text": "0.8"
+      },
+      "first_detection_time": "2013-01-15 13:00:14.556000",
+      "last_detection_time": "2013-01-15 13:00:23.919000",
+      "quality": "95",
+      "frequency_count": "42",
+      "frequency_list": "\n  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n  ",
+      "burst_duration": {
+        "unit": "ms",
+        "#text": "44"
+      },
+      "burst_bandwidth": {
+        "unit": "Hz",
+        "#text": "120"
+      }
+    }
+  }
+}
+

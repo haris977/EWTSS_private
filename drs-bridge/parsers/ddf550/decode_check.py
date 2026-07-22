@@ -66,28 +66,28 @@ def wrap_xml(xml: str) -> bytes:
 # or raw XML (ports 9153/9154) bytes -- add real captured hex below as you
 # get access to hardware.
 BUILTIN_VECTORS: list[tuple[str, bytes]] = [
-    ("DDFCLRequest AnalysisIntervalMs (set, id=1)", (
-        '<?xml version="1.0" ?>'
-        '<DDFCLRequest id="1" type="set">'
-        '<Command name="AnalysisIntervalMs">'
-        '50000'
-        '</Command>'
-        '</DDFCLRequest>'
-    ).encode("utf-8")),
-    ("DDFCLRequest ReportedEmittersMaxNumBurstsActive (set, id=2)", (
-        '<?xml version="1.0" ?>'
-        '<DDFCLRequest id="2" type="set">'
-        '<Command name="ReportedEmittersMaxNumBurstsActive">'
-        'true'
-        '</Command>'
-        '</DDFCLRequest>'
-    ).encode("utf-8")),
-    ("DDFCLRequest SensitivityTiming (get, id=3)", (
-        '<?xml version="1.0" ?>'
-        '<DDFCLRequest id="3" type="get">'
-        '<Command name="SensitivityTiming">'
-        '</Command>'
-        '</DDFCLRequest>'
+    ("DFData -- FORMAT02/03 Hopper, real Unit glyphs (deg/dBuV as ° / µ), multi-line FrequencyList", (
+        '<DFData DDF-CL-ID="17">'
+        '<EmitterClass>Hopper</EmitterClass>'
+        '<StartFrequency Unit="Hz">55237500</StartFrequency>'
+        '<CenterFrequency Unit="Hz">57405418</CenterFrequency>'
+        '<StopFrequency Unit="Hz">59912500</StopFrequency>'
+        '<BearingAvg Unit="°">85.2</BearingAvg>'
+        '<BearingStdDev Unit="°">2.9</BearingStdDev>'
+        '<LevelAvg Unit="dBµV">18.0</LevelAvg>'
+        '<LevelStdDev Unit="dBµV">1.4</LevelStdDev>'
+        '<ElevationAvg Unit="°">7.6</ElevationAvg>'
+        '<ElevationStdDev Unit="°">0.8</ElevationStdDev>'
+        '<FirstDetectionTime>2013-01-15 13:00:14.556000</FirstDetectionTime>'
+        '<LastDetectionTime>2013-01-15 13:00:23.919000</LastDetectionTime>'
+        '<Quality>95</Quality>'
+        '<FrequencyCount>42</FrequencyCount>'
+        '<FrequencyList>\n'
+        '  55350000,55625000,55700000,55800000,55950000,55975000,56050000,56125000, ...\n'
+        '  </FrequencyList>'
+        '<BurstDuration Unit="ms">44</BurstDuration>'
+        '<BurstBandwidth Unit="Hz">120</BurstBandwidth>'
+        '</DFData>'
     ).encode("utf-8")),
 ]
 

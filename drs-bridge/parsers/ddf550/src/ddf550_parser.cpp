@@ -381,7 +381,17 @@ SDFC_EXPORT int format_response(const char* /*kind*/, const char* kwargs_json,
     std::string msg_kind, msg_type, channel;
     long long id = -1;
     try {
-        nlohmann::json kwargs = nlohmann::json::parse(kwargs_json);
+        // ordered_json (not plain json): plain nlohmann::json objects are
+        // std::map-backed and always iterate alphabetically, which is what
+        // was producing dfjob/dfdata/df_station_data XML in A-Z tag order
+        // instead of the ICD's field order. ordered_json preserves the key
+        // order kwargs_json was written in. build_command_xml (the
+        // request/reply path below) still takes plain nlohmann::json --
+        // its Param/Struct/Array shape is order-insensitive (arrays already
+        // preserve order; the object keys it reads are fixed/named, not
+        // iterated generically) -- so kwargs.at("command") converts
+        // implicitly with no observable change there.
+        nlohmann::ordered_json kwargs = nlohmann::ordered_json::parse(kwargs_json);
         if (!kwargs.is_object()) return -1;
 
         msg_kind = kwargs.value("msg_kind", "");
