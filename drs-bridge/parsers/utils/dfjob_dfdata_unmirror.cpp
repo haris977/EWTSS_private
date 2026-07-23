@@ -63,7 +63,7 @@ const char* lookup_tag(const std::string& key) {
     return it->second;
 }
 
-void append_child_value(pugi::xml_node& parent, const std::string& tag, const nlohmann::json& value);
+void append_child_value(pugi::xml_node& parent, const std::string& tag, const nlohmann::ordered_json& value);
 
 // Fills `node`'s attributes/text/children from `value`. `value` is either
 // a plain string (a pure leaf, e.g. "Static" for EmitterClass, or the
@@ -71,7 +71,7 @@ void append_child_value(pugi::xml_node& parent, const std::string& tag, const nl
 // carry a "unit" attribute, "#text", and/or further nested known-tag
 // children (e.g. DFStationData's fields, FrequencyListReport's repeated
 // FrequencyReport, HwInfo-style nesting).
-void fill_node(pugi::xml_node& node, const nlohmann::json& value) {
+void fill_node(pugi::xml_node& node, const nlohmann::ordered_json& value) {
     if (value.is_string()) {
         node.text().set(value.get<std::string>().c_str());
         return;
@@ -95,7 +95,7 @@ void fill_node(pugi::xml_node& node, const nlohmann::json& value) {
 // -- a JSON array means a repeated sibling tag (mirror's one-or-many rule,
 // same as pugixml_generic_unmirror.h), an empty object {} means an empty
 // element, anything else recurses via fill_node.
-void append_child_value(pugi::xml_node& parent, const std::string& tag, const nlohmann::json& value) {
+void append_child_value(pugi::xml_node& parent, const std::string& tag, const nlohmann::ordered_json& value) {
     if (value.is_array()) {
         for (const auto& entry : value) append_child_value(parent, tag, entry);
         return;
@@ -113,7 +113,7 @@ std::string print_node(pugi::xml_node& node) {
 
 } // namespace
 
-std::string build_dfjob_xml(const nlohmann::json& df_job) {
+std::string build_dfjob_xml(const nlohmann::ordered_json& df_job) {
     if (!df_job.is_object())
         throw std::runtime_error("build_dfjob_xml: \"df_job\" must be an object");
 
@@ -125,7 +125,7 @@ std::string build_dfjob_xml(const nlohmann::json& df_job) {
     return print_node(root);
 }
 
-std::string build_df_station_data_xml(const nlohmann::json& df_station_data) {
+std::string build_df_station_data_xml(const nlohmann::ordered_json& df_station_data) {
     if (!df_station_data.is_object())
         throw std::runtime_error("build_df_station_data_xml: \"df_station_data\" must be an object");
 
@@ -137,7 +137,7 @@ std::string build_df_station_data_xml(const nlohmann::json& df_station_data) {
     return print_node(root);
 }
 
-std::string build_dfdata_xml(const nlohmann::json& df_data) {
+std::string build_dfdata_xml(const nlohmann::ordered_json& df_data) {
     if (!df_data.is_object())
         throw std::runtime_error("build_dfdata_xml: \"df_data\" must be an object");
 

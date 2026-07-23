@@ -37,7 +37,15 @@
 // Builds "<DFJob>...</DFJob>" from a JSON object shaped exactly like
 // parse_message()'s own mirrored "df_job" body value (see
 // DDF550_9150_Control_XML_to_JSON.md Part 2, DFJob example).
-std::string build_dfjob_xml(const nlohmann::json& df_job);
+//
+// Takes nlohmann::ordered_json (not plain nlohmann::json) specifically so
+// the emitted XML's element order follows the JSON's key insertion/parse
+// order -- plain nlohmann::json objects are std::map-backed and always
+// iterate alphabetically, which does not match the ICD's worked-example
+// field order. Callers must parse kwargs_json with
+// nlohmann::ordered_json::parse (not nlohmann::json::parse) for this to
+// have any effect -- order lost at the outer parse can't be recovered here.
+std::string build_dfjob_xml(const nlohmann::ordered_json& df_job);
 
 // Builds "<DFStationData>...</DFStationData>" from a JSON object shaped
 // exactly like parse_message()'s own mirrored "df_station_data" body
@@ -46,7 +54,7 @@ std::string build_dfjob_xml(const nlohmann::json& df_job);
 // "df_station_data") -- distinct from FORMAT01, which nests the same
 // content as a child of <DFData> instead (handled already, inside
 // build_dfdata_xml, via the ordinary "df_station_data" key lookup).
-std::string build_df_station_data_xml(const nlohmann::json& df_station_data);
+std::string build_df_station_data_xml(const nlohmann::ordered_json& df_station_data);
 
 // Builds "<DFData ...>...</DFData>" from a JSON object shaped exactly like
 // parse_message()'s own mirrored "df_data" body value -- any of
@@ -59,4 +67,4 @@ std::string build_df_station_data_xml(const nlohmann::json& df_station_data);
 // (FORMAT01's usage) -- these are genuinely different wire shapes that
 // happen to mirror to the same JSON key on decode, disambiguated here by
 // nesting depth, not guessed.
-std::string build_dfdata_xml(const nlohmann::json& df_data);
+std::string build_dfdata_xml(const nlohmann::ordered_json& df_data);
