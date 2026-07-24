@@ -13,18 +13,28 @@ This is the "manual encode verification" companion to decode_check.py
 and to tests/test_frames_ca120.cpp (automated, synthetic-only regression
 coverage of both directions).
 
-CA120's format_response() contract (see ca120_parser.cpp's own doc comment)
-is narrower than DDF-550's: it only ever encodes an XML <Request> frame for
-the control channel (TCP 9001). Required JSON fields:
-    "msg_type" : "set" | "get" | "suppress"
-    "id"       : integer request correlation ID
-    "xml_body" : inner XML string (children of <Request>), JSON-escaped
-Optional:
-    "time"     : integer CA120 time value (us)
-The DLL's first ("kind") argument is currently unused by CA120's
-format_response (see the `const char* /*kind*/` parameter in
-ca120_parser.cpp) -- this script still passes msg_type through it for
-consistency with the ABI signature, but changing it has no effect.
+CA120's format_response() contract (see ca120_parser.cpp's own doc comment
+and ca120_tag_table.h) accepts exactly the shape parse_message() itself
+produces -- no separate flattened xml_body contract exists any more. A
+caller (drs-server, or a random-mode generator standing in for CA120's
+hardware role) hands back parse_message's own output verbatim:
+    {"msg_kind": "request" | "reply" | "event",
+     "body": {"<msg_kind>": {
+         "type": "...", "id": "...", "time": "...", "source": "...",
+                                      (whichever the message actually has)
+         "<subsystem_tag>": {...}, ...   (everything else becomes an XML
+                                          child of the root, e.g.
+                                          "digital_demodulator", "tuner")
+     }}}
+"hw"/"channel" are accepted but ignored if present -- purely informational
+envelope fields from parse_message's output, not needed to rebuild wire
+bytes. Encoding fails (-1) for any key not in ca120_tag_table.h's lookup
+tables -- see that file for why tag-name reconstruction needs an explicit
+table rather than a generic algorithm (to_snake_case() is lossy).
+The DLL's first ("kind") argument is unused by CA120's format_response
+(see the `const char* /*kind*/` parameter in ca120_parser.cpp) -- this
+script still passes msg_kind through it for consistency with the ABI
+signature, but changing it has no effect.
 
 There is no AMMOS encode direction to verify: AMMOS is CA120-to-bridge
 only (a receive-only data stream), so format_response has nothing to
@@ -33,9 +43,9 @@ produce for it.
 NOTE on why this bypasses drs_bridge.parser_loader.ParserHandle.format_response():
 that convenience method is hardcoded to a different variant family's kwargs
 shape (group_id/unit_id/status) and does not match CA120's format_response
-contract (msg_type/id/xml_body[/time]). This script calls the DLL's raw
-format_response binding directly instead (same one ParserHandle sets up
-internally, just invoked with the correct kwargs shape for this variant).
+contract (msg_kind/body). This script calls the DLL's raw format_response
+binding directly instead (same one ParserHandle sets up internally, just
+invoked with the correct kwargs shape for this variant).
 
 Usage:
     python format_check.py                     # run the built-in vectors
@@ -77,13 +87,14 @@ def find_dll() -> Path:
 
 def call_format_response(handle, kwargs: dict) -> bytes | None:
     """Call the DLL's format_response() directly with CA120's real kwargs
-    shape (msg_type/id/xml_body[/time]) -- see module docstring for why
-    ParserHandle's own format_response() wrapper can't be used here."""
+    shape (msg_kind/body, matching parse_message's own output) -- see module
+    docstring for why ParserHandle's own format_response() wrapper can't be
+    used here."""
     kwargs_json = json.dumps(kwargs).encode("utf-8")
     out_buf = ctypes.POINTER(ctypes.c_uint8)()
     out_len = ctypes.c_size_t(0)
     rc = handle._format_response(  # noqa: SLF001 -- raw ABI binding, see docstring
-        kwargs.get("msg_type", "").encode("utf-8"),
+        kwargs.get("msg_kind", "").encode("utf-8"),
         kwargs_json,
         ctypes.byref(out_buf),
         ctypes.byref(out_len),
@@ -100,10 +111,11 @@ def call_format_response(handle, kwargs: dict) -> bytes | None:
 # test_frames_ca120.cpp, expressed here as the exact JSON kwargs
 # format_response() expects -- add real ICD-derived examples below as needed.
 BUILTIN_VECTORS: list[tuple[str, dict]] = [
-    ("Full parse_message-shaped Reply JSON, as drs-server would actually hold it "
-     "(hw/channel/msg_kind/body wrapper) -- NOT format_response's real kwargs shape "
-     "(msg_type/id/xml_body). Kept in as-received to show what actually happens if "
-     "this exact object is handed to format_response() unmodified.", {
+    ("Full parse_message-shaped Reply JSON, exactly as drs-server would hold it "
+     "(hw/channel/msg_kind/body wrapper) -- no reshaping. This is now "
+     "format_response's real kwargs shape; see ca120_tag_table.h for the "
+     "AvailableDemodulators/Decoders tag entries that make this specific "
+     "payload encodable.", {
         "hw": "ca120",
         "channel": "xml",
         "msg_kind": "reply",
@@ -140,41 +152,6 @@ BUILTIN_VECTORS: list[tuple[str, dict]] = [
                 },
             }
         },
-    }),
-    ("Same data, reshaped to format_response's actual contract "
-     "(msg_type/id/xml_body per ca120_parser.cpp:744-749) -- msg_type/id pulled "
-     "from body.reply.type/id, xml_body hand-built from body.reply.* (this "
-     "reshaping step is exactly the not-yet-ported 'unmirror' work flagged "
-     "earlier; nothing in the DLL does it automatically today).", {
-        "msg_type": "get",
-        "id": 70054,
-        "xml_body": (
-            '<DigitalDemodulator>'
-            '<AvailableDemodulators>'
-            '<DemodulatorInfo>'
-            '<DemodulatorName>ASK2</DemodulatorName>'
-            '<DemodulatorVersion>1</DemodulatorVersion>'
-            '<ModuleID>1048576</ModuleID>'
-            '<ParameterSize>9</ParameterSize>'
-            '<SupportsSymbolData>1</SupportsSymbolData>'
-            '<SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>'
-            '<SupportsInstantData>1</SupportsInstantData>'
-            '<SupportsImageData>0</SupportsImageData>'
-            '<SupportsTransmissionData>0</SupportsTransmissionData>'
-            '<SupportsAudioData>0</SupportsAudioData>'
-            '<IsUniversal>1</IsUniversal>'
-            '<SupportsSpecialData>0</SupportsSpecialData>'
-            '</DemodulatorInfo>'
-            '</AvailableDemodulators>'
-            '</DigitalDemodulator>'
-            '<BitstreamProcessing>'
-            '<AvailableDecoders>'
-            '<Decoder id="100000" classificationOnly="1">'
-            '<DecoderName>ASCII</DecoderName>'
-            '</Decoder>'
-            '</AvailableDecoders>'
-            '</BitstreamProcessing>'
-        ),
     }),
 ]
 
@@ -214,10 +191,29 @@ def encode_one(handle, label: str, kwargs: dict) -> dict:
     return result
 
 
+_BOUNDARY = "-" * 100
+
+
+def extract_id(kwargs: dict) -> str | None:
+    """Best-effort pull of body.<msg_kind>.id so each block's boundary
+    header shows which message it is at a glance."""
+    msg_kind = kwargs.get("msg_kind")
+    body = kwargs.get("body")
+    if isinstance(body, dict) and msg_kind in body and isinstance(body[msg_kind], dict):
+        return str(body[msg_kind].get("id", "")) or None
+    return None
+
+
 def format_entry(entry: dict) -> str:
-    lines = [f"=== {entry['label']} ===", "input_json:", json.dumps(entry["input_json"], indent=2)]
+    id_str = extract_id(entry["input_json"])
+    header = f"VECTOR: {entry['label']}"
+    if id_str:
+        header += f"   [id={id_str}]"
+
+    lines = [_BOUNDARY, header, _BOUNDARY, "input_json:", json.dumps(entry["input_json"], indent=2)]
     if "error" in entry:
         lines.append(f"RESULT: ERROR -- {entry['error']}")
+        lines.append(_BOUNDARY)
         lines.append("")
         return "\n".join(lines)
 
@@ -230,6 +226,7 @@ def format_entry(entry: dict) -> str:
     elif "roundtrip_json" in entry:
         lines.append("roundtrip_json (decoded back via extract_frame + parse_message):")
         lines.append(json.dumps(entry["roundtrip_json"], indent=2))
+    lines.append(_BOUNDARY)
     lines.append("")
     return "\n".join(lines)
 

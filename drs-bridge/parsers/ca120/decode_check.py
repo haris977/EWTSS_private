@@ -168,8 +168,31 @@ def decode_one(handle, label: str, wire: bytes) -> dict:
     return result
 
 
+_BOUNDARY = "-" * 100
+
+
+def extract_id(output_json: dict | None) -> str | None:
+    """Best-effort pull of body.<msg_kind>.id (or .stream for AMMOS frames)
+    so each block's boundary header shows which message it is at a glance."""
+    if not output_json:
+        return None
+    msg_kind = output_json.get("msg_kind")
+    body = output_json.get("body")
+    if isinstance(body, dict) and msg_kind in body and isinstance(body[msg_kind], dict):
+        if "id" in body[msg_kind]:
+            return str(body[msg_kind]["id"])
+    if "stream" in output_json:  # AMMOS frames have no id/type -- show stream+frame_count instead
+        return f"stream={output_json['stream']} frame_count={output_json.get('frame_count')}"
+    return None
+
+
 def format_entry(entry: dict) -> str:
-    lines = [f"=== {entry['label']} ===", f"input_hex     : {entry['input_hex']}"]
+    id_str = extract_id(entry.get("output_json"))
+    header = f"VECTOR: {entry['label']}"
+    if id_str:
+        header += f"   [id={id_str}]"
+
+    lines = [_BOUNDARY, header, _BOUNDARY, f"input_hex     : {entry['input_hex']}"]
     lines.append(f"input_readable: {entry['input_readable']}")
     if "frame_hex" in entry:
         lines.append(f"frame_hex     : {entry['frame_hex']}")
@@ -178,6 +201,7 @@ def format_entry(entry: dict) -> str:
     else:
         lines.append("output_json:")
         lines.append(json.dumps(entry["output_json"], indent=2))
+    lines.append(_BOUNDARY)
     lines.append("")
     return "\n".join(lines)
 

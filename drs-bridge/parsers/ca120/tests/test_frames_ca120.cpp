@@ -548,14 +548,21 @@ static void test_xml_leading_whitespace() {
 // format_response tests
 // ---------------------------------------------------------------------------
 
+// format_response() accepts exactly the shape parse_message() itself
+// produces (msg_kind/body.<msg_kind> wrapper) -- see ca120_parser.cpp's
+// format_response doc comment and ca120_tag_table.h. No separate flattened
+// xml_body contract exists any more; a caller (drs-server, or a
+// random-mode generator) hands back parse_message's own output verbatim.
+
 static void test_format_response_basic() {
     const char* json =
-        "{\"msg_type\":\"set\",\"id\":7,"
-        "\"xml_body\":\"<Tuner><Frequency>100000000</Frequency></Tuner>\"}";
+        "{\"msg_kind\":\"request\","
+        "\"body\":{\"request\":{\"type\":\"set\",\"id\":\"7\","
+        "\"tuner\":{\"frequency\":\"100000000\"}}}}";
 
     uint8_t* out_buf = nullptr;
     size_t out_len = 0;
-    int rc = format_response("set", json, &out_buf, &out_len);
+    int rc = format_response("request", json, &out_buf, &out_len);
     CHECK(rc == 0, "format_response returns success");
 
     std::string xml(reinterpret_cast<const char*>(out_buf), out_len);
@@ -563,44 +570,61 @@ static void test_format_response_basic() {
     CHECK(xml.find("</Request>") != std::string::npos, "format_response produces </Request>");
     CHECK(xml.find("type=\"set\"") != std::string::npos, "format_response has type=set");
     CHECK(xml.find("id=\"7\"") != std::string::npos,     "format_response has id=7");
-    CHECK(xml.find("Frequency") != std::string::npos,    "format_response body preserved");
+    CHECK(xml.find("<Tuner><Frequency>100000000</Frequency></Tuner>") != std::string::npos,
+          "format_response reconstructed Tuner/Frequency from nested JSON");
     free_result(out_buf);
 }
 
 static void test_format_response_with_time() {
     const char* json =
-        "{\"msg_type\":\"get\",\"id\":3,\"time\":12345,"
-        "\"xml_body\":\"<Tuner/>\"}";
+        "{\"msg_kind\":\"request\","
+        "\"body\":{\"request\":{\"type\":\"get\",\"id\":\"3\",\"time\":\"12345\","
+        "\"tuner\":{}}}}";
 
     uint8_t* out_buf = nullptr;
     size_t out_len = 0;
-    int rc = format_response("set", json, &out_buf, &out_len);
+    int rc = format_response("request", json, &out_buf, &out_len);
     CHECK(rc == 0, "format_response with time -> success");
 
     std::string xml(reinterpret_cast<const char*>(out_buf), out_len);
     CHECK(xml.find("time=\"12345\"") != std::string::npos, "format_response has time=12345");
+    CHECK(xml.find("<Tuner/>") != std::string::npos, "format_response empty tuner object self-closes");
     free_result(out_buf);
 }
 
 static void test_format_response_missing_required_field() {
-    // Missing xml_body
-    const char* json = "{\"msg_type\":\"set\",\"id\":1}";
+    // Missing "body"
+    const char* json = "{\"msg_kind\":\"request\"}";
     uint8_t* out_buf = nullptr;
     size_t out_len = 0;
-    int rc = format_response("set", json, &out_buf, &out_len);
-    CHECK(rc == -1, "format_response with missing xml_body -> -1");
+    int rc = format_response("request", json, &out_buf, &out_len);
+    CHECK(rc == -1, "format_response with missing body -> -1");
+    free_result(out_buf);
+}
+
+static void test_format_response_unknown_tag_fails() {
+    // "not_a_real_tag" is not in ca120_tag_table.h -- must fail loudly, not guess
+    const char* json =
+        "{\"msg_kind\":\"request\","
+        "\"body\":{\"request\":{\"type\":\"set\",\"id\":\"1\","
+        "\"not_a_real_tag\":{\"x\":\"1\"}}}}";
+    uint8_t* out_buf = nullptr;
+    size_t out_len = 0;
+    int rc = format_response("request", json, &out_buf, &out_len);
+    CHECK(rc == -1, "format_response with an uncatalogued tag -> -1 (fails loudly, no guessing)");
     free_result(out_buf);
 }
 
 static void test_format_response_roundtrip() {
     // Build a Request via format_response, then extract_frame it back
     const char* json =
-        "{\"msg_type\":\"set\",\"id\":9,"
-        "\"xml_body\":\"<Tuner><Frequency>200000000</Frequency></Tuner>\"}";
+        "{\"msg_kind\":\"request\","
+        "\"body\":{\"request\":{\"type\":\"set\",\"id\":\"9\","
+        "\"tuner\":{\"frequency\":\"200000000\"}}}}";
 
     uint8_t* wire = nullptr;
     size_t wire_len = 0;
-    int frc = format_response("set", json, &wire, &wire_len);
+    int frc = format_response("request", json, &wire, &wire_len);
     CHECK(frc == 0, "roundtrip: format_response produced bytes");
 
     uint8_t* out = nullptr;
@@ -616,6 +640,168 @@ static void test_format_response_roundtrip() {
     CHECK(contains(result, "\"msg_kind\":\"request\""), "roundtrip: msg_kind == request");
     CHECK(contains(result, "\"frequency\":\"200000000\""),
           "roundtrip: frequency value preserved (nested under body.request.tuner)");
+    free_result(result);
+    free_result(out);
+    free_result(wire);
+}
+
+// Round-trips the ICD §5.6.4 AvailableDemodulators/AvailableDecoders Reply
+// body (two subsystem roots) through format_response -> extract_frame ->
+// parse_message, confirming ca120_tag_table.h's entries for that payload
+// are correct end-to-end (matches CA120_9001_Control_XML_to_JSON.md).
+static void test_format_response_available_demodulators_roundtrip() {
+    const char* json =
+        "{\"msg_kind\":\"reply\","
+        "\"body\":{\"reply\":{\"type\":\"get\",\"id\":\"70054\","
+        "\"digital_demodulator\":{\"available_demodulators\":{\"demodulator_info\":{"
+        "\"demodulator_name\":\"ASK2\",\"demodulator_version\":\"1\",\"module_id\":\"1048576\","
+        "\"parameter_size\":\"9\",\"supports_symbol_data\":\"1\","
+        "\"supports_iq_constellation_data\":\"0\",\"supports_instant_data\":\"1\","
+        "\"supports_image_data\":\"0\",\"supports_transmission_data\":\"0\","
+        "\"supports_audio_data\":\"0\",\"is_universal\":\"1\",\"supports_special_data\":\"0\""
+        "}}},"
+        "\"bitstream_processing\":{\"available_decoders\":{\"decoder\":{"
+        "\"id\":\"100000\",\"classification_only\":\"1\",\"decoder_name\":\"ASCII\""
+        "}}}"
+        "}}}";
+
+    uint8_t* wire = nullptr;
+    size_t wire_len = 0;
+    int frc = format_response("reply", json, &wire, &wire_len);
+    CHECK(frc == 0, "AvailableDemodulators/Decoders: format_response produced bytes");
+
+    std::string xml(reinterpret_cast<const char*>(wire), wire_len);
+    CHECK(xml.find("<Reply type=\"get\" id=\"70054\">") != std::string::npos,
+          "AvailableDemodulators/Decoders: root Reply attrs correct");
+    CHECK(xml.find("<SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>") != std::string::npos,
+          "AvailableDemodulators/Decoders: acronym+underscore tag name reconstructed exactly");
+    CHECK(xml.find("<Decoder id=\"100000\" classificationOnly=\"1\">") != std::string::npos,
+          "AvailableDemodulators/Decoders: classificationOnly attribute casing reconstructed");
+
+    uint8_t* out = nullptr;
+    size_t out_len = 0;
+    int rc = extract_frame(wire, wire_len, &out, &out_len);
+    CHECK(rc == 0, "AvailableDemodulators/Decoders: extract_frame of format_response output -> success");
+
+    char* result = nullptr;
+    size_t result_len = 0;
+    int prc = parse_message(out, out_len, &result, &result_len);
+    CHECK(prc == 0,          "AvailableDemodulators/Decoders: roundtrip parse_message -> success");
+    CHECK(contains(result, "\"demodulator_name\":\"ASK2\""),
+          "AvailableDemodulators/Decoders: roundtrip demodulator_name preserved");
+    CHECK(contains(result, "\"classification_only\":\"1\""),
+          "AvailableDemodulators/Decoders: roundtrip classification_only preserved");
+    free_result(result);
+    free_result(out);
+    free_result(wire);
+}
+
+// Round-trips ICD §5.3.2's Tuner Parameters Get reply (26 fields) -- the
+// exact case shown earlier failing before ca120_tag_table.h was extended
+// to cover Tuner's fields beyond bare Frequency.
+static void test_format_response_tuner_parameters_roundtrip() {
+    const char* json =
+        "{\"msg_kind\":\"reply\","
+        "\"body\":{\"reply\":{\"type\":\"get\",\"id\":\"67456\","
+        "\"tuner\":{\"parameters\":{"
+        "\"frequency\":{\"unit\":\"Hz\",\"#text\":\"110000000\"},"
+        "\"bandwidth\":{\"unit\":\"Hz\",\"#text\":\"80000000\"},"
+        "\"preselection\":\"lowDistortion\","
+        "\"mode\":\"ffm\""
+        "}}}}}";
+
+    uint8_t* wire = nullptr;
+    size_t wire_len = 0;
+    int frc = format_response("reply", json, &wire, &wire_len);
+    CHECK(frc == 0, "Tuner Parameters: format_response produced bytes");
+
+    std::string xml(reinterpret_cast<const char*>(wire), wire_len);
+    CHECK(xml.find("<Bandwidth unit=\"Hz\">80000000</Bandwidth>") != std::string::npos,
+          "Tuner Parameters: Bandwidth (previously-uncatalogued tag) now encodes correctly");
+    CHECK(xml.find("<Mode>ffm</Mode>") != std::string::npos,
+          "Tuner Parameters: bare 'mode' resolves to the <Mode> ELEMENT here (no DCP parent)");
+
+    uint8_t* out = nullptr;
+    size_t out_len = 0;
+    int rc = extract_frame(wire, wire_len, &out, &out_len);
+    CHECK(rc == 0, "Tuner Parameters: extract_frame of format_response output -> success");
+    char* result = nullptr;
+    size_t result_len = 0;
+    int prc = parse_message(out, out_len, &result, &result_len);
+    CHECK(prc == 0, "Tuner Parameters: roundtrip parse_message -> success");
+    CHECK(contains(result, "\"bandwidth\":{\"unit\":\"Hz\",\"#text\":\"80000000\"}"),
+          "Tuner Parameters: roundtrip bandwidth preserved");
+    free_result(result);
+    free_result(out);
+    free_result(wire);
+}
+
+// Proves the "mode" attribute-vs-element context resolution: DCP's own
+// mode="multiChannel" attribute (ICD §5.1.1) must NOT be confused with
+// Tuner's <Mode> element exercised in the previous test.
+static void test_format_response_dcp_mode_attribute_roundtrip() {
+    const char* json =
+        "{\"msg_kind\":\"request\","
+        "\"body\":{\"request\":{\"type\":\"set\",\"id\":\"2\","
+        "\"dcp\":{\"type\":\"detector\",\"mode\":\"multiChannel\","
+        "\"resource_demand_class\":\"hw\"}}}}";
+
+    uint8_t* wire = nullptr;
+    size_t wire_len = 0;
+    int frc = format_response("request", json, &wire, &wire_len);
+    CHECK(frc == 0, "DCP mode attribute: format_response produced bytes");
+
+    std::string xml(reinterpret_cast<const char*>(wire), wire_len);
+    CHECK(xml.find("<DCP type=\"detector\" mode=\"multiChannel\">") != std::string::npos,
+          "DCP mode attribute: 'mode' resolves to the mode=\"...\" ATTRIBUTE here (DCP parent context)");
+
+    uint8_t* out = nullptr;
+    size_t out_len = 0;
+    int rc = extract_frame(wire, wire_len, &out, &out_len);
+    CHECK(rc == 0, "DCP mode attribute: extract_frame of format_response output -> success");
+    char* result = nullptr;
+    size_t result_len = 0;
+    int prc = parse_message(out, out_len, &result, &result_len);
+    CHECK(prc == 0, "DCP mode attribute: roundtrip parse_message -> success");
+    CHECK(contains(result, "\"mode\":\"multiChannel\""),
+          "DCP mode attribute: roundtrip mode value preserved");
+    free_result(result);
+    free_result(out);
+    free_result(wire);
+}
+
+// Round-trips ICD §5.1.2's LicenseAllocation reply -- three levels of
+// same-named "License" nested recursively, stress-testing that the encoder
+// handles a tag nesting inside itself (not just distinct parent/child tags).
+static void test_format_response_license_allocation_roundtrip() {
+    const char* json =
+        "{\"msg_kind\":\"reply\","
+        "\"body\":{\"reply\":{\"type\":\"get\",\"id\":\"67388\","
+        "\"resource_manager\":{\"license_allocation\":{\"license\":{"
+        "\"name\":\"root\",\"license\":{"
+        "\"name\":\"mid\",\"total_licenses\":\"10\",\"available_licenses\":\"3\","
+        "\"license\":{\"name\":\"leaf\"}"
+        "}}}}}}}";
+
+    uint8_t* wire = nullptr;
+    size_t wire_len = 0;
+    int frc = format_response("reply", json, &wire, &wire_len);
+    CHECK(frc == 0, "LicenseAllocation: format_response produced bytes");
+
+    std::string xml(reinterpret_cast<const char*>(wire), wire_len);
+    CHECK(xml.find("<TotalLicenses>10</TotalLicenses>") != std::string::npos,
+          "LicenseAllocation: nested License-in-License-in-License encodes correctly");
+
+    uint8_t* out = nullptr;
+    size_t out_len = 0;
+    int rc = extract_frame(wire, wire_len, &out, &out_len);
+    CHECK(rc == 0, "LicenseAllocation: extract_frame of format_response output -> success");
+    char* result = nullptr;
+    size_t result_len = 0;
+    int prc = parse_message(out, out_len, &result, &result_len);
+    CHECK(prc == 0, "LicenseAllocation: roundtrip parse_message -> success");
+    CHECK(contains(result, "\"available_licenses\":\"3\""),
+          "LicenseAllocation: roundtrip nested value preserved");
     free_result(result);
     free_result(out);
     free_result(wire);
@@ -673,7 +859,12 @@ int main() {
     test_format_response_basic();
     test_format_response_with_time();
     test_format_response_missing_required_field();
+    test_format_response_unknown_tag_fails();
     test_format_response_roundtrip();
+    test_format_response_available_demodulators_roundtrip();
+    test_format_response_tuner_parameters_roundtrip();
+    test_format_response_dcp_mode_attribute_roundtrip();
+    test_format_response_license_allocation_roundtrip();
 
     test_free_result_null_safe();
     test_free_result_real_pointer();

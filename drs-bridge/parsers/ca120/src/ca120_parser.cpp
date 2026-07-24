@@ -18,12 +18,15 @@
 #include "json_kwargs.h"
 #include "pugixml.hpp"
 #include "pugixml_generic_mirror.h"
+#include "ca120_tag_table.h"
+#include "json.hpp"
 
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
 #include <string>
 #include <algorithm>
+#include <vector>
 
 using namespace sdfc;
 
@@ -739,61 +742,178 @@ SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
 // format_response  (ABI entry point)
 // ---------------------------------------------------------------------------
 //
-// Encodes a JSON descriptor into a CA120 XML <Request> wire frame.
+// Encodes a JSON descriptor into a CA120 XML wire frame. Accepts exactly the
+// shape parse_message() itself produces (see pugixml_generic_mirror.h /
+// CA120_9001_Control_XML_to_JSON.md) -- a caller (drs-server, or a
+// simulated/random-mode generator standing in for CA120's hardware role)
+// hands back that same object verbatim, no reshaping into a separate flat
+// contract required:
 //
-// Required JSON fields:
-//   "msg_type"   : "set" | "get" | "suppress"
-//   "id"         : integer request correlation ID
-//   "xml_body"   : inner XML string (children of <Request>), JSON-escaped
-// Optional:
-//   "time"       : integer CA120 time value (µs)
+//   {"msg_kind": "request" | "reply" | "event",
+//    "body": {"<msg_kind>": {
+//        "type": "...", "id": "...", "time": "...", "source": "...",
+//                                     (whichever of these the message has)
+//        "<subsystem_tag>": {...},   (one or more; e.g. "digital_demodulator",
+//        ...                          "control", "tuner" -- everything that
+//                                     isn't type/id/time/source becomes an
+//                                     XML child of the root)
+//    }}}
+// "hw"/"channel" (also present in parse_message's own output) are accepted
+// but ignored -- they're informational envelope fields, not needed to
+// rebuild the wire bytes.
+//
+// The nested subsystem content is converted back to XML tag-by-tag via
+// ca120_tags::element_names()/attribute_names() (see ca120_tag_table.h for
+// why this must be an explicit lookup table, not a generic algorithm).
+// Encoding fails (-1) if a key in the body isn't in either table -- a
+// not-yet-catalogued tag fails loudly rather than guessing wrong.
 //
 // Writes UTF-8 XML bytes to out_frame.
-// Returns total bytes written, or -1 on encoding error.
+// Returns 0 on success (byte count via *out_len), or -1 on encoding error.
+
+namespace {
+
+std::string xml_escape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        switch (c) {
+            case '&':  out += "&amp;";  break;
+            case '<':  out += "&lt;";   break;
+            case '>':  out += "&gt;";   break;
+            case '"':  out += "&quot;"; break;
+            default:   out += c;        break;
+        }
+    }
+    return out;
+}
+
+std::string attr_value_string(const nlohmann::ordered_json& v) {
+    return v.is_string() ? v.get<std::string>() : v.dump();
+}
+
+// Builds "<OriginalTag ...attrs...>...children/text...</OriginalTag>" (or a
+// self-closing "<OriginalTag/>") from one mirrored JSON value, recursively.
+// `value` may be: a plain string (text-only leaf), an array (repeated
+// sibling tags), or an object (attributes/#text/children merged flat, the
+// same shape node_object_body() in pugixml_generic_mirror.cpp produces).
+// Throws std::runtime_error on any key not found in ca120_tags' tables.
+std::string encode_node(const std::string& original_tag, const nlohmann::ordered_json& value) {
+    if (value.is_string()) {
+        return "<" + original_tag + ">" + xml_escape(value.get<std::string>()) + "</" + original_tag + ">";
+    }
+    if (value.is_array()) {
+        std::string out;
+        for (const auto& item : value) out += encode_node(original_tag, item);
+        return out;
+    }
+    if (!value.is_object()) throw std::runtime_error("unsupported JSON value for tag " + original_tag);
+
+    const auto& attr_table = ca120_tags::attribute_names();
+    const auto& elem_table = ca120_tags::element_names();
+    const auto& overrides  = ca120_tags::parent_attribute_overrides();
+    auto override_it = overrides.find(original_tag);
+    const std::unordered_map<std::string, std::string>* parent_overrides =
+        (override_it != overrides.end()) ? &override_it->second : nullptr;
+
+    std::string text;
+    bool has_text = false;
+    std::vector<std::pair<std::string, std::string>> attrs;
+    std::vector<std::pair<std::string, const nlohmann::ordered_json*>> children;
+
+    for (auto it = value.begin(); it != value.end(); ++it) {
+        const std::string& key = it.key();
+        if (key == "#text") {
+            has_text = true;
+            text = it.value().get<std::string>();
+            continue;
+        }
+        // Context-specific override (e.g. "mode" is an attribute only when
+        // original_tag == "DCP") takes priority over the global tables.
+        if (parent_overrides) {
+            auto ov = parent_overrides->find(key);
+            if (ov != parent_overrides->end()) {
+                attrs.emplace_back(ov->second, attr_value_string(it.value()));
+                continue;
+            }
+        }
+        auto a = attr_table.find(key);
+        if (a != attr_table.end()) {
+            attrs.emplace_back(a->second, attr_value_string(it.value()));
+            continue;
+        }
+        auto e = elem_table.find(key);
+        if (e == elem_table.end())
+            throw std::runtime_error("unknown CA120 key '" + key + "' -- not in ca120_tag_table.h");
+        children.emplace_back(e->second, &it.value());
+    }
+
+    std::string out = "<" + original_tag;
+    for (auto& a : attrs) out += " " + a.first + "=\"" + xml_escape(a.second) + "\"";
+
+    if (!has_text && children.empty()) { out += "/>"; return out; }
+
+    out += ">";
+    if (has_text) out += xml_escape(text);
+    for (auto& c : children) out += encode_node(c.first, *c.second);
+    out += "</" + original_tag + ">";
+    return out;
+}
+
+}  // namespace
 
 SDFC_EXPORT int format_response(const char* /*kind*/, const char* kwargs_json,
                                  uint8_t** out_buf, size_t* out_len)
 {
     if (!kwargs_json || !out_buf || !out_len) return -1;
 
-    std::string msg_type = json_str_field(kwargs_json, "msg_type");
-    std::string xml_body = json_str_field(kwargs_json, "xml_body");
-    long long   id       = json_int_field(kwargs_json, "id");
-    long long   time_val = json_int_field(kwargs_json, "time");
+    std::string xml;
+    try {
+        nlohmann::ordered_json kwargs = nlohmann::ordered_json::parse(kwargs_json);
+        if (!kwargs.is_object()) return -1;
 
-    if (msg_type.empty() || xml_body.empty() || id < 0) return -1;
+        std::string msg_kind = kwargs.value("msg_kind", "");
+        static const std::unordered_map<std::string, std::string> kRootTags = {
+            {"request", "Request"}, {"reply", "Reply"}, {"event", "Event"},
+        };
+        auto root_it = kRootTags.find(msg_kind);
+        if (root_it == kRootTags.end()) return -1;
+        const std::string& root_tag = root_it->second;
 
-    // Build opening tag
-    char hdr[256];
-    int  hlen;
-    if (time_val > 0) {
-        hlen = std::snprintf(hdr, sizeof(hdr),
-            "<Request type=\"%s\" id=\"%lld\" time=\"%lld\">",
-            msg_type.c_str(), id, time_val);
-    } else {
-        hlen = std::snprintf(hdr, sizeof(hdr),
-            "<Request type=\"%s\" id=\"%lld\">",
-            msg_type.c_str(), id);
+        if (!kwargs.contains("body") || !kwargs.at("body").is_object()) return -1;
+        const auto& body = kwargs.at("body");
+        if (!body.contains(msg_kind) || !body.at(msg_kind).is_object()) return -1;
+
+        nlohmann::ordered_json msg = body.at(msg_kind);  // copy: root attrs get erased below
+
+        static const std::vector<std::string> kRootAttrOrder = {"type", "id", "time", "source"};
+        std::string attr_str;
+        for (const auto& key : kRootAttrOrder) {
+            if (!msg.contains(key)) continue;
+            attr_str += " " + key + "=\"" + xml_escape(attr_value_string(msg.at(key))) + "\"";
+            msg.erase(key);
+        }
+
+        std::string children_xml;
+        const auto& elem_table = ca120_tags::element_names();
+        for (auto it = msg.begin(); it != msg.end(); ++it) {
+            auto e = elem_table.find(it.key());
+            if (e == elem_table.end()) return -1;  // unknown tag -- fail loudly, don't guess
+            children_xml += encode_node(e->second, it.value());
+        }
+
+        xml = "<" + root_tag + attr_str + ">" + children_xml + "</" + root_tag + ">";
+    } catch (...) {
+        return -1;
     }
-    if (hlen <= 0 || hlen >= (int)sizeof(hdr)) return -1;
 
-    static const char kFooter[]   = "</Request>";
-    static const int  kFooterLen  = (int)(sizeof(kFooter) - 1);
+    if (xml.size() > (size_t)MAX_FRAME_BUFFER_BYTES) return -1;
 
-    int body_len  = (int)xml_body.size();
-    int total     = hlen + body_len + kFooterLen;
-
-    if (total > MAX_FRAME_BUFFER_BYTES) return -1;
-
-    auto* buf = static_cast<uint8_t*>(std::malloc((size_t)total));
+    auto* buf = static_cast<uint8_t*>(std::malloc(xml.size()));
     if (!buf) return -1;
-    uint8_t* p = buf;
-    memcpy(p, hdr,               (size_t)hlen);       p += hlen;
-    memcpy(p, xml_body.c_str(),  (size_t)body_len);   p += body_len;
-    memcpy(p, kFooter,           (size_t)kFooterLen);
-
+    memcpy(buf, xml.data(), xml.size());
     *out_buf = buf;
-    *out_len = (size_t)total;
+    *out_len = xml.size();
     return 0;
 }
 

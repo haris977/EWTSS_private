@@ -845,3 +845,742 @@ roundtrip_json (decoded back via extract_frame + parse_message):
   }
 }
 
+=== Full parse_message-shaped Reply JSON, exactly as drs-server would hold it (hw/channel/msg_kind/body wrapper) -- no reshaping. This is now format_response's real kwargs shape; see ca120_tag_table.h for the AvailableDemodulators/Decoders tag entries that make this specific payload encodable. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+output_hex: 3c5265706c7920747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f5265706c793e
+output_xml:
+<Reply type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Full parse_message-shaped Reply JSON, exactly as drs-server would hold it (hw/channel/msg_kind/body wrapper) -- no reshaping. This is now format_response's real kwargs shape; see ca120_tag_table.h for the AvailableDemodulators/Decoders tag entries that make this specific payload encodable. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+output_hex: 3c5265706c7920747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f5265706c793e
+output_xml:
+<Reply type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Full parse_message-shaped Reply JSON, exactly as drs-server would hold it (hw/channel/msg_kind/body wrapper) -- no reshaping. This is now format_response's real kwargs shape; see ca120_tag_table.h for the AvailableDemodulators/Decoders tag entries that make this specific payload encodable. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+output_hex: 3c5265706c7920747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f5265706c793e
+output_xml:
+<Reply type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+VECTOR: Full parse_message-shaped Reply JSON, exactly as drs-server would hold it (hw/channel/msg_kind/body wrapper) -- no reshaping. This is now format_response's real kwargs shape; see ca120_tag_table.h for the AvailableDemodulators/Decoders tag entries that make this specific payload encodable.   [id=70054]
+----------------------------------------------------------------------------------------------------
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+output_hex: 3c5265706c7920747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f5265706c793e
+output_xml:
+<Reply type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+VECTOR: Full parse_message-shaped Reply JSON, exactly as drs-server would hold it (hw/channel/msg_kind/body wrapper) -- no reshaping. This is now format_response's real kwargs shape; see ca120_tag_table.h for the AvailableDemodulators/Decoders tag entries that make this specific payload encodable.   [id=70054]
+----------------------------------------------------------------------------------------------------
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+output_hex: 3c5265706c7920747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f5265706c793e
+output_xml:
+<Reply type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+VECTOR: --json input   [id=1]
+----------------------------------------------------------------------------------------------------
+input_json:
+{
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "set",
+      "id": "1",
+      "tuner": {
+        "parameters": {
+          "bandwidth": {
+            "unit": "Hz",
+            "#text": "80000000"
+          }
+        }
+      }
+    }
+  }
+}
+RESULT: ERROR -- format_response: encoding failed (rc != 0)
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+VECTOR: --json input   [id=67456]
+----------------------------------------------------------------------------------------------------
+input_json:
+{
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "67456",
+      "tuner": {
+        "parameters": {
+          "bandwidth": {
+            "unit": "Hz",
+            "#text": "80000000"
+          }
+        }
+      }
+    }
+  }
+}
+output_hex: 3c5265706c7920747970653d22676574222069643d223637343536223e3c54756e65723e3c506172616d65746572733e3c42616e64776964746820756e69743d22487a223e38303030303030303c2f42616e6477696474683e3c2f506172616d65746572733e3c2f54756e65723e3c2f5265706c793e
+output_xml:
+<Reply type="get" id="67456">
+  <Tuner>
+    <Parameters>
+      <Bandwidth unit="Hz">80000000</Bandwidth>
+    </Parameters>
+  </Tuner>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "67456",
+      "tuner": {
+        "parameters": {
+          "bandwidth": {
+            "unit": "Hz",
+            "#text": "80000000"
+          }
+        }
+      }
+    }
+  }
+}
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+VECTOR: Full parse_message-shaped Reply JSON, exactly as drs-server would hold it (hw/channel/msg_kind/body wrapper) -- no reshaping. This is now format_response's real kwargs shape; see ca120_tag_table.h for the AvailableDemodulators/Decoders tag entries that make this specific payload encodable.   [id=70054]
+----------------------------------------------------------------------------------------------------
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+output_hex: 3c5265706c7920747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f5265706c793e
+output_xml:
+<Reply type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Reply>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+----------------------------------------------------------------------------------------------------
+
