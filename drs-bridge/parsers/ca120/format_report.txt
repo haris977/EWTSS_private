@@ -1,0 +1,847 @@
+=== Set -- Tuner Frequency (matches test_format_response_basic) ===
+input_json:
+{
+  "msg_type": "set",
+  "id": 7,
+  "xml_body": "<Tuner><Frequency>100000000</Frequency></Tuner>"
+}
+output_hex: 3c5265717565737420747970653d22736574222069643d2237223e3c54756e65723e3c4672657175656e63793e3130303030303030303c2f4672657175656e63793e3c2f54756e65723e3c2f526571756573743e
+output_xml:
+<?xml version="1.0" ?>
+<Request type="set" id="7">
+  <Tuner>
+    <Frequency>100000000</Frequency>
+  </Tuner>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "set",
+      "id": "7",
+      "tuner": {
+        "frequency": "100000000"
+      }
+    }
+  }
+}
+
+=== Get with time -- bare Tuner query (matches test_format_response_with_time) ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 3,
+  "time": 12345,
+  "xml_body": "<Tuner/>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d2233222074696d653d223132333435223e3c54756e65722f3e3c2f526571756573743e
+output_xml:
+<?xml version="1.0" ?>
+<Request type="get" id="3" time="12345">
+  <Tuner/>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "3",
+      "time": "12345",
+      "tuner": {}
+    }
+  }
+}
+
+=== Set -- DataStream start, tunerSpectrum (ICD §5.5.1 shape) ===
+input_json:
+{
+  "msg_type": "set",
+  "id": 68917,
+  "time": 6000000,
+  "xml_body": "<Control><DataStream action=\"start\" type=\"tunerSpectrum\"><Protocol>tcp</Protocol><IP>192.168.1.226</IP><Port>14776</Port></DataStream></Control>"
+}
+output_hex: 3c5265717565737420747970653d22736574222069643d223638393137222074696d653d2236303030303030223e3c436f6e74726f6c3e3c4461746153747265616d20616374696f6e3d2273746172742220747970653d2274756e6572537065637472756d223e3c50726f746f636f6c3e7463703c2f50726f746f636f6c3e3c49503e3139322e3136382e312e3232363c2f49503e3c506f72743e31343737363c2f506f72743e3c2f4461746153747265616d3e3c2f436f6e74726f6c3e3c2f526571756573743e
+output_xml:
+<?xml version="1.0" ?>
+<Request type="set" id="68917" time="6000000">
+  <Control>
+    <DataStream action="start" type="tunerSpectrum">
+      <Protocol>tcp</Protocol>
+      <IP>192.168.1.226</IP>
+      <Port>14776</Port>
+    </DataStream>
+  </Control>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "set",
+      "id": "68917",
+      "time": "6000000",
+      "control": {
+        "data_stream": {
+          "action": "start",
+          "type": "tunerSpectrum",
+          "protocol": "tcp",
+          "ip": "192.168.1.226",
+          "port": "14776"
+        }
+      }
+    }
+  }
+}
+
+=== Available Demodulators/Decoders body -- xml_body reconstructed from decode_check's §5.6.4 Reply vector. NOTE: format_response only ever wraps in <Request> (see module docstring) -- there is no encode path for <Reply>, so the round-trip below will show msg_kind=request, not reply. This vector checks that format_response can encode this two-subsystem-root body content without corruption, not that it reproduces a <Reply>. ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 70054,
+  "xml_body": "<DigitalDemodulator><AvailableDemodulators><DemodulatorInfo><DemodulatorName>ASK2</DemodulatorName><DemodulatorVersion>1</DemodulatorVersion><ModuleID>1048576</ModuleID><ParameterSize>9</ParameterSize><SupportsSymbolData>1</SupportsSymbolData><SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData><SupportsInstantData>1</SupportsInstantData><SupportsImageData>0</SupportsImageData><SupportsTransmissionData>0</SupportsTransmissionData><SupportsAudioData>0</SupportsAudioData><IsUniversal>1</IsUniversal><SupportsSpecialData>0</SupportsSpecialData></DemodulatorInfo></AvailableDemodulators></DigitalDemodulator><BitstreamProcessing><AvailableDecoders><Decoder id=\"100000\" classificationOnly=\"1\"><DecoderName>ASCII</DecoderName></Decoder></AvailableDecoders></BitstreamProcessing>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f526571756573743e
+output_xml:
+<?xml version="1.0" ?>
+<Request type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Available Demodulators/Decoders body -- xml_body reconstructed from decode_check's §5.6.4 Reply vector. NOTE: format_response only ever wraps in <Request> (see module docstring) -- there is no encode path for <Reply>, so the round-trip below will show msg_kind=request, not reply. This vector checks that format_response can encode this two-subsystem-root body content without corruption, not that it reproduces a <Reply>. ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 70054,
+  "xml_body": "<DigitalDemodulator><AvailableDemodulators><DemodulatorInfo><DemodulatorName>ASK2</DemodulatorName><DemodulatorVersion>1</DemodulatorVersion><ModuleID>1048576</ModuleID><ParameterSize>9</ParameterSize><SupportsSymbolData>1</SupportsSymbolData><SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData><SupportsInstantData>1</SupportsInstantData><SupportsImageData>0</SupportsImageData><SupportsTransmissionData>0</SupportsTransmissionData><SupportsAudioData>0</SupportsAudioData><IsUniversal>1</IsUniversal><SupportsSpecialData>0</SupportsSpecialData></DemodulatorInfo></AvailableDemodulators></DigitalDemodulator><BitstreamProcessing><AvailableDecoders><Decoder id=\"100000\" classificationOnly=\"1\"><DecoderName>ASCII</DecoderName></Decoder></AvailableDecoders></BitstreamProcessing>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f526571756573743e
+output_xml:
+<?xml version="1.0" ?>
+<Request type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Available Demodulators/Decoders body -- xml_body reconstructed from decode_check's §5.6.4 Reply vector. NOTE: format_response only ever wraps in <Request> (see module docstring) -- there is no encode path for <Reply>, so the round-trip below will show msg_kind=request, not reply. This vector checks that format_response can encode this two-subsystem-root body content without corruption, not that it reproduces a <Reply>. ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 70054,
+  "xml_body": "<DigitalDemodulator><AvailableDemodulators><DemodulatorInfo><DemodulatorName>ASK2</DemodulatorName><DemodulatorVersion>1</DemodulatorVersion><ModuleID>1048576</ModuleID><ParameterSize>9</ParameterSize><SupportsSymbolData>1</SupportsSymbolData><SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData><SupportsInstantData>1</SupportsInstantData><SupportsImageData>0</SupportsImageData><SupportsTransmissionData>0</SupportsTransmissionData><SupportsAudioData>0</SupportsAudioData><IsUniversal>1</IsUniversal><SupportsSpecialData>0</SupportsSpecialData></DemodulatorInfo></AvailableDemodulators></DigitalDemodulator><BitstreamProcessing><AvailableDecoders><Decoder id=\"100000\" classificationOnly=\"1\"><DecoderName>ASCII</DecoderName></Decoder></AvailableDecoders></BitstreamProcessing>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f526571756573743e
+output_xml:
+<Request type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Available Demodulators/Decoders body -- xml_body reconstructed from decode_check's §5.6.4 Reply vector. NOTE: format_response only ever wraps in <Request> (see module docstring) -- there is no encode path for <Reply>, so the round-trip below will show msg_kind=request, not reply. This vector checks that format_response can encode this two-subsystem-root body content without corruption, not that it reproduces a <Reply>. ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 70054,
+  "xml_body": "<DigitalDemodulator><AvailableDemodulators><DemodulatorInfo><DemodulatorName>ASK2</DemodulatorName><DemodulatorVersion>1</DemodulatorVersion><ModuleID>1048576</ModuleID><ParameterSize>9</ParameterSize><SupportsSymbolData>1</SupportsSymbolData><SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData><SupportsInstantData>1</SupportsInstantData><SupportsImageData>0</SupportsImageData><SupportsTransmissionData>0</SupportsTransmissionData><SupportsAudioData>0</SupportsAudioData><IsUniversal>1</IsUniversal><SupportsSpecialData>0</SupportsSpecialData></DemodulatorInfo></AvailableDemodulators></DigitalDemodulator><BitstreamProcessing><AvailableDecoders><Decoder id=\"100000\" classificationOnly=\"1\"><DecoderName>ASCII</DecoderName></Decoder></AvailableDecoders></BitstreamProcessing>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f526571756573743e
+output_xml:
+<Request type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Full parse_message-shaped Reply JSON, as drs-server would actually hold it (hw/channel/msg_kind/body wrapper) -- NOT format_response's real kwargs shape (msg_type/id/xml_body). Kept in as-received to show what actually happens if this exact object is handed to format_response() unmodified. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+RESULT: ERROR -- format_response: encoding failed (rc != 0)
+
+=== Full parse_message-shaped Reply JSON, as drs-server would actually hold it (hw/channel/msg_kind/body wrapper) -- NOT format_response's real kwargs shape (msg_type/id/xml_body). Kept in as-received to show what actually happens if this exact object is handed to format_response() unmodified. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+RESULT: ERROR -- format_response: encoding failed (rc != 0)
+
+=== Full parse_message-shaped Reply JSON, as drs-server would actually hold it (hw/channel/msg_kind/body wrapper) -- NOT format_response's real kwargs shape (msg_type/id/xml_body). Kept in as-received to show what actually happens if this exact object is handed to format_response() unmodified. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+RESULT: ERROR -- format_response: encoding failed (rc != 0)
+
+=== Same data, reshaped to format_response's actual contract (msg_type/id/xml_body per ca120_parser.cpp:744-749) -- msg_type/id pulled from body.reply.type/id, xml_body hand-built from body.reply.* (this reshaping step is exactly the not-yet-ported 'unmirror' work flagged earlier; nothing in the DLL does it automatically today). ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 70054,
+  "xml_body": "<DigitalDemodulator><AvailableDemodulators><DemodulatorInfo><DemodulatorName>ASK2</DemodulatorName><DemodulatorVersion>1</DemodulatorVersion><ModuleID>1048576</ModuleID><ParameterSize>9</ParameterSize><SupportsSymbolData>1</SupportsSymbolData><SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData><SupportsInstantData>1</SupportsInstantData><SupportsImageData>0</SupportsImageData><SupportsTransmissionData>0</SupportsTransmissionData><SupportsAudioData>0</SupportsAudioData><IsUniversal>1</IsUniversal><SupportsSpecialData>0</SupportsSpecialData></DemodulatorInfo></AvailableDemodulators></DigitalDemodulator><BitstreamProcessing><AvailableDecoders><Decoder id=\"100000\" classificationOnly=\"1\"><DecoderName>ASCII</DecoderName></Decoder></AvailableDecoders></BitstreamProcessing>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f526571756573743e
+output_xml:
+<Request type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Full parse_message-shaped Reply JSON, as drs-server would actually hold it (hw/channel/msg_kind/body wrapper) -- NOT format_response's real kwargs shape (msg_type/id/xml_body). Kept in as-received to show what actually happens if this exact object is handed to format_response() unmodified. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+RESULT: ERROR -- format_response: encoding failed (rc != 0)
+
+=== Same data, reshaped to format_response's actual contract (msg_type/id/xml_body per ca120_parser.cpp:744-749) -- msg_type/id pulled from body.reply.type/id, xml_body hand-built from body.reply.* (this reshaping step is exactly the not-yet-ported 'unmirror' work flagged earlier; nothing in the DLL does it automatically today). ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 70054,
+  "xml_body": "<DigitalDemodulator><AvailableDemodulators><DemodulatorInfo><DemodulatorName>ASK2</DemodulatorName><DemodulatorVersion>1</DemodulatorVersion><ModuleID>1048576</ModuleID><ParameterSize>9</ParameterSize><SupportsSymbolData>1</SupportsSymbolData><SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData><SupportsInstantData>1</SupportsInstantData><SupportsImageData>0</SupportsImageData><SupportsTransmissionData>0</SupportsTransmissionData><SupportsAudioData>0</SupportsAudioData><IsUniversal>1</IsUniversal><SupportsSpecialData>0</SupportsSpecialData></DemodulatorInfo></AvailableDemodulators></DigitalDemodulator><BitstreamProcessing><AvailableDecoders><Decoder id=\"100000\" classificationOnly=\"1\"><DecoderName>ASCII</DecoderName></Decoder></AvailableDecoders></BitstreamProcessing>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f526571756573743e
+output_xml:
+<Request type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+
+=== Full parse_message-shaped Reply JSON, as drs-server would actually hold it (hw/channel/msg_kind/body wrapper) -- NOT format_response's real kwargs shape (msg_type/id/xml_body). Kept in as-received to show what actually happens if this exact object is handed to format_response() unmodified. ===
+input_json:
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "reply",
+  "body": {
+    "reply": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+RESULT: ERROR -- format_response: encoding failed (rc != 0)
+
+=== Same data, reshaped to format_response's actual contract (msg_type/id/xml_body per ca120_parser.cpp:744-749) -- msg_type/id pulled from body.reply.type/id, xml_body hand-built from body.reply.* (this reshaping step is exactly the not-yet-ported 'unmirror' work flagged earlier; nothing in the DLL does it automatically today). ===
+input_json:
+{
+  "msg_type": "get",
+  "id": 70054,
+  "xml_body": "<DigitalDemodulator><AvailableDemodulators><DemodulatorInfo><DemodulatorName>ASK2</DemodulatorName><DemodulatorVersion>1</DemodulatorVersion><ModuleID>1048576</ModuleID><ParameterSize>9</ParameterSize><SupportsSymbolData>1</SupportsSymbolData><SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData><SupportsInstantData>1</SupportsInstantData><SupportsImageData>0</SupportsImageData><SupportsTransmissionData>0</SupportsTransmissionData><SupportsAudioData>0</SupportsAudioData><IsUniversal>1</IsUniversal><SupportsSpecialData>0</SupportsSpecialData></DemodulatorInfo></AvailableDemodulators></DigitalDemodulator><BitstreamProcessing><AvailableDecoders><Decoder id=\"100000\" classificationOnly=\"1\"><DecoderName>ASCII</DecoderName></Decoder></AvailableDecoders></BitstreamProcessing>"
+}
+output_hex: 3c5265717565737420747970653d22676574222069643d223730303534223e3c4469676974616c44656d6f64756c61746f723e3c417661696c61626c6544656d6f64756c61746f72733e3c44656d6f64756c61746f72496e666f3e3c44656d6f64756c61746f724e616d653e41534b323c2f44656d6f64756c61746f724e616d653e3c44656d6f64756c61746f7256657273696f6e3e313c2f44656d6f64756c61746f7256657273696f6e3e3c4d6f64756c6549443e313034383537363c2f4d6f64756c6549443e3c506172616d6574657253697a653e393c2f506172616d6574657253697a653e3c537570706f72747353796d626f6c446174613e313c2f537570706f72747353796d626f6c446174613e3c537570706f72747349515f436f6e7374656c6c6174696f6e446174613e303c2f537570706f72747349515f436f6e7374656c6c6174696f6e446174613e3c537570706f727473496e7374616e74446174613e313c2f537570706f727473496e7374616e74446174613e3c537570706f727473496d616765446174613e303c2f537570706f727473496d616765446174613e3c537570706f7274735472616e736d697373696f6e446174613e303c2f537570706f7274735472616e736d697373696f6e446174613e3c537570706f727473417564696f446174613e303c2f537570706f727473417564696f446174613e3c4973556e6976657273616c3e313c2f4973556e6976657273616c3e3c537570706f7274735370656369616c446174613e303c2f537570706f7274735370656369616c446174613e3c2f44656d6f64756c61746f72496e666f3e3c2f417661696c61626c6544656d6f64756c61746f72733e3c2f4469676974616c44656d6f64756c61746f723e3c42697473747265616d50726f63657373696e673e3c417661696c61626c654465636f646572733e3c4465636f6465722069643d223130303030302220636c617373696669636174696f6e4f6e6c793d2231223e3c4465636f6465724e616d653e41534349493c2f4465636f6465724e616d653e3c2f4465636f6465723e3c2f417661696c61626c654465636f646572733e3c2f42697473747265616d50726f63657373696e673e3c2f526571756573743e
+output_xml:
+<Request type="get" id="70054">
+  <DigitalDemodulator>
+    <AvailableDemodulators>
+      <DemodulatorInfo>
+        <DemodulatorName>ASK2</DemodulatorName>
+        <DemodulatorVersion>1</DemodulatorVersion>
+        <ModuleID>1048576</ModuleID>
+        <ParameterSize>9</ParameterSize>
+        <SupportsSymbolData>1</SupportsSymbolData>
+        <SupportsIQ_ConstellationData>0</SupportsIQ_ConstellationData>
+        <SupportsInstantData>1</SupportsInstantData>
+        <SupportsImageData>0</SupportsImageData>
+        <SupportsTransmissionData>0</SupportsTransmissionData>
+        <SupportsAudioData>0</SupportsAudioData>
+        <IsUniversal>1</IsUniversal>
+        <SupportsSpecialData>0</SupportsSpecialData>
+      </DemodulatorInfo>
+    </AvailableDemodulators>
+  </DigitalDemodulator>
+  <BitstreamProcessing>
+    <AvailableDecoders>
+      <Decoder id="100000" classificationOnly="1">
+        <DecoderName>ASCII</DecoderName>
+      </Decoder>
+    </AvailableDecoders>
+  </BitstreamProcessing>
+</Request>
+roundtrip_json (decoded back via extract_frame + parse_message):
+{
+  "hw": "ca120",
+  "channel": "xml",
+  "msg_kind": "request",
+  "body": {
+    "request": {
+      "type": "get",
+      "id": "70054",
+      "digital_demodulator": {
+        "available_demodulators": {
+          "demodulator_info": {
+            "demodulator_name": "ASK2",
+            "demodulator_version": "1",
+            "module_id": "1048576",
+            "parameter_size": "9",
+            "supports_symbol_data": "1",
+            "supports_iq_constellation_data": "0",
+            "supports_instant_data": "1",
+            "supports_image_data": "0",
+            "supports_transmission_data": "0",
+            "supports_audio_data": "0",
+            "is_universal": "1",
+            "supports_special_data": "0"
+          }
+        }
+      },
+      "bitstream_processing": {
+        "available_decoders": {
+          "decoder": {
+            "id": "100000",
+            "classification_only": "1",
+            "decoder_name": "ASCII"
+          }
+        }
+      }
+    }
+  }
+}
+

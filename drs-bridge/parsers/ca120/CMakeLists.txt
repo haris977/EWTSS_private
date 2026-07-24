@@ -20,6 +20,11 @@ if(MSVC)
         "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/ca120.def")
 else()
     target_compile_options(ca120 PRIVATE -Wall -Wextra -Wpedantic)
+    # Static-link the MinGW runtime so ctypes.CDLL() can load this DLL
+    # without libstdc++-6.dll/libgcc_s_seh-1.dll needing to be on PATH
+    # (Python's ctypes uses the restricted DLL search path since 3.8+,
+    # which does not consult PATH the way a normal EXE launch would).
+    target_link_options(ca120 PRIVATE -static-libgcc -static-libstdc++ -static)
 endif()
 
 # ---- Unit tests (no external framework; plain asserts) ----
