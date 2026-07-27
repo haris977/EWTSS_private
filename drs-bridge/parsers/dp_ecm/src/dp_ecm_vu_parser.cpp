@@ -1946,7 +1946,7 @@ static void decode_mrx_temperature(const uint8_t* p, int n, JsonWriter& w) {
 // fan_speed_rpm(int32@0).
 static void decode_fan_speed_resp(const uint8_t* p, int n, JsonWriter& w) {
     if (n < 4) { w.key_str("warning", "fan_speed payload < 4 bytes"); return; }
-    w.key_int("fan_speed_rpm", load_i32le(p + 0));
+    w.key_int("fan_speed_rpm", load_i32be(p + 0));
 }
 
 // 1/17 — UART Test Status command (4 bytes). Per ICD Table 225.
@@ -2448,6 +2448,70 @@ extern "C" SDFC_EXPORT int extract_frame(const uint8_t* buf, size_t buf_len,
     return 0;
 }
 
+// Search/Jamming Error Codes — ICD pages 226-228 (S.No 1-23, 25-26, 28-53).
+// S.No 24 is the "Jamming Error Codes" section header (not a code); S.No 27 is
+// absent from the ICD table itself. Falls back to a generic "OnSuccess"/"Error"
+// for any status not in this table (other groups may use different code ranges
+// not yet confirmed against their own ICD sections).
+static const char* vu_error_name(int16_t status) {
+    switch (status) {
+        case     0: return "OnSuccess";
+        // Search Error Codes (S.No 2-23)
+        case -5000: return "Invalid Start Frequency";
+        case -4999: return "Invalid Stop Frequency";
+        case -4998: return "Invalid RF Attenuation";
+        case -4997: return "Invalid IF Attenuation";
+        case -4996: return "Invalid Threshold";
+        case -4995: return "Invalid Resolution";
+        case -4994: return "Invalid Min/Max Pulse Range";
+        case -4993: return "Invalid Minimum Hops Count";
+        case -4992: return "Invalid Configure Detection";
+        case -4991: return "Invalid FFT Data Acquisition";
+        case -4990: return "Invalid FH Detection";
+        case -4989: return "Invalid FF Detection";
+        case -4988: return "Invalid Burst Detection";
+        case -4987: return "Invalid BITE ON/OFF Message";
+        case -4986: return "Invalid BITE Test";
+        case -4985: return "Invalid Reference Input Selection";
+        case -4984: return "Invalid Health Status";
+        case -4983: return "Invalid Protected Scan ON/OFF";
+        case -4982: return "Invalid Protected Band";
+        case -4981: return "Invalid FH Splitband";
+        case -4980: return "Invalid FF Count";
+        case -4966: return "Invalid Integration time selection";
+        // Jamming Error Codes (S.No 25-26, 28-53)
+        case -6000: return "Invalid Frequency difference (BW = 240 MHz)";
+        case -5999: return "Invalid Exciter Boundary limit";
+        case -5998: return "Invalid Frequency start stop frequency";
+        case -5997: return "Invalid Frequency PA Selection";
+        case -5996: return "Invalid PA power level selection";
+        case -5995: return "Invalid Omni Antenna Range";
+        case -5994: return "Invalid HPASU Antenna Selection";
+        case -5993: return "Jamming under progress";
+        case -5992: return "Responsive Jamming Invalid Omni Antenna Selection";
+        case -5991: return "Invalid HPASU Path Selection";
+        case -5990: return "HPASU Invalid Antenna Selection";
+        case -5989: return "Responsive Jamming Invalid Bandwidth Selection";
+        case -5988: return "Invalid list jam frequency count";
+        case -5987: return "HPASU Invalid State";
+        case -5986: return "HPASU Invalid PA Health Selection";
+        case -5985: return "Invalid FH Jam Frequency count";
+        case -5984: return "Invalid Wideband Noise Jam Bandwidth Selection";
+        case -5983: return "Invalid Digital Modulation Symbol Rate Selection";
+        case -5982: return "Invalid Digital Modulation index";
+        case -5981: return "Invalid Jamming frequency configuration";
+        case -5980: return "Invalid Configured Jamming count";
+        case -5979: return "Invalid Responsive sweep Jamming Channel Count";
+        case -5978: return "Invalid PA Modulation Selection";
+        case -5977: return "Invalid PA Power level Selection";
+        case -5976: return "PA Over Drive Fault";
+        case -5975: return "PA VSWR Fault";
+        case -5974: return "PA BPM Fault";
+        case -5973: return "SDU Fault";
+        default: return "Error";
+    }
+}
+
 // =============================================================================
 // ABI: parse_message
 // =============================================================================
@@ -2478,7 +2542,7 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
     w.key_uint("message_size_bytes", hdr.payload_size);
     if (frame_type == FRAME_RESPONSE) {
         w.key_int("status", hdr.status);
-        w.key_str("status_name", hdr.status == 0 ? "OnSuccess" : "Error");
+        w.key_str("status_name", vu_error_name(hdr.status));
     }
 
     bool decoded = false;
@@ -2863,9 +2927,10 @@ extern "C" SDFC_EXPORT int parse_message(const uint8_t* frame, size_t frame_len,
             switch (hdr.unit_id) {
                 case  2:
                     decode_vu_jam_ack(hdr.unit_id, payload, plen, w); decoded = true; break;
-                case  4: /* 200/3 ACK — 0 bytes */                            decoded = true; break;
-                case  6: decode_ext_modulation_buffer_size(payload, plen, w); decoded = true; break;
-                case  8: /* Exciter Prog Noise ACK — 0 bytes */               decoded = true; break;
+                case  4: /* Stop Jamming ACK — 0 bytes, ICD Table 183, confirmed */ decoded = true; break;
+                case  6:
+                    decode_ext_modulation_buffer_size(payload, plen, w); decoded = true; break;
+                case  8: /* Exciter Prog Noise ACK — 0 bytes, reverted pending ICD confirmation */ decoded = true; break;
                 case 10: /* ECM Report State ACK — 0 bytes */           decoded = true; break;
                 case 12: /* List Fixed Freq Jam ACK — 0 bytes */        decoded = true; break;
                 case 14: /* 200/13 ACK — 0 bytes */                    decoded = true; break;
@@ -4087,11 +4152,13 @@ extern "C" SDFC_EXPORT int format_response(const char* kind, const char* kwargs_
         }
     } else if (group == 200) {
         switch (unit) {
-            case 2:
-                fn = encode_vu_jam_ack; break;
-            case 4: is_ack = true; break; // 200/3 ACK
-            case 6: fn = encode_ext_modulation_buffer_size; break;
-            case 8: is_ack = true; break; // Exciter Prog Noise ACK
+            // 2 (Immediate Jam ACK): no dedicated encoder — caller sends a bare ACK (no
+            // payload_hex) or the raw jam_id/active bytes via payload_hex; falls through
+            // to the generic passthrough below.
+            case 2: break;
+            case 4: is_ack = true; break; // Stop Jamming ACK — 0 bytes, ICD Table 183, confirmed
+            case 6: fn = encode_ext_modulation_buffer_size; break; // ICD Table 165, confirmed
+            case 8: is_ack = true; break; // Exciter Prog Noise ACK — reverted pending ICD confirmation
             case 10: is_ack = true; break; // ECM Report State ACK
             case 12: is_ack = true; break; // List Fixed Freq Jam ACK
             case 14: is_ack = true; break; // 200/13 ACK

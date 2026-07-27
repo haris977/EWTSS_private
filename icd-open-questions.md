@@ -2,13 +2,23 @@
 
 **Purpose:** Tracks unresolved questions per hardware ICD that block or risk live integration.  
 **Owner:** Person C (C++ parser developer)  
-**Last updated:** 2026-06-22
+**Last updated:** 2026-07-24
 
 Questions are grouped by device. Each question carries a **Risk** tag:
 
 - `🔴 BLOCKER` — will produce silent wrong output or a crash in live integration without this answer  
 - `🟡 VERIFY` — assumption made in the parser; needs a live-capture or client confirmation before sign-off  
 - `🟢 NICE-TO-HAVE` — parser works without this, but the answer improves completeness
+- `✅ RESOLVED` — answered/fixed; kept for traceability, no longer blocks anything
+
+---
+
+## Resolved (as of 2026-07-24)
+
+| ID | Device | What was resolved |
+|---|---|---|
+| H1 | JHF | Endianness — header confirmed BE via live pcap capture; RESP payload BE confirmed by client test; CMD payload converted to BE, zero `load_*le` calls remain in the file. |
+| V1 | JVU | Same evidence chain as H1, plus one straggler (`decode_fan_speed_resp`, group 1/unit 14) found and fixed 2026-07-24. Zero `load_*le`/`store_*le` calls remain; retested with no regressions. |
 
 ---
 
@@ -18,13 +28,16 @@ ICD used: `DP-ECM-1074-6000-V1-ICD-0V04`
 
 | # | Question | Risk | Notes |
 |---|---|---|---|
-| H1 | **Endianness is inferred LITTLE-ENDIAN — never explicitly stated in the ICD.** Is this correct? | 🔴 BLOCKER | All `load_*le` helpers in the parser depend on this. Wrong endianness means every multi-byte field is silently garbage. |
+| H1 | **Endianness — ICD still never explicitly states byte order.** Was: inferred little-endian, unconfirmed. | ✅ RESOLVED | **2026-07-01 → 2026-07-24:** header fields confirmed BIG-ENDIAN against a live Wireshark capture (`jhf.pcapng`); RESP payload flipped to BE and confirmed by a real client test (2026-07-03, fixed a negative-version symptom). CMD-payload (decode) side has also been fully converted — `dp_ecm_hf_parser.cpp` has **zero** remaining `load_*le`/`store_*le` calls as of 2026-07-24, matching the old proven WS1 reference (`C:\Users\Admin\Downloads\drs_bridge`), which is uniformly big-endian for this same protocol family. The ICD itself still doesn't say so in writing — treat this as de-risked by capture + reference-implementation agreement, not as an ICD citation. |
 | H2 | **How are IQ streaming ports 10021–10028 activated?** Is there a specific command the bridge must send first, or does the device start pushing once a TCP connection is made? | 🔴 BLOCKER | Stream-socket entry (frame type 3) is not yet wired in the parser. Need the activation sequence to implement it correctly. |
 | H3 | **Status field in the response frame header** — the ICD notes a 16-bit signed status at byte offset 4. Is this always present even in non-error responses, or is it only populated on error? | 🟡 VERIFY | The parser reads it unconditionally. If it is reserved/zero in success responses, the output JSON is fine but redundant. If it is absent, offset calculations shift. |
 | H4 | **HF and VU both use ports 10014 and 10015.** If both devices are live simultaneously, are they always on different IP addresses? Is the IP per-unit fixed at the rack level, or is it configurable? | 🟡 VERIFY | The bridge config will need one YAML profile per device instance. Need to confirm the IP assignment scheme so profiles can be written. |
 | H5 | **IQ channels 10021–10028 — are all 8 channels always active, or only the channels the device is currently configured for?** | 🟢 NICE-TO-HAVE | Determines whether the bridge should try all 8 or only the active subset. |
 | H6 | **Group 200 unit IDs 200/17, 200/19, 200/21 (Immediate Jam, Ext Modulation, Prog Exciter) are listed as "not yet assigned" in the ICD.** Parser falls through to `raw_hex` for these. What are the actual assigned unit IDs in the deployed firmware? | 🟡 VERIFY | Until confirmed, any jamming command using these units will produce `raw_hex` output instead of a decoded response — bridge-layer logic cannot act on it. |
 | H7 | **Group 200 unit IDs 200/23 (Stop Responsive Sweep Jam), 200/24, and 200/51 (Stop Sweep Jam ACK) are assumed — they are not explicitly listed in the ICD unit table.** Are these IDs correct? | 🟡 VERIFY | A wrong unit ID means the parser silently misidentifies these command/response frames. The DRS would never correctly echo a stop-jam ACK back to the system. |
+| H8 | **File header cites `DP-ECM-1074-6000-V1-ICD-0V04` as HF's protocol doc — but that is VU's ICD number and band ("30 MHz – 6000 MHz"), not HF's (product DP-ECM-1071).** Does HF actually have its own separate ICD nobody has checked, or is this one document really shared across both variants? | 🔴 BLOCKER | If HF was coded against VU's ICD by mistake, every HF-specific table/field-width assumption in the file is unverified. This would explain why HF's Group 106/200 jamming layout (see V6/V7 below — same structure in both files) has never lined up against a confirmed HF-specific source. |
+| H9 | **Group 106 "Start Immediate Jam" (case 1, 28 bytes) — VU's copy of this same structure was confirmed wrong against the real ICD** (see V6: real Group 200/Unit 1 "Start Immediate Jam" is a 2340-byte `S_CMD_GENERATE_EXCITER_OUTPUT`, not a 28-byte single-frequency struct). Since HF's Group 106 dispatch (units 1/3/5/9/21/39/41/45/49/55) is structurally identical to VU's, does HF have the same bug? | 🔴 BLOCKER | Same failure mode as V6 — if confirmed, HF's entire "immediate jamming" command family is decoding a small fraction of the real command and dropping the mode-selected TDM/FDM/Sweep/Comb-noise payload entirely. |
+| H10 | **List Jam Report — VU's ICD (Table 184, confirmed by user 2026-07-24) places this at Group 200/Unit 15, not Unit 16.** HF's parser has it at Group 200/Unit 16, paired with a self-invented 0-byte "poll" command at Unit 15 that appears nowhere in the ICD text seen so far. Is HF's unit 16 correct, or does HF share VU's off-by-one? | 🟡 VERIFY | If wrong, the DRS never recognizes the real List Jam Report frame and falls back to `raw_hex` — jam-list data becomes invisible to the bridge. |
 
 ---
 
@@ -34,12 +47,14 @@ ICD used: `DP-ECM-1074-6000-V1-ICD-0V04`
 
 | # | Question | Risk | Notes |
 |---|---|---|---|
-| V1 | **Endianness is inferred LITTLE-ENDIAN — never explicitly stated in the ICD.** Same question as H1 above. | 🔴 BLOCKER | Shares the same risk as the HF variant. |
+| V1 | **Endianness — ICD still never explicitly states byte order.** Was: inferred little-endian, unconfirmed. | ✅ RESOLVED | **2026-07-01 → 2026-07-24:** same evidence chain as H1 (live capture for header, client test for RESP payload). Last remaining little-endian call in the file (`decode_fan_speed_resp`, group 1/unit 14 — a straggler missed in the mechanical BE conversion) was found and fixed 2026-07-24. `dp_ecm_vu_parser.cpp` now has **zero** `load_*le`/`store_*le` calls; rebuilt and retested with no regressions (same 8 pre-existing failures, unrelated to endianness — see V5). |
 | V2 | **No IQ streaming ports are defined in the VU ICD section.** Is the VU hardware physically incapable of IQ streaming, or was it simply omitted from this ICD version? | 🟡 VERIFY | If VU supports IQ streaming on the same 10021–10028 ports, the parser needs to handle frame type 3 on those ports. Currently it does not. |
 | V3 | **Same port collision as H4** — VU uses TCP 10014 and 10015, same as HF. IP-based addressing confirmed? | 🟡 VERIFY | See H4. |
-| V4 | **Group 200 (VU Jamming) — ICD defines 4 ACK responses (200/2, 200/4, 200/6, 200/8). Are there more jamming command groups not yet decoded?** | 🟢 NICE-TO-HAVE | Parser currently falls back to `raw_hex` for any unrecognised unit. Non-blocking but limits operational visibility. |
-| V5 | **Group 200 jamming response payload is NOT decoded — parser treats 200/2, 200/4, 200/6, 200/8 as 0-byte ACK-only frames.** If the real device returns a body in these responses (status codes, jam parameters), the DRS response will be empty/wrong. What is the full response body layout for each? | 🔴 BLOCKER | The DRS must echo back a correctly formed jamming ACK. If the response has a body and the parser emits nothing, the system will receive a malformed frame or silence. |
-| V6 | **ICD sequence numbering ambiguity in the VU section** — internal parser notes flag that "response ID is not in the sequence manner" for certain Group 200 entries. Is there a correct request→response ID mapping table for VU jamming commands? | 🟡 VERIFY | A wrong response ID means the system cannot match ACKs to commands, breaking the command/response handshake. |
+| V4 | **Group 200 "jamming ACK" dispatch is internally inconsistent, independent of any ICD question.** `decode_vu_jam_ack` is documented (in the code's own header comment) as covering units 2/4/6/8, but the dispatch switch only calls it for unit 2 — unit 4 and unit 8 fall through as bare 0-byte ACKs, and unit 6 calls the wrong function (`decode_ext_modulation_buffer_size`) entirely. | 🔴 BLOCKER | Confirmed by the code contradicting its own comment, and by 4 failing tests (`test_dp_ecm_vu.exe`, 2026-07-24). Follow-on-jam, jam-list, and responsive-sweep ACKs never get `jam_kind`/`jam_id`/`jam_active` decoded. Not an open ICD question — this is a known bug, ready to fix once prioritized. |
+| V5 | **`format_response`'s `encode_vu_jam_ack` (Group 200/Unit 2 ACK encoder) ignores what the caller actually asked for** — it unconditionally forces an 8-byte zeroed jam struct regardless of whether the request was a bare status-only ACK or carried `payload_hex`. | 🔴 BLOCKER | Confirmed by test: a plain ACK bloats from 18 to 26 bytes, and a 6-byte `payload_hex` payload gets stomped instead of passed through (`jam_id` comes out 0 instead of the expected 42). The DRS cannot currently send a correctly-sized jamming ACK back to the system. Known bug, ready to fix. |
+| V6 | **"Start Immediate Jam" is coded at the wrong group/unit entirely, with the wrong table size.** Confirmed 2026-07-24 by ICD Table 169/170 (user-provided): the real command is **Group 200, Unit 1**, 2340 bytes, `S_CMD_GENERATE_EXCITER_OUTPUT` — a 584-byte per-channel union (Single Freq/TDM/FDM/Sweep/Comb-Noise, selected by a Jamming Mode byte) × up to 4 channels, built on a 32-byte `S_JAM_CONFIGURATION` (Table 155). The parser instead has this at **Group 106, Unit 1**, only 28 bytes, citing its own "Table 152"/"Table 140" (neither of which matches 155/169/170), and treats TDM/FDM/Sweep/Comb-Noise as four separate command unit IDs (106/3, 106/5, 106/41, 106/55) rather than mode-selected payloads inside one command. | 🔴 BLOCKER | The parser is decoding roughly 1% of the real command and has invented a command-ID scheme (Group 106) that doesn't match the ICD's actual Group 200/Unit 1. Every immediate/TDM/FDM/sweep/comb-noise jam command from the real system would be either misrouted or truncated. Needs Tables 155, 166 (`S_TDM_CONFIGURATION`), 167 (`S_FDM_CONFIGURATION`), and 177 (Jamming Mode enum) to rebuild correctly — requested from user, not yet provided. |
+| V7 | **List Jam Report is coded at the wrong group/unit, with a possible unit mismatch (Hz vs. kHz).** Confirmed 2026-07-24 by ICD Table 184 (user-provided): the real report is **Group 200, Unit 15** (`S_LIST_JAM_REPORT_REPLY`, count-prefixed array, 8 bytes/entry, max 100). The VU parser has it at **Group 108, Unit 6** (citing its own "Table 176"); HF's parser has it at Group 200 but **Unit 16**, paired with a self-invented 0-byte "poll" command at Unit 15 that doesn't appear in the ICD text seen so far. The decoded field is also assumed to be in Hz; the ICD table names it "Scan Frequency (KHz)". | 🟡 VERIFY | Structurally the existing decoder is very close (count + 8-byte entries matches), so this is a location/unit fix rather than a rewrite — but until fixed, the real report frame falls through to `raw_hex` in both files. Also confirm whether the code's 4th status value (`within_protected_band`, index 3) exists in the real ICD — the pasted table only showed 3 status values (0/1/2). |
+| V8 | **No historical precedent for Group 200 exists in the old, proven WS1 reference implementation** (`C:\Users\Admin\Downloads\drs_bridge`) at all. Checked every DP-ECM-relevant `command.csv` in WS1 (`jsvushf_srx`, `srx`, `jsvushf_mrx(_msc)`, `mrx(_msc)`) plus ~500K lines of real captured command traffic (`cmd_errors.csv`) — **zero** rows or log lines reference `group_id 200`, in any unit. WS1's SJC groups top out at 100/101/106/108/109/111/112. | 🟡 VERIFY | This doesn't prove Group 200 is wrong — WS1 may simply predate whatever ICD revision introduced it. But it means nothing under Group 200 in either parser has ever been checked against a working reference, unlike Groups 100/101/106(diagnostics)/109/111/112 which WS1 does cover. Treat every Group 200 unit ID as unverified until checked page-by-page against the real ICD (see V6, V7 for the two already found wrong). |
 
 ---
 
@@ -168,12 +183,16 @@ These gaps apply to multiple devices and affect the DRS's ability to correctly m
 
 ## Summary — Blockers Only
 
+*(H1 and V1, endianness, moved to Resolved below as of 2026-07-24 — no longer blockers.)*
+
 | ID | Device | Blocker |
 |---|---|---|
-| H1 | JHF | Endianness unconfirmed |
 | H2 | JHF | IQ streaming activation sequence unknown |
-| V1 | JVU | Endianness unconfirmed |
-| V5 | JVU | Group 200 jamming response body not decoded — DRS cannot echo a correct jam ACK |
+| H8 | JHF | File header cites VU's ICD document number, not HF's — HF may never have been checked against its own ICD |
+| H9 | JHF | Group 106 "Start Immediate Jam" likely shares VU's V6 bug (wrong group, ~1% of real command decoded) — unconfirmed for HF specifically |
+| V4 | JVU | Group 200 jam-ACK dispatch contradicts its own code comment — follow-on/jam-list/responsive-sweep ACKs never decoded (confirmed bug, not an ICD question) |
+| V5 | JVU | `encode_vu_jam_ack` ignores caller input — cannot send a correctly-sized jamming ACK (confirmed bug, not an ICD question) |
+| V6 | JVU | "Start Immediate Jam" coded at Group 106/Unit 1 (28 bytes) instead of the ICD-confirmed Group 200/Unit 1 (2340 bytes, `S_CMD_GENERATE_EXCITER_OUTPUT`) — real command almost entirely undecoded |
 | D1 | DDF-550 | XML magic words unknown — `format_response` will send malformed frames |
 | D4 | DDF-550 | EB200 periodic data never decoded — DFPScan azimuth/bearing values never reach the system |
 | D5 | DDF-550 | EB200 incomplete TCP read returns corrupt (-1) not wait (0) — large EB200 frames silently discarded |
