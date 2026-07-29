@@ -161,7 +161,7 @@ AA AA 10 03 00 03 00 00 00 E5 01 00 01 00 0C 00 00 00 63 00 2D C6 C0 00 00 00 00
   "body_len": 229,
   "msg_type": "load_warner_library",
   "new_set": true,
-  "num_records": 1,
+  "num_library_records": 1,
   "records": [
     {
       "record_no": 12,
@@ -230,7 +230,6 @@ AA AA 10 04 00 04 00 00 00 04 00 02 00 0C EE EE
   "body_len": 4,
   "msg_type": "delete_warner",
   "num_library_records": 2,
-  "action": "delete_selected",
   "record_numbers": [12],
   "parse_warning": "body_truncated_fewer_records_than_declared"
 }
@@ -326,7 +325,6 @@ AA AA 10 08 00 07 00 00 00 02 00 78 EE EE
   "seq_no": 7,
   "body_len": 2,
   "msg_type": "auto_purge",
-  "enabled": true,
   "track_age_sec": 120
 }
 ```
@@ -357,7 +355,6 @@ AA AA 10 10 00 08 00 00 00 06 00 02 00 0A 00 0B EE EE
   "body_len": 6,
   "msg_type": "purge_passive_track",
   "num_tracks": 2,
-  "action": "purge_selected",
   "track_numbers": [10, 11]
 }
 ```
@@ -537,8 +534,7 @@ AA AA 15 0A 00 0D 00 00 00 05 10 03 00 03 02 EE EE
   "msg_type": "ack_nack_rsec_to_esmp",
   "acked_cmd_code_hex": "0x1003",
   "acked_seq_no": 3,
-  "ack_status": 2,
-  "ack_status_text": "ack_received_and_executed"
+  "ack_status": 2
 }
 ```
 
@@ -620,8 +616,7 @@ FF D8 01 03 EE EE
       "scan_ms": 500,
       "amplitude_dbm": -40,
       "status": "0x01",
-      "emitter_cat": 3,
-      "manual": false
+      "emitter_cat": 3
     }
   ]
 }
@@ -657,11 +652,10 @@ AA AA 15 04 00 15 00 00 00 08 01 03 00 01 00 02 00 00 EE EE
   "seq_no": 21,
   "body_len": 8,
   "msg_type": "operational_data",
-  "esmp_status": "operational",
-  "esmp_status_code": 1,
+  "esmp_status": 1,
   "num_active_tracks": 3,
   "num_manual_tracks": 0,
-  "scan_status": "scanning",
+  "scan_status": 1,
   "scan_band_index": 2,
   "hw_status_hex": "00"
 }
@@ -691,8 +685,7 @@ AA AA 15 05 00 16 00 00 00 02 00 05 EE EE
   "seq_no": 22,
   "body_len": 2,
   "msg_type": "purge_response",
-  "result": 0,
-  "result_text": "success"
+  "result": 0
 }
 ```
 [back to top](#rsec--himshakti-binary-icd-to-json-reference)
@@ -718,8 +711,7 @@ AA AA 15 09 00 17 00 00 00 05 10 10 00 08 01 EE EE
   "msg_type": "ack_nack_esmp_to_rsec",
   "acked_cmd_code_hex": "0x1010",
   "acked_seq_no": 8,
-  "ack_status": 1,
-  "ack_status_text": "ack_received"
+  "ack_status": 1
 }
 ```
 
@@ -1091,27 +1083,32 @@ AA AA 60 01 00 32 00 00 00 2D 01 F5 03 84 00 12 4F 80 00 00 00 00 00 00 00 00 00
 
 ---
 
-### 5.2 Manual-mode messages not yet semantically decoded
+### 5.2 Manual-mode messages — all 11 now field-level decoded (2026-07-28)
 
-These command codes are dispatched (so you'll always get valid JSON, never a
-parse failure), but the body is currently surfaced only as `raw_body_hex` —
-no field-level decoding yet. The IRS defines full bodies for all of them
-(§5.7.2-5.7.12); ask if you need these built out.
+All manual-mode command codes are now dispatched with full field-level
+decoding, built directly against `HIMSHAKTI_RSEC_IRS_02062025_BEL_To_Constelli.pdf`
+§5.7.1-5.7.12. Two of these (`0x0FA8`, `0x0FAE`) had no dispatch case at all
+before this pass — not even the raw-hex fallback — and were only discovered
+by reading the IRS's table of contents against the parser's actual switch
+statement.
 
-| Command Code | IRS message | IRS § |
-|---|---|---|
-| `0x0FA4` | Break Track (Manual) | 5.7.5 |
-| `0x0FA5` | Jam Command (Manual) | 5.7.2 |
-| `0x0FA6` | Stop Jam (Manual) | 5.7.4 |
-| `0x0FA7` | Track and Jam Command (Manual) | 5.7.3 |
-| `0x0FB0` | Reset EA Subsystem | 5.7.9 |
-| `0x1120` | Set Forbidden Frequency Bands | 5.7.8 |
-| `0x1121` | Set Prohibited Sectors | 5.7.11 |
-| `0x111D` | ECM operational status | 5.7.12 |
+| Command Code | IRS message | IRS § | `msg_type` | Notes |
+|---|---|---|---|---|
+| `0x0FA4` | Break Track (Manual) | 5.7.5 | `break_track_manual` | Same wire shape as semi-auto Break Track (0x1104); reuses `parse_ecmp_break_track` |
+| `0x0FA5` | Jam Command (Manual) | 5.7.2 | `jam_command_manual` | Same wire shape as semi-auto Jam Command (0x1102); reuses `parse_ecmp_jam` |
+| `0x0FA6` | Stop Jam (Manual) | 5.7.4 | `stop_jam_manual` | Same wire shape as semi-auto Stop Jam (0x1105); reuses `parse_ecmp_stop_jam` |
+| `0x0FA7` | Track and Jam Command (Manual) | 5.7.3 | `track_and_jam_manual` | Same wire shape as semi-auto (0x1103); reuses `parse_ecmp_track_and_jam` |
+| `0x0FA8` | Update Track (Manual) | 5.7.6 | `update_track_manual` | **Was not wired in at all.** Variable-length parameter list (code 1-12, size per code) — new `parse_update_track_manual` |
+| `0x0FAE` | Change Mode (Manual) | 5.7.7 | `change_mode_manual` | **Was not wired in at all.** 1-byte mode value (1=Semi Auto, 2=Manual) — new `parse_change_mode_manual` |
+| `0x0FB0` | Reset EA Subsystem | 5.7.9 | `reset_ea_subsystem` | No data element table — trigger-only, same as Purge All (0x1011) |
+| `0x1108` | Platform Heading Data to EA Processor | 5.7.10 | `platform_heading_to_ea` | **Was not wired in at all** (previously fell through to `"msg_type":"unknown"`). Same 2-byte ÷10-deg shape as ESMP-side Platform Heading (0x1014); reuses `parse_platform_heading` |
+| `0x1120` | Set Forbidden Frequency Bands | 5.7.8 | `set_forbidden_bands` | New decoder — distinct from ESMP-side Lockout Bands (0x1005): UINT16 MHz fields, not UINT32 KHz |
+| `0x1121` | Set Prohibited Sectors | 5.7.11 | `set_prohibited_sectors` | New decoder — distinct from ESMP-side Lockout Sectors (0x1006): adds an `entry_id` field |
+| `0x111D` | ECM operational status | 5.7.12 | `ecm_operational_status` | Same wire shape as EA Operational Data Semi (0x1153); reuses `parse_ea_operational_data` |
 
-Also note: `0x1108` (Platform Heading Data to EA Processor, §5.7.10) is not
-wired into the dispatcher at all — it currently falls through to
-`"msg_type":"unknown"` rather than even reaching the raw-hex fallback above.
+All 11 covered by new tests in `tests/test_frames_rsec.cpp` (31/31 passing).
+`format_response()` (encode side) for these remains explicitly out of scope —
+see the parser-level note on that decision.
 
 [back to top](#rsec--himshakti-binary-icd-to-json-reference)
 
@@ -1451,7 +1448,7 @@ CmdCode `0x02` · IRS §5.11.2
   "data_len": 3,
   "msg_type": "scu_spin",
   "speed_rpm": 45,
-  "direction": "cw"
+  "direction": 0
 }
 ```
 [back to top](#rsec--himshakti-binary-icd-to-json-reference)
@@ -1559,7 +1556,7 @@ fall through to `scu_unknown` against a real SCU.
   "bit_cmd_checksum_ok": true,
   "bit_cmd_received": true,
   "bit_ready_for_operation": true,
-  "current_scu_status": "auto_mode",
+  "current_scu_status": 3,
   "servo_encoder_ok": true,
   "servo_amplifier_ok": true,
   "azimuth_deg": 90

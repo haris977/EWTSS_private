@@ -2,7 +2,7 @@
 
 **Purpose:** Tracks unresolved questions per hardware ICD that block or risk live integration.  
 **Owner:** Person C (C++ parser developer)  
-**Last updated:** 2026-07-24
+**Last updated:** 2026-07-28
 
 Questions are grouped by device. Each question carries a **Risk** tag:
 
@@ -143,6 +143,7 @@ ICD used: `DLRL/HIMSHAKTI/RSEC/2025/IRS`, Version 1.0, dated 21-07-2025
 | R4 | **Variant A Active Track response (command 0x1502) body length — IRS table ambiguity.** The parser uses 62 bytes but a note in `rsec_parser.cpp` says it may be 61 bytes if the RESERVED byte is absent. | 🟡 VERIFY | If the device sends 61-byte bodies, the parser will emit `parse_warning: body_shorter_than_expected` on every Active Track frame. Needs one real capture to confirm. |
 | R5 | **Track ID namespaces: 1–500 = ESM-correlated (semi-auto), 501–550 = manually-entered (manual EA mode).** Is this segregation enforced by the RSEC device (it rejects IDs outside range), or is it a convention in the integration spec only? | 🟢 NICE-TO-HAVE | Determines whether the bridge needs to validate track IDs before forwarding ECMP jam commands. |
 | R6 | **`format_response()` for RSEC is a stub — no ACK/response frame generation is implemented.** When the real system sends a command to the DRS (mimicking RSEC), what is the exact binary frame layout the RSEC device returns as its ACK? This must be reverse-engineered from the IRS or a packet capture. | 🔴 BLOCKER | Without a correctly formatted response frame, the system's command/response handshake never completes. Every command the system sends will time out or fail. |
+| R7 | **Is RSEC's "Control Centre (CC)" interface actually the same thing as "ECS" from the DP-ECM side of the project, or a genuinely separate system?** The IRS (§1) says JLB/JMB/JHB-1/JHB-2/JHB(E) entities "are commanded and controlled by Control Centre (CC)... also capable of operating in standalone when CC is not present." The RSEC↔CC interface itself is unimplemented because the IRS's own traceability table references CC-facing message IDs (`RSEC_INT_*`, `RSEC_PEER_TO_PEER`, §5.12.2-5.15.4) that don't exist anywhere in the document body. | 🟡 VERIFY | Raised by the user (2026-07-28) as their own hypothesis, to be put to the client directly rather than assumed — if CC and ECS turn out to be the same higher-echelon system under two different names across ICDs, that would explain why CC's actual message content is missing here (it may already be specified under the ECS-side ICD instead of needing new content from BEL). |
 
 ---
 

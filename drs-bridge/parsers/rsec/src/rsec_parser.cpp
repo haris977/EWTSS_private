@@ -337,26 +337,26 @@ static std::string decode_jpro(const uint8_t* p, int avail) {
         uint8_t subtype_code      = t[5];
         uint8_t non_linear_profile = t[6];
 
-        char entry[192];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"technique\":%u,\"technique_value\":%u,\"num_cycles\":%u,"
-            "\"velocity_profile\":%u,\"end_range_or_doppler\":%u,"
-            "\"subtype_code\":%u,\"non_linear_profile\":%u}",
-            (i > 0 ? "," : ""), technique, technique_value, num_cycles,
-            velocity_profile, end_range_doppler, subtype_code, non_linear_profile);
-        tech_arr += entry;
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("technique",           technique);
+        entry_w.key_int("technique_value",     technique_value);
+        entry_w.key_int("num_cycles",          num_cycles);
+        entry_w.key_int("velocity_profile",    velocity_profile);
+        entry_w.key_int("end_range_or_doppler",end_range_doppler);
+        entry_w.key_int("subtype_code",        subtype_code);
+        entry_w.key_int("non_linear_profile",  non_linear_profile);
+        if (i > 0) tech_arr += ",";
+        tech_arr += entry_w.str();
     }
     tech_arr += "]";
 
-    // Built as a std::string, not a fixed snprintf buffer: with 3 populated
-    // technique blocks this string runs past 500 bytes and a fixed buffer
-    // silently truncates it (found via the reference-doc generator — every
-    // message that embeds a JPRO was corrupted by this before the fix).
-    std::string out = "{\"drfm_mode\":" + std::to_string(drfm_mode) +
-        ",\"num_responses\":" + std::to_string(num_resp) +
-        ",\"repeat\":" + (repeat ? "true" : "false") +
-        ",\"techniques\":" + tech_arr + "}";
-    return out;
+    sdfc::JsonWriter jpro_w;
+    jpro_w.key_int("drfm_mode",      drfm_mode);
+    jpro_w.key_int("num_responses",  num_resp);
+    jpro_w.key_bool("repeat",        repeat);
+    jpro_w.key_raw("techniques",     tech_arr);
+    jpro_w.key_str("raw_hex",        hex_dump(p, 24));
+    return jpro_w.str();
 }
 
 // ---------------------------------------------------------------------------
@@ -399,10 +399,10 @@ static constexpr int WARNER_RECORD_SIZE = 226;
 
 static std::string decode_warner_record(const uint8_t* p, int avail) {
     if (avail < WARNER_RECORD_SIZE) {
-        char err[64];
-        std::snprintf(err, sizeof(err),
-            "{\"error\":\"record_truncated\",\"avail\":%d}", avail);
-        return err;
+        sdfc::JsonWriter err;
+        err.key_str("error", "record_truncated");
+        err.key_int("avail", avail);
+        return err.str();
     }
 
     uint16_t rec_no          = load_be16(p + 0);
@@ -454,33 +454,38 @@ static std::string decode_warner_record(const uint8_t* p, int avail) {
     }
     spot_freqs += "]";
 
-    char out[2048];
-    std::snprintf(out, sizeof(out),
-        "{\"record_no\":%u,\"central_radar_db_no\":%u,"
-        "\"freq_khz\":%u,\"freq_attributes\":%u,\"freq_tolerance_khz\":%u,"
-        "\"pw_ns\":%u,\"pw_tolerance_ns\":%u,"
-        "\"prf_hz\":%u,\"pri_attributes\":%u,\"prf_tolerance_hz\":%u,"
-        "\"threat_threshold_dbm\":%u,\"scan_type\":%u,"
-        "\"asp_ms\":%u,\"asp_tolerance_ms\":%u,"
-        "\"jpro\":%s,\"threat_level\":%u,\"ntds_code\":%u,\"platform\":%u,"
-        "\"operational_role\":%u,\"confidence_level\":%u,"
-        "\"radar_name\":\"%s\",\"radar_mode\":%u,\"next_mode_record_no\":%u,"
-        "\"freq_min_khz\":%u,\"freq_max_khz\":%u,"
-        "\"pw_min_ns\":%u,\"pw_max_ns\":%u,\"pgri_ns\":%u,"
-        "\"spot_prfs_hz\":%s,\"spot_frequencies_khz\":%s}",
-        rec_no, central_db_no,
-        freq_khz, freq_attr, freq_tol_khz,
-        pw_ns, pw_tol_ns,
-        prf_hz, pri_attr, prf_tol_hz,
-        threat_thresh, scan_type,
-        asp_ms, asp_tol_ms,
-        jpro.c_str(), threat_level, ntds_code, platform,
-        operational_role, confidence_level,
-        radar_name, radar_mode, next_mode_rec_no,
-        freq_min_khz, freq_max_khz,
-        pw_min_ns, pw_max_ns, pgri_ns,
-        spot_prfs.c_str(), spot_freqs.c_str());
-    return out;
+    sdfc::JsonWriter w;
+    w.key_int("record_no", rec_no);
+    w.key_int("central_radar_db_no", central_db_no);
+    w.key_int("freq_khz", freq_khz);
+    w.key_int("freq_attributes", freq_attr);
+    w.key_int("freq_tolerance_khz", freq_tol_khz);
+    w.key_int("pw_ns", pw_ns);
+    w.key_int("pw_tolerance_ns", pw_tol_ns);
+    w.key_int("prf_hz", prf_hz);
+    w.key_int("pri_attributes", pri_attr);
+    w.key_int("prf_tolerance_hz", prf_tol_hz);
+    w.key_int("threat_threshold_dbm", threat_thresh);
+    w.key_int("scan_type", scan_type);
+    w.key_int("asp_ms", asp_ms);
+    w.key_int("asp_tolerance_ms", asp_tol_ms);
+    w.key_raw("jpro", jpro);
+    w.key_int("threat_level", threat_level);
+    w.key_int("ntds_code", ntds_code);
+    w.key_int("platform", platform);
+    w.key_int("operational_role", operational_role);
+    w.key_int("confidence_level", confidence_level);
+    w.key_str("radar_name", radar_name);
+    w.key_int("radar_mode", radar_mode);
+    w.key_int("next_mode_record_no", next_mode_rec_no);
+    w.key_int("freq_min_khz", freq_min_khz);
+    w.key_int("freq_max_khz", freq_max_khz);
+    w.key_int("pw_min_ns", pw_min_ns);
+    w.key_int("pw_max_ns", pw_max_ns);
+    w.key_int("pgri_ns", pgri_ns);
+    w.key_raw("spot_prfs_hz", spot_prfs);
+    w.key_raw("spot_frequencies_khz", spot_freqs);
+    return w.str();
 }
 
 // ===========================================================================
@@ -489,119 +494,238 @@ static std::string decode_warner_record(const uint8_t* p, int avail) {
 // ===========================================================================
 
 // ---- ESMP → RSEC: Active Track Data (0x1502) — periodic 1 Hz, NEVER ACK ----
-// Body layout (IRS §5.2, Table — Active Track):
-//   0:   SystemMode   (UINT8): current ESMP operating mode
-//   1:   NumTracks    (UINT8): number of track entries (0–N)
-//   Per track (24 bytes each):
-//     0–1:   TrackID       (UINT16 BE): 1–500 ESM-correlated, 501–550 manual
-//     2–3:   DOA           (INT16 BE): tenths of degrees, ÷10 = degrees (0.0°–359.9°)
-//     4–7:   FreqKHz       (UINT32 BE): frequency in KHz
-//     8–11:  PRIUsec       (UINT32 BE): PRI in microseconds
-//     12–15: PWNsec        (UINT32 BE): pulse width in nanoseconds
-//     16–19: ScanPeriodMs  (UINT32 BE): scan period in milliseconds
-//     20–21: AmplitudedBm  (INT16 BE): amplitude in dBm × 1 (direct dBm)
-//     22:    TrackStatus   (UINT8): bit flags — b0=active, b1=manual, b2=jamming
-//     23:    EmitterCat    (UINT8): emitter category code
+// Body layout (IRS §5.3.1, Data Elements Table, pp.26-31): a single flat
+// track record — no header, no repeat count, starts directly at Track No.
+// Fixed portion is 94 bytes:
+//   0–1:   TrackNo           (UINT16 BE): 1–500
+//   2–3:   TrackStatus       (UINT16 BE): bit-encoded
+//   4–5:   DOA               (UINT16 BE): tenths of degrees, ÷10 = degrees
+//   6–9:   Frequency         (UINT32 BE): ×10 = KHz
+//   10–13: FrequencyAttribs  (UINT32 BE): bit-encoded
+//   14–17: PW                (UINT32 BE): ×10 = ns
+//   18–21: PRI               (UINT32 BE): ÷10 = microseconds
+//   22–25: PRF               (UINT32 BE): Hz
+//   26–29: PRIAttribs        (UINT32 BE): bit-encoded
+//   30:    Amplitude         (UINT8):     ×-1 = dBm
+//   31:    ScanType          (UINT8):     bit-encoded
+//   32–33: AntennaScanPeriod (UINT16 BE): ms
+//   34–37: TOFA              (UINT32 BE): seconds since 00:00:00 current date
+//   38–41: TOLA              (UINT32 BE): seconds since 00:00:00 current date
+//   42–43: ActivityCount     (UINT16 BE)
+//   44–45: TrackAge          (UINT16 BE): seconds
+//   46–47: TrackHitCount     (UINT16 BE)
+//   48–52: Identity1(4)+ConfidenceLevel1(1)
+//   53–57: Identity2(4)+ConfidenceLevel2(1)
+//   58–62: Identity3(4)+ConfidenceLevel3(1)
+//   63–67: Identity4(4)+ConfidenceLevel4(1)
+//   68–72: Identity5(4)+ConfidenceLevel5(1)
+//   73:    Reserved          (UINT8)
+//   74–77: FrequencyMinimum  (UINT32 BE): ×10 = KHz
+//   78–81: FrequencyMaximum  (UINT32 BE): ×10 = KHz
+//   82–85: PWMinimum         (UINT32 BE): ×10 = ns
+//   86–89: PWMaximum         (UINT32 BE): ×10 = ns
+//   90–93: PGRI              (UINT32 BE): ×10 = ns
+// 94+: Spot PRFs/PWs (interleaved pairs) then Spot Frequencies — variable
+//   length, count driven by subfields inside PRIAttribs/FrequencyAttribs
+//   (bit positions not yet available); emitted as raw hex pending that.
 
-static constexpr int ACTIVE_TRACK_ENTRY_SIZE = 24;
+static constexpr int ACTIVE_TRACK_FIXED_SIZE = 94;
 
 static void parse_active_track(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
-    if (body_len < 2) { w.key_str("parse_error", "body_too_short"); return; }
+    uint16_t track_no        = load_be16(body + 0);
+    uint16_t track_status    = load_be16(body + 2);
+    uint16_t doa_raw         = load_be16(body + 4);
+    uint32_t freq_raw        = load_be32(body + 6);
+    uint32_t freq_attributes = load_be32(body + 10);
+    uint32_t pw_raw          = load_be32(body + 14);
+    uint32_t pri_raw         = load_be32(body + 18);
+    uint32_t prf_hz          = load_be32(body + 22);
+    uint32_t pri_attributes  = load_be32(body + 26);
+    uint8_t  amp_raw         = body[30];
+    uint8_t  scan_type       = body[31];
+    uint16_t asp_ms          = load_be16(body + 32);
+    uint32_t tofa_s          = load_be32(body + 34);
+    uint32_t tola_s          = load_be32(body + 38);
+    uint16_t activity_count  = load_be16(body + 42);
+    uint16_t track_age_s     = load_be16(body + 44);
+    uint16_t track_hit_count = load_be16(body + 46);
+    uint32_t identity1       = load_be32(body + 48);
+    uint8_t  confidence1     = body[52];
+    uint32_t identity2       = load_be32(body + 53);
+    uint8_t  confidence2     = body[57];
+    uint32_t identity3       = load_be32(body + 58);
+    uint8_t  confidence3     = body[62];
+    uint32_t identity4       = load_be32(body + 63);
+    uint8_t  confidence4     = body[67];
+    uint32_t identity5       = load_be32(body + 68);
+    uint8_t  confidence5     = body[72];
+    uint32_t freq_min_raw    = load_be32(body + 74);
+    uint32_t freq_max_raw    = load_be32(body + 78);
+    uint32_t pw_min_raw      = load_be32(body + 82);
+    uint32_t pw_max_raw      = load_be32(body + 86);
+    uint32_t pgri_raw        = load_be32(body + 90);
 
-    uint8_t sys_mode   = body[0];
-    uint8_t num_tracks = body[1];
-    w.key_int("system_mode",   sys_mode);
-    w.key_int("num_tracks",    num_tracks);
+    w.key_int("track_no",           track_no);
+    w.key_int("track_status",       track_status);
+    w.key_double("doa_deg",         doa_raw / 10.0);
+    w.key_int("freq_khz",           static_cast<long long>(freq_raw) * 10);
+    w.key_int("freq_attributes",    freq_attributes);
+    w.key_int("pw_ns",              static_cast<long long>(pw_raw) * 10);
+    w.key_double("pri_us",          pri_raw / 10.0);
+    w.key_int("prf_hz",             prf_hz);
+    w.key_int("pri_attributes",     pri_attributes);
+    w.key_int("amplitude_dbm",      -static_cast<long long>(amp_raw));
+    w.key_int("scan_type",          scan_type);
+    w.key_int("asp_ms",             asp_ms);
+    w.key_int("tofa_s",             tofa_s);
+    w.key_int("tola_s",             tola_s);
+    w.key_int("activity_count",     activity_count);
+    w.key_int("track_age_s",        track_age_s);
+    w.key_int("track_hit_count",    track_hit_count);
+    w.key_int("identity1",          identity1);
+    w.key_int("confidence_level1",  confidence1);
+    w.key_int("identity2",          identity2);
+    w.key_int("confidence_level2",  confidence2);
+    w.key_int("identity3",          identity3);
+    w.key_int("confidence_level3",  confidence3);
+    w.key_int("identity4",          identity4);
+    w.key_int("confidence_level4",  confidence4);
+    w.key_int("identity5",          identity5);
+    w.key_int("confidence_level5",  confidence5);
+    w.key_int("freq_min_khz",       static_cast<long long>(freq_min_raw) * 10);
+    w.key_int("freq_max_khz",       static_cast<long long>(freq_max_raw) * 10);
+    w.key_int("pw_min_ns",          static_cast<long long>(pw_min_raw) * 10);
+    w.key_int("pw_max_ns",          static_cast<long long>(pw_max_raw) * 10);
+    w.key_int("pgri_ns",            static_cast<long long>(pgri_raw) * 10);
 
-    if (num_tracks == 0) return;
-
-    int expected = 2 + num_tracks * ACTIVE_TRACK_ENTRY_SIZE;
-    if (body_len < expected) {
-        w.key_str("parse_warning", "body_shorter_than_expected");
+    if (body_len > ACTIVE_TRACK_FIXED_SIZE) {
+        w.key_str("spot_data_hex",
+                  sdfc::to_hex(body + ACTIVE_TRACK_FIXED_SIZE,
+                               body_len - ACTIVE_TRACK_FIXED_SIZE));
     }
-
-    std::string arr = "[";
-    int max_parse = std::min(static_cast<int>(num_tracks),
-                             (body_len - 2) / ACTIVE_TRACK_ENTRY_SIZE);
-    for (int i = 0; i < max_parse; ++i) {
-        const uint8_t* e = body + 2 + i * ACTIVE_TRACK_ENTRY_SIZE;
-        uint16_t track_id  = load_be16(e + 0);
-        int16_t  doa_raw   = load_be16s(e + 2);
-        uint32_t freq_khz  = load_be32(e + 4);
-        uint32_t pri_us    = load_be32(e + 8);
-        uint32_t pw_ns     = load_be32(e + 12);
-        uint32_t scan_ms   = load_be32(e + 16);
-        int16_t  amp_dbm   = load_be16s(e + 20);
-        uint8_t  status    = e[22];
-        uint8_t  emit_cat  = e[23];
-
-        double doa_deg   = doa_raw / 10.0;
-        double freq_mhz  = freq_khz / 1000.0;
-        bool   is_manual = (track_id >= 501 && track_id <= 550);
-
-        char entry[256];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"track_id\":%u,\"doa_deg\":%.1f,\"freq_mhz\":%.3f,"
-            "\"pri_us\":%u,\"pw_ns\":%u,\"scan_ms\":%u,"
-            "\"amplitude_dbm\":%d,\"status\":\"0x%02X\","
-            "\"emitter_cat\":%u,\"manual\":%s}",
-            (i > 0 ? "," : ""),
-            track_id, doa_deg, freq_mhz,
-            pri_us, pw_ns, scan_ms,
-            static_cast<int>(amp_dbm), status,
-            emit_cat, is_manual ? "true" : "false");
-        arr += entry;
-    }
-    arr += "]";
-    w.key_raw("tracks", arr);
 }
 
-// ---- ESMP → RSEC: Operational Data (0x1504) — periodic 1 Hz, NEVER ACK ----
-// Body layout (IRS §5.2):
-//   0:    ESMPStatus     (UINT8): 0=Init, 1=Operational, 2=Fault, 3=Standby
-//   1:    NumActiveTracks (UINT8)
-//   2:    NumManualTracks (UINT8)
-//   3:    ScanStatus     (UINT8): 0=Idle, 1=Scanning, 2=Directed
-//   4–5:  ScanBandIndex  (UINT16 BE): currently scanning band
-//   6:    HWStatus       (UINT8): hardware status flags
-//   7:    ReservedOpData (UINT8): reserved
+// ---- ESMP → RSEC: Operational Data (0x1504) — periodic 1 Hz ----
+// Body layout (IRS §5.3.2, Data Elements Table, pp.34-36):
+// Fixed header (25 bytes):
+//   0–1:   NumActiveTracks  (UINT16 BE)
+//   2–3:   NumPassive       (UINT16 BE)
+//   4–5:   NumCWTracks      (UINT16 BE)
+//   6–7:   NumWarnerTracks  (UINT16 BE)
+//   8–9:   NumLockOnTracks  (UINT16 BE)
+//   10–11: TrackInformation (UINT16 BE): bit-encoded
+//   12–13: LinkStatus       (UINT16 BE): bit-encoded, "sub-systems" link status
+//   14–15: PlatformHeading  (UINT16 BE): ÷10 = degrees
+//   16–19: PulseCount1(NB)  (UINT32 BE)
+//   20–23: PulseCount2(BB)  (UINT32 BE)
+//   24:    NumThreats(n)    (UINT8):     1–10, drives the repeated block below
+// Repeated threat entry (36 bytes each, n times, starting at offset 25):
+//   +0–1:  EmitterNumber    (UINT16 BE)
+//   +2–5:  Frequency        (UINT32 BE): ×10 = KHz
+//   +6–7:  ThreatAzimuth    (UINT16 BE): ÷10 = degrees
+//   +8–9:  Elevation        (UINT16 BE): ÷10 = degrees, raw wire mapping only
+//                           (0–300→0.0–30.0; 3500–3599→350.0–359.9, which
+//                           represents -10.0..-0.1 — no sign remap applied here)
+//   +10:   ThreatStatus     (UINT8):     bit-encoded, 8 bits
+//   +11–34:JPRONumber       (24 bytes):  see decode_jpro()
+//   +35:   RTGStatus        (UINT8):     0–1
+// Fixed footer (28 bytes, after the last threat entry):
+//   +0–1:  ServoPositionPort       (UINT16 BE): ÷10 = degrees
+//   +2–3:  ServoPositionStarboard  (UINT16 BE): ÷10 = degrees
+//   +4–7:  LinkStatus              (UINT32 BE): bit-encoded, "LRUs of EA
+//                                   sub-system" link status (distinct field
+//                                   from the header's 2-byte LinkStatus)
+//   +8–27: TxHealthStatus          (5 × UINT32 BE): bit-encoded array
+
+static constexpr int OPDATA_HEADER_SIZE = 25;
+static constexpr int OPDATA_THREAT_SIZE = 36;
 
 static void parse_operational_data(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
-    if (body_len < 8) { w.key_str("parse_error", "body_too_short"); return; }
+    uint16_t num_active_tracks = load_be16(body + 0);
+    uint16_t num_passive       = load_be16(body + 2);
+    uint16_t num_cw_tracks     = load_be16(body + 4);
+    uint16_t num_warner_tracks = load_be16(body + 6);
+    uint16_t num_lock_on       = load_be16(body + 8);
+    uint16_t track_information = load_be16(body + 10);
+    uint16_t link_status       = load_be16(body + 12);
+    uint16_t platform_heading  = load_be16(body + 14);
+    uint32_t pulse_count_nb    = load_be32(body + 16);
+    uint32_t pulse_count_bb    = load_be32(body + 20);
+    uint8_t  num_threats       = body[24];
 
-    static const char* esmp_status_str[] = {"init", "operational", "fault", "standby"};
-    static const char* scan_status_str[] = {"idle", "scanning", "directed", "unknown"};
+    w.key_int("num_active_tracks",  num_active_tracks);
+    w.key_int("num_passive",        num_passive);
+    w.key_int("num_cw_tracks",      num_cw_tracks);
+    w.key_int("num_warner_tracks",  num_warner_tracks);
+    w.key_int("num_lock_on_tracks", num_lock_on);
+    w.key_int("track_information",  track_information);
+    w.key_int("link_status",        link_status);
+    w.key_double("platform_heading_deg", platform_heading / 10.0);
+    w.key_int("pulse_count_nb",     pulse_count_nb);
+    w.key_int("pulse_count_bb",     pulse_count_bb);
+    w.key_int("num_threats",        num_threats);
 
-    uint8_t  esmp_status  = body[0];
-    uint8_t  num_active   = body[1];
-    uint8_t  num_manual   = body[2];
-    uint8_t  scan_status  = body[3];
-    uint16_t scan_band    = load_be16(body + 4);
-    uint8_t  hw_status    = body[6];
+    std::string threats = "[";
+    for (int i = 0; i < num_threats; ++i) {
+        const uint8_t* t = body + OPDATA_HEADER_SIZE + i * OPDATA_THREAT_SIZE;
+        uint16_t emitter_no    = load_be16(t + 0);
+        uint32_t freq_raw      = load_be32(t + 2);
+        uint16_t azimuth_raw   = load_be16(t + 6);
+        uint16_t elevation_raw = load_be16(t + 8);
+        uint8_t  threat_status = t[10];
+        int      jpro_offset   = OPDATA_HEADER_SIZE + i * OPDATA_THREAT_SIZE + 11;
+        std::string jpro       = decode_jpro(t + 11, body_len - jpro_offset);
+        uint8_t  rtg_status    = t[35];
 
-    const char* esmp_str = (esmp_status < 4) ? esmp_status_str[esmp_status] : "unknown";
-    const char* scan_str = (scan_status < 3) ? scan_status_str[scan_status] : "unknown";
+        sdfc::JsonWriter tw;
+        tw.key_int("emitter_number",  emitter_no);
+        tw.key_int("freq_khz",        static_cast<long long>(freq_raw) * 10);
+        tw.key_double("azimuth_deg",  azimuth_raw / 10.0);
+        tw.key_double("elevation_deg", elevation_raw / 10.0);
+        tw.key_int("threat_status",   threat_status);
+        tw.key_raw("jpro",            jpro);
+        tw.key_int("rtg_status",      rtg_status);
+        if (i > 0) threats += ",";
+        threats += tw.str();
+    }
+    threats += "]";
+    w.key_raw("threats", threats);
 
-    w.key_str("esmp_status",         esmp_str);
-    w.key_int("esmp_status_code",    esmp_status);
-    w.key_int("num_active_tracks",   num_active);
-    w.key_int("num_manual_tracks",   num_manual);
-    w.key_str("scan_status",         scan_str);
-    w.key_int("scan_band_index",     scan_band);
-    w.key_str("hw_status_hex",       hex_dump(&hw_status, 1));
+    const uint8_t* footer = body + OPDATA_HEADER_SIZE + num_threats * OPDATA_THREAT_SIZE;
+    uint16_t servo_port      = load_be16(footer + 0);
+    uint16_t servo_starboard = load_be16(footer + 2);
+    uint32_t lru_link_status = load_be32(footer + 4);
+
+    w.key_double("servo_position_port_deg",      servo_port / 10.0);
+    w.key_double("servo_position_starboard_deg", servo_starboard / 10.0);
+    w.key_int("lru_link_status", lru_link_status);
+
+    std::string tx_health = "[";
+    for (int i = 0; i < 5; ++i) {
+        uint32_t v = load_be32(footer + 8 + i * 4);
+        if (i > 0) tx_health += ",";
+        tx_health += std::to_string(v);
+    }
+    tx_health += "]";
+    w.key_raw("tx_health_status", tx_health);
 }
 
 // ---- ESMP → RSEC: Purge Response (0x1505) ----
-// Body layout: Result(UINT8): 0=success, 1=fail, 2=track_not_found
+// Body layout (IRS §5.3.3, Data Elements Table, p.36):
+//   0–1: NumberOfTracks (UINT16 BE): 0–500, count of purged tracks
+//   2+:  TrackNumber (UINT16 BE) x NumberOfTracks: 1–500 each
 
-static void parse_purge_response(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
-    if (body_len < 1) { w.key_str("parse_error", "body_too_short"); return; }
-    uint8_t result = body[0];
-    w.key_int("result", result);
-    w.key_str("result_text",
-        result == 0 ? "success" :
-        result == 1 ? "fail" :
-        result == 2 ? "track_not_found" : "unknown");
+static void parse_purge_response(const uint8_t* body, int /*body_len*/, sdfc::JsonWriter& w) {
+    uint16_t num_tracks = load_be16(body + 0);
+    w.key_int("num_tracks", num_tracks);
+
+    std::string arr = "[";
+    for (int i = 0; i < num_tracks; ++i) {
+        if (i > 0) arr += ",";
+        arr += std::to_string(load_be16(body + 2 + i * 2));
+    }
+    arr += "]";
+    w.key_raw("track_numbers", arr);
 }
 
 // ---- ESMP<->RSEC: ACK/NACK (0x1509 ESMP->RSEC §5.3.4; 0x150A RSEC->ESMP §5.2.9) ----
@@ -626,11 +750,6 @@ static void parse_ack_nack(const uint8_t* body, int body_len, sdfc::JsonWriter& 
     w.key_str("acked_cmd_code_hex", cmd_hex);
     w.key_int("acked_seq_no",       acked_seq_no);
     w.key_int("ack_status",         ack_status);
-    w.key_str("ack_status_text",
-        ack_status == 0 ? "nack_invalid" :
-        ack_status == 1 ? "ack_received" :
-        ack_status == 2 ? "ack_received_and_executed" :
-        ack_status == 3 ? "received_but_failed_to_execute" : "unknown");
 }
 
 // ---- RSEC → ESMP: Time Data (0x1002) ----
@@ -656,7 +775,7 @@ static void parse_load_warner(const uint8_t* body, int body_len, sdfc::JsonWrite
     uint8_t  new_set_modify = body[0];
     uint16_t num_records    = load_be16(body + 1);
     w.key_bool("new_set", new_set_modify != 0);
-    w.key_int("num_records", num_records);
+    w.key_int("num_library_records", num_records);
 
     if (num_records == 0) return;
 
@@ -684,7 +803,6 @@ static void parse_delete_warner(const uint8_t* body, int body_len, sdfc::JsonWri
     if (body_len < 2) { w.key_str("parse_error", "body_too_short"); return; }
     uint16_t num_records = load_be16(body);
     w.key_int("num_library_records", num_records);
-    w.key_str("action", num_records == 0 ? "empty_library" : "delete_selected");
 
     std::string arr = "[";
     int count = 0;
@@ -712,10 +830,11 @@ static void parse_lockout_bands(const uint8_t* body, int body_len, sdfc::JsonWri
         const uint8_t* b = body + 1 + i * 8;
         uint32_t lo = load_be32(b + 0);
         uint32_t hi = load_be32(b + 4);
-        char entry[80];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"freq_low_khz\":%u,\"freq_high_khz\":%u}", (i > 0 ? "," : ""), lo, hi);
-        arr += entry;
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("freq_low_khz",  lo);
+        entry_w.key_int("freq_high_khz", hi);
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
     }
     arr += "]";
     w.key_raw("bands", arr);
@@ -734,10 +853,11 @@ static void parse_lockout_sectors(const uint8_t* body, int body_len, sdfc::JsonW
         const uint8_t* s = body + 1 + i * 4;
         double start_deg = load_be16(s + 0) / 10.0;
         double end_deg   = load_be16(s + 2) / 10.0;
-        char entry[80];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"start_deg\":%.1f,\"end_deg\":%.1f}", (i > 0 ? "," : ""), start_deg, end_deg);
-        arr += entry;
+        sdfc::JsonWriter entry_w;
+        entry_w.key_double("start_deg", start_deg);
+        entry_w.key_double("end_deg",   end_deg);
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
     }
     arr += "]";
     w.key_raw("sectors", arr);
@@ -750,9 +870,7 @@ static void parse_lockout_sectors(const uint8_t* body, int body_len, sdfc::JsonW
 
 static void parse_auto_purge(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
     if (body_len < 2) { w.key_str("parse_error", "body_too_short"); return; }
-    uint16_t track_age = load_be16(body);
-    w.key_bool("enabled",    track_age != 0);
-    w.key_int("track_age_sec", track_age);
+    w.key_int("track_age_sec", load_be16(body));
 }
 
 // ---- RSEC → ESMP: Purge Passive Tracks (0x1010) ----
@@ -764,7 +882,6 @@ static void parse_purge_passive(const uint8_t* body, int body_len, sdfc::JsonWri
     if (body_len < 2) { w.key_str("parse_error", "body_too_short"); return; }
     uint16_t num_tracks = load_be16(body);
     w.key_int("num_tracks", num_tracks);
-    w.key_str("action", num_tracks == 0 ? "purge_all" : "purge_selected");
 
     std::string arr = "[";
     int count = 0;
@@ -830,15 +947,19 @@ static void parse_set_scan_bands(const uint8_t* body, int body_len, sdfc::JsonWr
         uint16_t collection_ms   = load_be16(b + 11);
         uint8_t  num_revisits    = b[13];
 
-        char entry[256];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"scan_band_index\":%u,\"start_freq_mhz\":%u,\"stop_freq_mhz\":%u,"
-            "\"rfcu_attenuation\":%u,\"ssu_attenuation\":%u,\"digrx_threshold\":%u,"
-            "\"if_bw_selection\":%u,\"detection_time_ms\":%u,\"collection_time_ms\":%u,"
-            "\"num_revisits\":%u}",
-            (i > 0 ? "," : ""), band_idx, start_freq_mhz, stop_freq_mhz,
-            rfcu_att, ssu_att, digrx_thresh, ifbw_sel, detection_ms, collection_ms, num_revisits);
-        arr += entry;
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("scan_band_index",     band_idx);
+        entry_w.key_int("start_freq_mhz",      start_freq_mhz);
+        entry_w.key_int("stop_freq_mhz",       stop_freq_mhz);
+        entry_w.key_int("rfcu_attenuation",    rfcu_att);
+        entry_w.key_int("ssu_attenuation",     ssu_att);
+        entry_w.key_int("digrx_threshold",     digrx_thresh);
+        entry_w.key_int("if_bw_selection",     ifbw_sel);
+        entry_w.key_int("detection_time_ms",   detection_ms);
+        entry_w.key_int("collection_time_ms",  collection_ms);
+        entry_w.key_int("num_revisits",        num_revisits);
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
         ++count;
     }
     arr += "]";
@@ -904,11 +1025,11 @@ static void parse_ecmp_jam(const uint8_t* body, int body_len, sdfc::JsonWriter& 
     int count = 0;
     for (int i = 0; i < num_emitters && (1 + i * 4 + 4) <= body_len; ++i) {
         const uint8_t* e = body + 1 + i * 4;
-        char entry[64];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"emitter_number\":%u,\"jam_duration_sec\":%u}",
-            (i > 0 ? "," : ""), load_be16(e), load_be16(e + 2));
-        arr += entry;
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("emitter_number",    load_be16(e));
+        entry_w.key_int("jam_duration_sec",  load_be16(e + 2));
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
         ++count;
     }
     arr += "]";
@@ -1048,17 +1169,19 @@ static void parse_ea_operational_data(const uint8_t* body, int body_len, sdfc::J
         std::string jpro     = decode_jpro(e + 11, EA_OP_DATA_ENTRY_SIZE - 11 - 1);
         uint8_t  rtg_status  = e[35];
 
-        // Built as std::string, not a fixed snprintf buffer — jpro alone can
-        // run past 500 bytes with 3 populated techniques (see decode_jpro).
-        char head[128];
-        std::snprintf(head, sizeof(head),
-            "%s{\"emitter_number\":%u,\"freq_mhz\":%u,\"azimuth_deg\":%.1f,"
-            "\"elevation_deg\":%.1f,\"threat_status\":\"0x%02X\",\"jpro\":",
-            (i > 0 ? "," : ""), emitter_no, freq_mhz, azimuth_deg,
-            elev_deg, threat_stat);
-        arr += head;
-        arr += jpro;
-        arr += ",\"rtg_status\":" + std::to_string(rtg_status) + "}";
+        char threat_hex[8];
+        std::snprintf(threat_hex, sizeof(threat_hex), "0x%02X", threat_stat);
+
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("emitter_number",  emitter_no);
+        entry_w.key_int("freq_mhz",        freq_mhz);
+        entry_w.key_double("azimuth_deg",  azimuth_deg);
+        entry_w.key_double("elevation_deg",elev_deg);
+        entry_w.key_str("threat_status",   threat_hex);
+        entry_w.key_raw("jpro",            jpro);
+        entry_w.key_int("rtg_status",      rtg_status);
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
         ++count;
     }
     arr += "]";
@@ -1091,6 +1214,133 @@ static void parse_ecmp_manual_start(const uint8_t* body, int body_len, sdfc::Jso
         w.key_raw("jpro", decode_jpro(body + 21, body_len - 21));
     else
         w.key_str("parse_warning", "jpro_data_missing_or_truncated");
+}
+
+// ---- RSEC → ECMP Manual: Set Forbidden Frequency Bands (0x1120) ----
+// Body (IRS §5.7.8, pp.65-66): NumberOfForbiddenFrequencyBands(UINT8, 0-16;
+// 0 = remove all existing lockout bands at ES Processor) +
+// repeated [StartFrequency(UINT16, MHz, 1000-18000) +
+// StopFrequency(UINT16, MHz, 1000-18000)], 'Number of Forbidden Frequency
+// Bands' times. Distinct from the ESMP-side Lockout Frequency Bands (0x1005),
+// which uses UINT32 KHz fields instead of UINT16 MHz fields.
+
+static void parse_forbidden_bands(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
+    if (body_len < 1) { w.key_str("parse_error", "body_too_short"); return; }
+    uint8_t num_bands = body[0];
+    w.key_int("num_bands", num_bands);
+
+    std::string arr = "[";
+    int count = 0;
+    for (int i = 0; i < num_bands && (1 + i * 4 + 4) <= body_len; ++i) {
+        const uint8_t* b = body + 1 + i * 4;
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("start_freq_mhz", load_be16(b + 0));
+        entry_w.key_int("stop_freq_mhz",  load_be16(b + 2));
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
+        ++count;
+    }
+    arr += "]";
+    w.key_raw("bands", arr);
+    if (count < num_bands)
+        w.key_str("parse_warning", "body_truncated_fewer_bands_than_declared");
+}
+
+// ---- RSEC → ECMP Manual: Reset EA Subsystem (0x0FB0) ----
+// Body (IRS §5.7.9, p.66): none — pure trigger, no data element table.
+// Dispatched directly with no decoder, same as Purge All (0x1011).
+
+// ---- RSEC → ECMP Manual: Set Prohibited Sectors (0x1121) ----
+// Body (IRS §5.7.11, pp.67-68): NumberOfSectors(UINT8, 1-4) +
+// repeated [EntryID(UINT8, 1-4) + StartAngle(UINT16, ÷10 deg, 0-359.9) +
+// StopAngle(UINT16, ÷10 deg, 0-359.9)], 'Number Of Sectors' times.
+// Distinct from the ESMP-side Lockout Sectors (0x1006), which has no
+// EntryID field.
+
+static void parse_prohibited_sectors(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
+    if (body_len < 1) { w.key_str("parse_error", "body_too_short"); return; }
+    uint8_t num_sectors = body[0];
+    w.key_int("num_sectors", num_sectors);
+
+    std::string arr = "[";
+    int count = 0;
+    for (int i = 0; i < num_sectors && (1 + i * 5 + 5) <= body_len; ++i) {
+        const uint8_t* s = body + 1 + i * 5;
+        uint8_t entry_id   = s[0];
+        double  start_deg  = load_be16(s + 1) / 10.0;
+        double  stop_deg   = load_be16(s + 3) / 10.0;
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("entry_id",    entry_id);
+        entry_w.key_double("start_deg",start_deg);
+        entry_w.key_double("stop_deg", stop_deg);
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
+        ++count;
+    }
+    arr += "]";
+    w.key_raw("sectors", arr);
+    if (count < num_sectors)
+        w.key_str("parse_warning", "body_truncated_fewer_sectors_than_declared");
+}
+
+// ---- RSEC → ECMP Manual: Update Track (Manual) (0x0FA8) ----
+// Body (IRS §5.7.6, Data Element Table, p.63-64): fixed 3-byte header +
+// repeated variable-size entries.
+//   0-1: EmitterNumber      (UINT16 BE): 501-550, track ID
+//   2:   NumberOfParameters (UINT8):     1-12
+//   3+:  repeated NumberOfParameters times:
+//          ParameterCode  (UINT8):  1-12
+//          ParameterValue (size "as applicable" per code — see
+//                          update_track_param_size(); not interpreted
+//                          here, just raw bytes — parameter semantics are
+//                          drs-server's job, not this DLL's)
+//
+// update_track_param_size() only exists to know how many bytes each
+// ParameterValue occupies so the next ParameterCode can be found — it is
+// structural (byte framing), not a semantic decode. The per-code byte
+// widths come from the field tables used throughout this IRS (§5.7.1/
+// §5.7.3), since §5.7.6 itself doesn't spell them out.
+// This message was previously not wired into the dispatcher at all (not
+// even a raw-hex stub) — command code confirmed against the IRS 2026-07-28.
+
+static int update_track_param_size(uint8_t code) {
+    static const int SIZES[] = {0, 2, 4, 4, 4, 4, 4, 1, 1, 2, 1, 2, 24};
+    return (code >= 1 && code <= 12) ? SIZES[code] : -1;
+}
+
+static void parse_update_track_manual(const uint8_t* body, int /*body_len*/, sdfc::JsonWriter& w) {
+    uint16_t emitter_number = load_be16(body + 0);
+    uint8_t  num_params     = body[2];
+    w.key_int("emitter_number",  emitter_number);
+    w.key_int("num_parameters",  num_params);
+
+    std::string arr = "[";
+    int off = 3;
+    for (int i = 0; i < num_params; ++i) {
+        uint8_t code = body[off];
+        int size = update_track_param_size(code);
+        const uint8_t* v = body + off + 1;
+
+        sdfc::JsonWriter entry_w;
+        entry_w.key_int("parameter_code",      code);
+        entry_w.key_str("parameter_value_hex", hex_dump(v, size));
+        if (i > 0) arr += ",";
+        arr += entry_w.str();
+        off += 1 + size;
+    }
+    arr += "]";
+    w.key_raw("parameter_updates", arr);
+}
+
+// ---- RSEC → ECMP Manual: Change Mode (Manual) (0x0FAE) ----
+// Body (IRS §5.7.7, p.64), 1 byte: ModeValue(UINT8): 1=Semi Auto, 2=Manual
+// Mode. This message was previously not wired into the dispatcher at all
+// (not even a raw-hex stub) — command code confirmed against the IRS
+// 2026-07-28.
+
+static void parse_change_mode_manual(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
+    if (body_len < 1) { w.key_str("parse_error", "body_too_short"); return; }
+    w.key_int("mode_value", body[0]);
 }
 
 // ---- Top-level Variant A dispatcher ----
@@ -1147,22 +1397,29 @@ static char* parse_variant_a_frame(const uint8_t* frame, int frame_len) {
         case 0x1153: w.key_str("msg_type", "ea_operational_data");  parse_ea_operational_data(body, blen, w); break;
         // RSEC → ECMP manual
         case 0x6001: w.key_str("msg_type", "ecmp_manual_start");    parse_ecmp_manual_start(body, blen, w);   break;
-        case 0x0FA4: w.key_str("msg_type", "ecmp_manual_0x0FA4");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
-        case 0x0FA5: w.key_str("msg_type", "ecmp_manual_0x0FA5");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
-        case 0x0FA6: w.key_str("msg_type", "ecmp_manual_0x0FA6");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
-        case 0x0FA7: w.key_str("msg_type", "ecmp_manual_0x0FA7");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
-        case 0x0FB0: w.key_str("msg_type", "ecmp_manual_0x0FB0");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
-        case 0x1120: w.key_str("msg_type", "ecmp_manual_0x1120");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
-        case 0x1121: w.key_str("msg_type", "ecmp_manual_0x1121");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
-        case 0x111D: w.key_str("msg_type", "ecmp_manual_0x111D");
-            w.key_str("raw_body_hex", hex_dump(body, blen));                                                  break;
+        // §5.7.5 Break Track (Manual) — identical wire shape to semi-auto Break Track (0x1104).
+        case 0x0FA4: w.key_str("msg_type", "break_track_manual");   parse_ecmp_break_track(body, blen, w);    break;
+        // §5.7.2 Jam Command (Manual) — identical wire shape to semi-auto Jam Command (0x1102).
+        case 0x0FA5: w.key_str("msg_type", "jam_command_manual");   parse_ecmp_jam(body, blen, w);            break;
+        // §5.7.4 Stop Jam (Manual) — identical wire shape to semi-auto Stop Jam (0x1105).
+        case 0x0FA6: w.key_str("msg_type", "stop_jam_manual");      parse_ecmp_stop_jam(body, blen, w);       break;
+        // §5.7.3 Track and Jam Command (Manual) — identical wire shape to semi-auto (0x1103).
+        case 0x0FA7: w.key_str("msg_type", "track_and_jam_manual"); parse_ecmp_track_and_jam(body, blen, w);  break;
+        // §5.7.6 Update Track (Manual) — was not wired in at all before 2026-07-28.
+        case 0x0FA8: w.key_str("msg_type", "update_track_manual");  parse_update_track_manual(body, blen, w); break;
+        // §5.7.9 Reset EA Subsystem — no data element table, trigger-only (like Purge All).
+        case 0x0FB0: w.key_str("msg_type", "reset_ea_subsystem");                                            break;
+        // §5.7.7 Change Mode (Manual) — was not wired in at all before 2026-07-28.
+        case 0x0FAE: w.key_str("msg_type", "change_mode_manual");   parse_change_mode_manual(body, blen, w);  break;
+        // §5.7.8 Set Forbidden Frequency Bands — distinct shape from ESMP-side Lockout Bands (0x1005).
+        case 0x1120: w.key_str("msg_type", "set_forbidden_bands");  parse_forbidden_bands(body, blen, w);     break;
+        // §5.7.10 Platform Heading Data to EA Processor — was not wired in at all before 2026-07-28;
+        // same 2-byte ÷10-deg shape as the ESMP-side Platform Heading (0x1014).
+        case 0x1108: w.key_str("msg_type", "platform_heading_to_ea"); parse_platform_heading(body, blen, w);  break;
+        // §5.7.11 Set Prohibited Sectors — distinct shape from ESMP-side Lockout Sectors (0x1006): adds EntryID.
+        case 0x1121: w.key_str("msg_type", "set_prohibited_sectors"); parse_prohibited_sectors(body, blen, w); break;
+        // §5.7.12 ECM operational status — identical wire shape to EA Operational Data Semi (0x1153).
+        case 0x111D: w.key_str("msg_type", "ecm_operational_status"); parse_ea_operational_data(body, blen, w); break;
         default:
             w.key_str("msg_type", "unknown");
             if (blen > 0)
@@ -1184,46 +1441,34 @@ static char* parse_variant_a_frame(const uint8_t* frame, int frame_len) {
 // ===========================================================================
 
 // ---- RSEC → BB Rx: SFB Selection (CmdUnitID=0x1126) ----
-// Body: NumBands(UINT8) + N×[FreqLow(UINT32 MHz BE) + FreqHigh(UINT32 MHz BE)]
+// Body layout (IRS §5.4.1, Data Element Table, p.37): fixed 3 bytes.
+//   0: SFBValue     (UINT8): 1=SFB1(2.2-18GHz), 2=SFB2(2.5-18GHz),
+//                            3=SFB3(4-18GHz), 4=SFB4(6-18GHz)
+//   1: ScanQuadrant  (UINT8): bit-encoded, bit0-3 = quadrants 1-4, bit4-7 unused
+//   2: Threshold     (UINT8): ×-1 = dBm
 
-static void parse_bb_sfb_selection(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
-    if (body_len < 1) { w.key_str("parse_error", "body_too_short"); return; }
-    uint8_t num = body[0];
-    w.key_int("num_bands", num);
+static void parse_bb_sfb_selection(const uint8_t* body, int /*body_len*/, sdfc::JsonWriter& w) {
+    uint8_t sfb_value     = body[0];
+    uint8_t scan_quadrant = body[1];
+    uint8_t threshold_raw = body[2];
 
-    std::string arr = "[";
-    for (int i = 0; i < num && (1 + i * 8 + 8) <= body_len; ++i) {
-        const uint8_t* b = body + 1 + i * 8;
-        char entry[80];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"freq_low_mhz\":%u,\"freq_high_mhz\":%u}",
-            (i > 0 ? "," : ""), load_be32(b), load_be32(b + 4));
-        arr += entry;
-    }
-    arr += "]";
-    w.key_raw("bands", arr);
+    w.key_int("sfb_value",           sfb_value);
+    w.key_int("scan_quadrant",       scan_quadrant);
+    w.key_int("threshold_dbm",       -static_cast<long long>(threshold_raw));
 }
 
 // ---- RSEC → BB Rx: RF Sector Blank (CmdUnitID=0x1127) ----
-// Body: NumSectors(UINT8) + N×[StartDOA(UINT16 ÷10) + EndDOA(UINT16 ÷10)]
+// Body layout (IRS §5.4.2, Data Element Table, p.38): fixed 1 byte.
+//   0: RFSectorValue (UINT8): quadrant selection for sector blanking —
+//      Q1(0-90deg)/Q2(90-180deg)/Q3(180-270deg)/Q4(270-360deg).
+//      NOTE: table prints "Range 0-360" for a 1-byte field, which can't fit;
+//      Description frames this as Q1-Q4 quadrant selection, same shape as
+//      0x1126's ScanQuadrant bitmask — treated as a bitmask/code here, not
+//      a literal degree value. Emitted as a plain int, no bit-by-bit split.
 
-static void parse_bb_sector_blank(const uint8_t* body, int body_len, sdfc::JsonWriter& w) {
-    if (body_len < 1) { w.key_str("parse_error", "body_too_short"); return; }
-    uint8_t num = body[0];
-    w.key_int("num_sectors", num);
-
-    std::string arr = "[";
-    for (int i = 0; i < num && (1 + i * 4 + 4) <= body_len; ++i) {
-        const uint8_t* s = body + 1 + i * 4;
-        char entry[80];
-        std::snprintf(entry, sizeof(entry),
-            "%s{\"start_deg\":%.1f,\"end_deg\":%.1f}",
-            (i > 0 ? "," : ""),
-            load_be16(s + 0) / 10.0, load_be16(s + 2) / 10.0);
-        arr += entry;
-    }
-    arr += "]";
-    w.key_raw("sectors", arr);
+static void parse_bb_sector_blank(const uint8_t* body, int /*body_len*/, sdfc::JsonWriter& w) {
+    uint8_t rf_sector_value = body[0];
+    w.key_int("rf_sector_value", rf_sector_value);
 }
 
 // ---- RSEC → BB Rx: CAL ON/OFF (CmdUnitID=0x1128) ----
@@ -1451,8 +1696,7 @@ static char* parse_variant_c_frame(const uint8_t* frame, int frame_len) {
             // Data (IRS §5.11.2, p.83): Speed(UINT8, rpm, 1-200) + Direction(UINT8: 0x00=CW, 0xFF=CCW)
             if (n >= 2) {
                 w.key_int("speed_rpm", data[0]);
-                w.key_str("direction", data[1] == 0x00 ? "cw" :
-                                       data[1] == 0xFF ? "ccw" : "unknown");
+                w.key_int("direction", data[1]);
             }
             break;
 
@@ -1498,11 +1742,7 @@ static char* parse_variant_c_frame(const uint8_t* frame, int frame_len) {
                 w.key_bool("bit_cmd_checksum_ok",   (feedback_code & 0x01) != 0);
                 w.key_bool("bit_cmd_received",      (feedback_code & 0x02) != 0);
                 w.key_bool("bit_ready_for_operation",(feedback_code & 0x04) != 0);
-                uint8_t scu_status = (feedback_code >> 6) & 0x03;
-                w.key_str("current_scu_status",
-                    scu_status == 0 ? "emergency_stop" :
-                    scu_status == 2 ? "manual_mode" :
-                    scu_status == 3 ? "auto_mode" : "unknown");
+                w.key_int("current_scu_status", (feedback_code >> 6) & 0x03);
                 w.key_bool("servo_encoder_ok",   (servo_status & 0x01) != 0);
                 w.key_bool("servo_amplifier_ok", (servo_status & 0x02) != 0);
                 w.key_double("azimuth_deg", load_be16(data + 2) * SCU_ANGLE_LSB_DEG);

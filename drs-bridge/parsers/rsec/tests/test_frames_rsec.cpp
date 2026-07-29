@@ -124,28 +124,50 @@ static std::string extract_and_parse(const uint8_t* wire, int wire_len) {
 static void test_extract_variant_a_active_track() {
     const char* name = "extract_variant_a_active_track";
     try {
-        uint8_t body[26] = {};
-        body[0] = 1;     // SystemMode = operational
-        body[1] = 1;     // NumTracks = 1
-        store_be16(body + 2, 42);              // TrackID = 42
-        store_be16(body + 4, 900);              // DOA = 90.0 deg
-        store_be32(body + 6, 10000);             // Freq = 10000 KHz = 10 MHz
-        store_be32(body + 10, 1000);             // PRI = 1000 us
-        store_be32(body + 14, 5000);             // PW = 5000 ns
-        store_be32(body + 18, 500);              // ScanPeriod = 500 ms
-        store_be16(body + 22, static_cast<uint16_t>(-40)); // Amplitude = -40 dBm
-        body[24] = 0x01; // Status = active
-        body[25] = 3;    // EmitterCategory = 3
+        // IRS Sec 5.3.1 Data Elements Table (pp.26-31): flat 94-byte record,
+        // no header/repeat-count, starts at Track No.
+        uint8_t body[94] = {};
+        store_be16(body + 0,  42);       // Track No = 42
+        store_be16(body + 2,  0x0001);   // Track Status = 0x0001
+        store_be16(body + 4,  900);      // DOA raw 900 -> 90.0 deg
+        store_be32(body + 6,  1000);     // Frequency raw 1000 -> x10 = 10000 KHz
+        store_be32(body + 10, 0);        // Frequency Attributes
+        store_be32(body + 14, 500);      // PW raw 500 -> x10 = 5000 ns
+        store_be32(body + 18, 10000);    // PRI raw 10000 -> /10 = 1000 us
+        store_be32(body + 22, 1000);     // PRF = 1000 Hz
+        store_be32(body + 26, 0);        // PRI Attributes
+        body[30] = 40;                   // Amplitude raw 40 -> x-1 = -40 dBm
+        body[31] = 0;                     // Scan Type
+        store_be16(body + 32, 500);      // ASP = 500 ms
+        store_be32(body + 34, 100);      // TOFA = 100 s
+        store_be32(body + 38, 200);      // TOLA = 200 s
+        store_be16(body + 42, 0);        // Activity count
+        store_be16(body + 44, 20);       // Track Age = 20 s
+        store_be16(body + 46, 1);        // Track Hit Count = 1
+        store_be32(body + 48, 0); body[52] = 0; // Identity1/Confidence1
+        store_be32(body + 53, 0); body[57] = 0; // Identity2/Confidence2
+        store_be32(body + 58, 0); body[62] = 0; // Identity3/Confidence3
+        store_be32(body + 63, 0); body[67] = 0; // Identity4/Confidence4
+        store_be32(body + 68, 0); body[72] = 0; // Identity5/Confidence5
+        // body[73] Reserved = 0
+        store_be32(body + 74, 1000);     // Frequency Minimum raw -> x10 = 10000 KHz
+        store_be32(body + 78, 1000);     // Frequency Maximum raw -> x10 = 10000 KHz
+        store_be32(body + 82, 500);      // PW Minimum raw -> x10 = 5000 ns
+        store_be32(body + 86, 500);      // PW Maximum raw -> x10 = 5000 ns
+        store_be32(body + 90, 0);        // PGRI
 
         int total;
-        const uint8_t* frame = make_variant_a(0x1502, 1, body, 26, &total);
+        const uint8_t* frame = make_variant_a(0x1502, 1, body, 94, &total);
         std::string s = extract_and_parse(frame, total);
 
         bool ok = s.find("\"msg_type\":\"active_track_data\"") != std::string::npos
-               && s.find("\"num_tracks\":1") != std::string::npos
-               && s.find("\"track_id\":42") != std::string::npos
+               && s.find("\"track_no\":42") != std::string::npos
                && s.find("\"doa_deg\":90") != std::string::npos
-               && s.find("\"freq_mhz\":10") != std::string::npos;
+               && s.find("\"freq_khz\":10000") != std::string::npos
+               && s.find("\"pri_us\":1000") != std::string::npos
+               && s.find("\"pw_ns\":5000") != std::string::npos
+               && s.find("\"amplitude_dbm\":-40") != std::string::npos
+               && s.find("\"track_age_s\":20") != std::string::npos;
         if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
     } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
 }
@@ -153,21 +175,50 @@ static void test_extract_variant_a_active_track() {
 static void test_extract_variant_a_operational_data() {
     const char* name = "extract_variant_a_operational_data";
     try {
-        uint8_t body[8] = {};
-        body[0] = 1; // ESMP operational
-        body[1] = 3; // 3 active tracks
-        body[2] = 0; // 0 manual tracks
-        body[3] = 1; // scanning
-        store_be16(body + 4, 2); // band index 2
-        body[6] = 0; // hw_status ok
+        // IRS Sec 5.3.2 Data Elements Table (pp.34-36): 25-byte header +
+        // NumThreats x 36-byte threat entries + 28-byte footer.
+        const int num_threats = 1;
+        const int total_len = 25 + num_threats * 36 + 28;
+        uint8_t body[total_len] = {};
+
+        store_be16(body + 0,  3);   // NumActiveTracks = 3
+        store_be16(body + 2,  0);   // NumPassive
+        store_be16(body + 4,  0);   // NumCWTracks
+        store_be16(body + 6,  0);   // NumWarnerTracks
+        store_be16(body + 8,  0);   // NumLockOnTracks
+        store_be16(body + 10, 0);   // TrackInformation
+        store_be16(body + 12, 0);   // LinkStatus (header)
+        store_be16(body + 14, 2);   // PlatformHeading raw 2 -> 0.2 deg
+        store_be32(body + 16, 100); // PulseCount1 (NB)
+        store_be32(body + 20, 200); // PulseCount2 (BB)
+        body[24] = static_cast<uint8_t>(num_threats); // NumThreats
+
+        uint8_t* t = body + 25;
+        store_be16(t + 0, 7);      // EmitterNumber = 7
+        store_be32(t + 2, 1000);   // Frequency raw 1000 -> x10 = 10000 KHz
+        store_be16(t + 6, 900);    // Azimuth raw 900 -> 90.0 deg
+        store_be16(t + 8, 100);    // Elevation raw 100 -> 10.0 deg
+        t[10] = 0x01;              // ThreatStatus
+        // t+11..t+34: JPRO Number (24 bytes) left zeroed
+        t[35] = 1;                 // RTGStatus
+
+        uint8_t* footer = body + 25 + num_threats * 36;
+        store_be16(footer + 0, 300); // Servo Port raw 300 -> 30.0 deg
+        store_be16(footer + 2, 400); // Servo Starboard raw 400 -> 40.0 deg
+        store_be32(footer + 4, 0);   // LinkStatus (footer/LRU)
+        // footer+8..footer+27: TxHealthStatus (5 x uint32) left zeroed
 
         int total;
-        const uint8_t* frame = make_variant_a(0x1504, 5, body, 8, &total);
+        const uint8_t* frame = make_variant_a(0x1504, 5, body, total_len, &total);
         std::string s = extract_and_parse(frame, total);
 
         bool ok = s.find("\"msg_type\":\"operational_data\"") != std::string::npos
-               && s.find("\"esmp_status\":\"operational\"") != std::string::npos
-               && s.find("\"num_active_tracks\":3") != std::string::npos;
+               && s.find("\"num_active_tracks\":3") != std::string::npos
+               && s.find("\"num_threats\":1") != std::string::npos
+               && s.find("\"emitter_number\":7") != std::string::npos
+               && s.find("\"freq_khz\":10000") != std::string::npos
+               && s.find("\"azimuth_deg\":90") != std::string::npos
+               && s.find("\"servo_position_port_deg\":30") != std::string::npos;
         if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
     } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
 }
@@ -188,8 +239,7 @@ static void test_extract_variant_a_ack_nack() {
         bool ok = s.find("\"msg_type\":\"ack_nack_esmp_to_rsec\"") != std::string::npos
                && s.find("\"acked_cmd_code_hex\":\"0x1003\"") != std::string::npos
                && s.find("\"acked_seq_no\":7") != std::string::npos
-               && s.find("\"ack_status\":2") != std::string::npos
-               && s.find("\"ack_status_text\":\"ack_received_and_executed\"") != std::string::npos;
+               && s.find("\"ack_status\":2") != std::string::npos;
         if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
     } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
 }
@@ -259,7 +309,7 @@ static void test_extract_variant_a_load_warner() {
     const char* name = "extract_variant_a_load_warner";
     try {
         // Body: NewSetFlag(1B)+NumRecords(2B)+1 record (226B)
-        static uint8_t body[3 + 226] = {};
+        uint8_t body[3 + 226] = {};
         body[0] = 1;                 // new set
         store_be16(body + 1, 1);     // 1 record
         uint8_t* rec = body + 3;
@@ -275,7 +325,7 @@ static void test_extract_variant_a_load_warner() {
 
         bool ok = s.find("\"msg_type\":\"load_warner_library\"") != std::string::npos
                && s.find("\"new_set\":true") != std::string::npos
-               && s.find("\"num_records\":1") != std::string::npos
+               && s.find("\"num_library_records\":1") != std::string::npos
                && s.find("\"record_no\":12") != std::string::npos
                && s.find("\"radar_name\":\"RDR-ABC1\"") != std::string::npos;
         if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
@@ -285,20 +335,21 @@ static void test_extract_variant_a_load_warner() {
 static void test_extract_variant_b_sfb_selection() {
     const char* name = "extract_variant_b_sfb_selection";
     try {
-        uint8_t body[17] = {};
-        body[0] = 2; // NumBands
-        store_be32(body + 1, 2000);
-        store_be32(body + 5, 6000);
-        store_be32(body + 9, 6000);
-        store_be32(body + 13, 18000);
+        // IRS Sec 5.4.1 Data Element Table (p.37): fixed 3-byte body.
+        uint8_t body[3] = {};
+        body[0] = 3;    // SFB Value = SFB3 (4-18GHz)
+        body[1] = 0x05; // Scan Quadrant = quadrants 1 & 3
+        body[2] = 40;   // Threshold raw 40 -> x-1 = -40 dBm
 
         int total;
-        const uint8_t* frame = make_variant_b(0x1126, body, 17, &total);
+        const uint8_t* frame = make_variant_b(0x1126, body, 3, &total);
         std::string s = extract_and_parse(frame, total);
 
         bool ok = s.find("\"frame_variant\":2") != std::string::npos
                && s.find("\"msg_type\":\"bb_sfb_selection\"") != std::string::npos
-               && s.find("\"num_bands\":2") != std::string::npos;
+               && s.find("\"sfb_value\":3") != std::string::npos
+               && s.find("\"scan_quadrant\":5") != std::string::npos
+               && s.find("\"threshold_dbm\":-40") != std::string::npos;
         if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
     } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
 }
@@ -357,7 +408,7 @@ static void test_extract_variant_c_spin() {
 
         bool ok = s.find("\"msg_type\":\"scu_spin\"") != std::string::npos
                && s.find("\"speed_rpm\":45") != std::string::npos
-               && s.find("\"direction\":\"cw\"") != std::string::npos;
+               && s.find("\"direction\":0") != std::string::npos;
         if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
     } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
 }
@@ -375,7 +426,7 @@ static void test_extract_variant_c_continuous_feedback() {
         std::string s = extract_and_parse(frame, total);
 
         bool ok = s.find("\"msg_type\":\"scu_continuous_feedback\"") != std::string::npos
-               && s.find("\"current_scu_status\":\"auto_mode\"") != std::string::npos
+               && s.find("\"current_scu_status\":3") != std::string::npos
                && s.find("\"servo_encoder_ok\":true") != std::string::npos
                && s.find("\"azimuth_deg\":90") != std::string::npos
                && s.find("elevation") == std::string::npos;
@@ -490,6 +541,200 @@ static void test_corrupt_variant_a_eom() {
     if (r == -1) TEST_PASS(name); else TEST_FAIL(name, "expected -1 for corrupt EOM");
 }
 
+// ---------------------------------------------------------------------------
+// RSEC -> ECMP Manual mode (IRS §5.7) — the 11 messages that previously had
+// no field-level decoding (8 were raw-hex-only stubs; 0x0FA8, 0x0FAE, 0x1108
+// had no dispatch case at all). Added 2026-07-28 against the IRS directly.
+// ---------------------------------------------------------------------------
+
+static void test_break_track_manual() {
+    const char* name = "break_track_manual";
+    try {
+        uint8_t body[3] = {};
+        body[0] = 1;              // 1 emitter
+        store_be16(body + 1, 501); // EmitterNumber = 501
+        int total;
+        const uint8_t* frame = make_variant_a(0x0FA4, 1, body, 3, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"break_track_manual\"") != std::string::npos
+               && s.find("\"num_emitters\":1") != std::string::npos
+               && s.find("\"emitter_numbers\":[501]") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_jam_command_manual() {
+    const char* name = "jam_command_manual";
+    try {
+        uint8_t body[5] = {};
+        body[0] = 1;
+        store_be16(body + 1, 510); // EmitterNumber
+        store_be16(body + 3, 25);  // JamDuration sec
+        int total;
+        const uint8_t* frame = make_variant_a(0x0FA5, 1, body, 5, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"jam_command_manual\"") != std::string::npos
+               && s.find("\"emitter_number\":510") != std::string::npos
+               && s.find("\"jam_duration_sec\":25") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_stop_jam_manual() {
+    const char* name = "stop_jam_manual";
+    try {
+        uint8_t body[3] = {};
+        body[0] = 1;
+        store_be16(body + 1, 520);
+        int total;
+        const uint8_t* frame = make_variant_a(0x0FA6, 1, body, 3, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"stop_jam_manual\"") != std::string::npos
+               && s.find("\"emitter_numbers\":[520]") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_track_and_jam_manual() {
+    const char* name = "track_and_jam_manual";
+    try {
+        uint8_t body[69] = {};
+        store_be16(body + 0, 501);      // TrackNo
+        store_be16(body + 2, 1800);     // DOA = 180.0 deg
+        store_be32(body + 4, 1500000);  // Frequency KHz
+        body[40] = 7;                   // ThreatLevel
+        store_be16(body + 67, 15);      // JamDuration sec
+        int total;
+        const uint8_t* frame = make_variant_a(0x0FA7, 1, body, 69, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"track_and_jam_manual\"") != std::string::npos
+               && s.find("\"track_no\":501") != std::string::npos
+               && s.find("\"jam_duration_sec\":15") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_update_track_manual() {
+    const char* name = "update_track_manual";
+    try {
+        // EmitterNumber(2B) + NumParams(1B) + [code=1 DOA(2B)] + [code=7 Amplitude(1B)]
+        uint8_t body[3 + (1 + 2) + (1 + 1)] = {};
+        store_be16(body + 0, 505); // EmitterNumber
+        body[2] = 2;               // 2 parameters
+        body[3] = 1;               // ParameterCode 1 = DOA
+        store_be16(body + 4, 2700); // DOA = 270.0 deg
+        body[6] = 7;                // ParameterCode 7 = Amplitude
+        body[7] = static_cast<uint8_t>(-45); // Amplitude = -45 dBm
+        int total;
+        const uint8_t* frame = make_variant_a(0x0FA8, 1, body, sizeof(body), &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"update_track_manual\"") != std::string::npos
+               && s.find("\"emitter_number\":505") != std::string::npos
+               && s.find("\"num_parameters\":2") != std::string::npos
+               && s.find("\"parameter_code\":1") != std::string::npos
+               && s.find("\"parameter_value_hex\":\"0A 8C\"") != std::string::npos
+               && s.find("\"parameter_code\":7") != std::string::npos
+               && s.find("\"parameter_value_hex\":\"D3\"") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_reset_ea_subsystem() {
+    const char* name = "reset_ea_subsystem";
+    try {
+        int total;
+        const uint8_t* frame = make_variant_a(0x0FB0, 1, nullptr, 0, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"reset_ea_subsystem\"") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_change_mode_manual() {
+    const char* name = "change_mode_manual";
+    try {
+        uint8_t body[1] = { 2 }; // Manual mode
+        int total;
+        const uint8_t* frame = make_variant_a(0x0FAE, 1, body, 1, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"change_mode_manual\"") != std::string::npos
+               && s.find("\"mode_value\":2") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_set_forbidden_bands() {
+    const char* name = "set_forbidden_bands";
+    try {
+        uint8_t body[5] = {};
+        body[0] = 1;                // 1 band
+        store_be16(body + 1, 2000); // start MHz
+        store_be16(body + 3, 4000); // stop MHz
+        int total;
+        const uint8_t* frame = make_variant_a(0x1120, 1, body, 5, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"set_forbidden_bands\"") != std::string::npos
+               && s.find("\"start_freq_mhz\":2000") != std::string::npos
+               && s.find("\"stop_freq_mhz\":4000") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_platform_heading_to_ea() {
+    const char* name = "platform_heading_to_ea";
+    try {
+        uint8_t body[2] = {};
+        store_be16(body + 0, 900); // 90.0 deg
+        int total;
+        const uint8_t* frame = make_variant_a(0x1108, 1, body, 2, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"platform_heading_to_ea\"") != std::string::npos
+               && s.find("\"heading_deg\":90") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_set_prohibited_sectors() {
+    const char* name = "set_prohibited_sectors";
+    try {
+        uint8_t body[6] = {};
+        body[0] = 1;                // 1 sector
+        body[1] = 3;                // EntryID = 3
+        store_be16(body + 2, 100);  // Start = 10.0 deg
+        store_be16(body + 4, 500);  // Stop = 50.0 deg
+        int total;
+        const uint8_t* frame = make_variant_a(0x1121, 1, body, 6, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"set_prohibited_sectors\"") != std::string::npos
+               && s.find("\"entry_id\":3") != std::string::npos
+               && s.find("\"start_deg\":10") != std::string::npos
+               && s.find("\"stop_deg\":50") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
+static void test_ecm_operational_status() {
+    const char* name = "ecm_operational_status";
+    try {
+        uint8_t body[37] = {};
+        body[0] = 1; // 1 track
+        store_be16(body + 1, 505);   // EmitterNumber
+        store_be32(body + 3, 8000);  // Frequency MHz
+        store_be16(body + 7, 1200);  // Azimuth = 120.0 deg
+        store_be16(body + 9, 100);   // Elevation = 10.0 deg
+        body[11] = 0x03;             // ThreatStatus bits
+        // JPRO at offset 12 (24 bytes), RTGStatus at offset 36
+        body[36] = 1; // RTG ON
+        int total;
+        const uint8_t* frame = make_variant_a(0x111D, 1, body, 37, &total);
+        std::string s = extract_and_parse(frame, total);
+        bool ok = s.find("\"msg_type\":\"ecm_operational_status\"") != std::string::npos
+               && s.find("\"emitter_number\":505") != std::string::npos
+               && s.find("\"rtg_status\":1") != std::string::npos;
+        if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
+    } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
+}
+
 static void test_purge_passive_purge_all() {
     const char* name = "purge_passive_purge_all";
     try {
@@ -499,7 +744,7 @@ static void test_purge_passive_purge_all() {
         std::string s = extract_and_parse(frame, total);
 
         bool ok = s.find("\"msg_type\":\"purge_passive_track\"") != std::string::npos
-               && s.find("\"action\":\"purge_all\"") != std::string::npos;
+               && s.find("\"num_tracks\":0") != std::string::npos;
         if (ok) TEST_PASS(name); else TEST_FAIL(name, "JSON content unexpected");
     } catch (const std::exception& e) { TEST_FAIL(name, e.what()); }
 }
@@ -536,6 +781,17 @@ int main() {
     test_incomplete_variant_a();
     test_corrupt_variant_a_eom();
     test_purge_passive_purge_all();
+    test_break_track_manual();
+    test_jam_command_manual();
+    test_stop_jam_manual();
+    test_track_and_jam_manual();
+    test_update_track_manual();
+    test_reset_ea_subsystem();
+    test_change_mode_manual();
+    test_set_forbidden_bands();
+    test_platform_heading_to_ea();
+    test_set_prohibited_sectors();
+    test_ecm_operational_status();
     test_free_null();
 
     std::printf("\nResults: %d passed, %d failed\n", pass_count, fail_count);
